@@ -275,9 +275,16 @@ describe('cross-platform desktop packaging', () => {
     const config = await readFile(path.join(desktopRoot, 'electron-builder.yml'), 'utf8');
     const supportedTuples = ['darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64', 'win32-arm64', 'win32-x64'];
     expect(runtimeDependencies.schemaVersion).toBe(1);
-    expect(runtimeDependencies.tunnelClient.version).toBe('0.0.14');
-    expect(runtimeDependencies.ripgrep.version).toBe('15.2.0');
-    expect(runtimeDependencies.pdfProvider).toMatchObject({ version: '26.07.0-0', platform: 'win32', arch: 'x64' });
+    expect(runtimeDependencies.tunnelClient.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(runtimeDependencies.tunnelClient.provenanceAsset)
+      .toBe(`tunnel-client-v${runtimeDependencies.tunnelClient.version}-provenance.sigstore.json`);
+    expect(runtimeDependencies.ripgrep.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(runtimeDependencies.pdfProvider).toMatchObject({ platform: 'win32', arch: 'x64' });
+    expect(runtimeDependencies.pdfProvider.version).toMatch(/^\d+\.\d+\.\d+-\d+$/);
+    expect(runtimeDependencies.pdfProvider.popplerVersion).toBe(runtimeDependencies.pdfProvider.version.replace(/-\d+$/, ''));
+    expect(runtimeDependencies.pdfProvider.sourceUrl)
+      .toContain(`/v${runtimeDependencies.pdfProvider.version}/Release-${runtimeDependencies.pdfProvider.version}.zip`);
+    expect(runtimeDependencies.pdfProvider.archiveSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(Object.keys(runtimeDependencies.tunnelClient.targets).sort()).toEqual(supportedTuples);
     expect(Object.keys(runtimeDependencies.ripgrep.targets).sort()).toEqual(supportedTuples);
     for (const target of Object.values(runtimeDependencies.tunnelClient.targets) as Array<{ archiveSha256: string }>) {
@@ -318,6 +325,15 @@ describe('cross-platform desktop packaging', () => {
     expect(await readFile(path.join(repositoryRoot, 'native', 'macos-host', 'Package.swift'), 'utf8')).toContain('LnwjudMacHost');
     expect(await readFile(path.join(repositoryRoot, 'native', 'linux-host', 'Cargo.toml'), 'utf8')).toContain('lnwjud-linux-host');
     expect(config).toContain('from: ../../native/windows-secret-migrator/bin/win-x64');
+  });
+
+  it('generates ignored stdio launchers before validating automated runtime dependency updates', async () => {
+    const workflow = await readFile(path.join(repositoryRoot, '.github', 'workflows', 'runtime-dependency-update.yml'), 'utf8');
+    const generateLauncher = 'node apps/desktop/scripts/write-stdio-launcher.mjs';
+    const packagingGate = 'corepack pnpm@10.15.0 test:packaging';
+    expect(workflow).toContain(generateLauncher);
+    expect(workflow).toContain(packagingGate);
+    expect(workflow.indexOf(generateLauncher)).toBeLessThan(workflow.indexOf(packagingGate));
   });
 
   it('defines a dedicated Portable update manifest instead of reusing the Installer feed', async () => {

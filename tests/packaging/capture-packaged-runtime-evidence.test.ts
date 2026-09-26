@@ -92,10 +92,15 @@ async function fixture(platform: 'linux' | 'darwin', arch = 'x64'): Promise<{
     verified: { archiveSha256: true, executableVersion: true, executableBit: true },
   };
   await put(`${resources}/runtime-tools/ripgrep/BUNDLED_RIPGREP.json`, JSON.stringify({ ...manifest, executable: 'rg' }));
-  const prefix = `tunnel-client-v0.0.14-${platform}-${arch === 'x64' ? 'amd64' : 'arm64'}`;
-  const evidence = [`${prefix}-licenses.txt`, `${prefix}.spdx.json`, 'tunnel-client-v0.0.14-provenance.sigstore.json'];
+  const runtimeDependencies = JSON.parse(
+    await fs.readFile(path.resolve('apps/desktop/src/main/runtime-dependencies.json'), 'utf8'),
+  ) as { tunnelClient: { version: string; provenanceAsset: string; targets: Record<string, { releaseTarget: string; releaseArch: string }> } };
+  const tunnelDependency = runtimeDependencies.tunnelClient;
+  const target = tunnelDependency.targets[`${platform}-${arch}`];
+  const prefix = `tunnel-client-v${tunnelDependency.version}-${target.releaseTarget}-${target.releaseArch}`;
+  const evidence = [`${prefix}-licenses.txt`, `${prefix}.spdx.json`, tunnelDependency.provenanceAsset];
   await put(`${resources}/tunnel-client/BUNDLED_TUNNEL_CLIENT.json`, JSON.stringify({
-    ...manifest, version: '0.0.14', executable: 'tunnel-client', asset: `${prefix}.zip`,
+    ...manifest, version: tunnelDependency.version, executable: 'tunnel-client', asset: `${prefix}.zip`,
     licenseAsset: evidence[0], spdxAsset: evidence[1], provenanceAsset: evidence[2],
   }));
   for (const name of evidence) await put(`${resources}/tunnel-client/${name}`, '{}');
