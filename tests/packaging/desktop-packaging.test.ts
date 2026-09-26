@@ -327,13 +327,16 @@ describe('cross-platform desktop packaging', () => {
     expect(config).toContain('from: ../../native/windows-secret-migrator/bin/win-x64');
   });
 
-  it('generates ignored stdio launchers before validating automated runtime dependency updates', async () => {
+  it('prepares generated launchers and desktop bundles before validating automated runtime dependency updates', async () => {
     const workflow = await readFile(path.join(repositoryRoot, '.github', 'workflows', 'runtime-dependency-update.yml'), 'utf8');
     const generateLauncher = 'node apps/desktop/scripts/write-stdio-launcher.mjs';
+    const desktopBuild = 'corepack pnpm@10.15.0 --filter @lnwjud/desktop build';
     const packagingGate = 'corepack pnpm@10.15.0 test:packaging';
     expect(workflow).toContain(generateLauncher);
+    expect(workflow).toContain(desktopBuild);
     expect(workflow).toContain(packagingGate);
-    expect(workflow.indexOf(generateLauncher)).toBeLessThan(workflow.indexOf(packagingGate));
+    expect(workflow.indexOf(generateLauncher)).toBeLessThan(workflow.indexOf(desktopBuild));
+    expect(workflow.indexOf(desktopBuild)).toBeLessThan(workflow.indexOf(packagingGate));
   });
 
   it('defines a dedicated Portable update manifest instead of reusing the Installer feed', async () => {
