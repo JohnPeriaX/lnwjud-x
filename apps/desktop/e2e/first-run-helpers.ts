@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { STARTUP_CORE_CHECK_IDS } from '../src/renderer/features/onboarding/startup-doctor-state.js';
 
 const HOME_HEADING = /^(ศูนย์ควบคุม Agent|Agent Control Center)$/;
 const HOME_NAV = /^(หน้าหลัก|Home)$/;
@@ -91,9 +92,9 @@ async function startupCoreFailures(page: Page): Promise<readonly {
   readonly detail?: string;
   readonly durationMs: number;
 }[]> {
-  return page.evaluate(async () => {
-    const coreIds = new Set(['os', 'database', 'executable_ripgrep', 'mcp-port']);
-    const report = await window.lnwjud.runDoctor();
+  return page.evaluate(async (requiredIds) => {
+    const coreIds = new Set(requiredIds);
+    const { doctor: report } = await window.lnwjud.recheckToolCatalog({ locale: 'en', requirementIds: requiredIds });
     return report.checks
       .filter((check) => coreIds.has(check.id) && (check.status === 'fail' || check.status === 'unknown'))
       .map(({ id, status, message, detail, durationMs }) => ({
@@ -103,5 +104,5 @@ async function startupCoreFailures(page: Page): Promise<readonly {
         ...(detail === undefined ? {} : { detail }),
         durationMs,
       }));
-  });
+  }, [...STARTUP_CORE_CHECK_IDS]);
 }
