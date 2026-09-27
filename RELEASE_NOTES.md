@@ -2,6 +2,13 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.6.5
+
+- **Agent Swarm visibility updates without restarting lnwjud:** enabling or disabling Codex delegation now updates the live MCP tool list. The per-tool `agent_swarm_run` switch still applies, and turning Codex delegation off immediately hides Codex and Agent Swarm tools. Active Desktop HTTP/Tunnel sessions receive the change; local STDIO detects Settings changes written by the Desktop process.
+- **Actual invocation verified:** the regression exercises a connected MCP client's `tools/list` and a read-only `agent_swarm_run` list call, not just lnwjud's internal schema registry. The tool remains permission-gated for starting or cancelling a swarm.
+- **Simpler setup and recovery:** Settings names both required switches and shows `agent_swarm_run` in its preview. If ChatGPT holds an older app-tool snapshot, refresh or rescan the connected app's tools after saving.
+- **Additional fixes since v5.6.4:** Desktop Agent Stop status survives a refresh (#140), and concurrent startup publishes a checkpoint encryption key only after its write finishes (#141).
+
 ### What's new in v5.6.4
 
 - **Existing Secure Tunnels recover after restart:** lnwjud updates its local MCP destination when the port changes. On Windows, it checks for an older client using the same lnwjud profile and Tunnel ID and closes it only when its identity can be verified. An unverified client is left alone and shown as an error; restarting Windows is the simple recovery path.

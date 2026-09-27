@@ -440,7 +440,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
   migrateLegacyMcpHttpPort(settingsRepository, process.env);
   const toolAvailabilityService = new ToolAvailabilityService(settingsRepository);
   const stopToolAvailabilityWatch = options.watchToolAvailability === true
-    ? toolAvailabilityService.watch(250)
+    ? toolAvailabilityService.watch(250, () => readUserSettings(settingsRepository, process.env).codexToolsEnabled)
     : (): void => {};
   const workLogViewState = new WorkLogViewState(settingsRepository);
   if (options.previousLogSessionStartedAt !== undefined) workLogViewState.migrateAutomaticStartupClear(options.previousLogSessionStartedAt);
@@ -720,7 +720,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
         (await resolveActiveProjectWorkspaces()).map((workspace) => ({ workspaceId: workspace.id, rootPath: workspace.realRootPath }))
       ),
       ...(options.hostMutationApprovalProvider === undefined ? {} : { hostMutationApprovalProvider: options.hostMutationApprovalProvider }),
-      codexToolsEnabled: readSettings().codexToolsEnabled,
+      codexToolsEnabledProvider: () => readSettings().codexToolsEnabled,
       ponytailModeProvider: () => readSettings().ponytailMode,
       toolAvailabilitySnapshotProvider: () => toolAvailabilityService.snapshot(),
       toolAvailabilitySubscribe: (listener) => toolAvailabilityService.subscribe(listener),
@@ -1764,6 +1764,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
       };
       persistUserSettings(settingsRepository, normalizedSettings);
       const next = readSettings();
+      if (previous.codexToolsEnabled !== next.codexToolsEnabled) toolAvailabilityService.notifyEligibilityChanged();
       const reconciledMcp = await extensionsService.listMcpServers().catch(() => undefined);
       if (reconciledMcp?.ok) {
         const unverified = reconciledMcp.value.servers.filter((server) => server.lifecycle === 'termination_unverified');
@@ -2589,7 +2590,6 @@ function runtimeRestartRequired(previous: UserSettings, next: UserSettings): boo
     || previous.mcpIdleTimeoutMs !== next.mcpIdleTimeoutMs
     || previous.mcpHttpPort !== next.mcpHttpPort
     || JSON.stringify(previous.mcpAllowedHostnames) !== JSON.stringify(next.mcpAllowedHostnames)
-    || previous.codexToolsEnabled !== next.codexToolsEnabled
     || previous.ponytailMode !== next.ponytailMode
     || JSON.stringify(previous.lspCommands) !== JSON.stringify(next.lspCommands)
     || JSON.stringify(previous.customPermission) !== JSON.stringify(next.customPermission);

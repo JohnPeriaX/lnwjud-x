@@ -21,6 +21,51 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.6.5',
+    categories: [
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          {
+            id: 'agent-swarm-live-exposure',
+            titleKey: 'whatsNew.565.agentSwarm.title',
+            descriptionKey: 'whatsNew.565.agentSwarm.description',
+            badge: 'fixed',
+            tags: ['Agent Swarm', 'Codex', 'MCP'],
+          },
+          {
+            id: 'agent-swarm-setup',
+            titleKey: 'whatsNew.565.agentSwarmSetup.title',
+            descriptionKey: 'whatsNew.565.agentSwarmSetup.description',
+            badge: 'improved',
+            tags: ['Settings', 'ChatGPT'],
+          },
+          {
+            id: 'desktop-agent-stop-status',
+            titleKey: 'whatsNew.565.desktopAgentStop.title',
+            descriptionKey: 'whatsNew.565.desktopAgentStop.description',
+            badge: 'fixed',
+            tags: ['Desktop Agent', 'Status'],
+          },
+        ],
+      },
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          {
+            id: 'checkpoint-key-startup',
+            titleKey: 'whatsNew.565.checkpointKey.title',
+            descriptionKey: 'whatsNew.565.checkpointKey.description',
+            badge: 'fixed',
+            tags: ['Recovery', 'Startup'],
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.6.4',
     categories: [
       {

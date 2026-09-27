@@ -279,6 +279,112 @@ describe('DesktopRuntime persistence', () => {
     }
   }, RUNTIME_TEST_TIMEOUT_MS);
 
+  it('publishes Agent Swarm to an already connected MCP client when Codex opt-in changes', async () => {
+    const rawDataRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-runtime-live-codex-data-'));
+    const rawWorkspaceRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-runtime-live-codex-workspace-'));
+    temporaryRoots.push(rawDataRoot, rawWorkspaceRoot);
+    const runtime = createDesktopRuntime(await realpath(rawDataRoot));
+    try {
+      const workspace = await runtime.services.addWorkspace({ rootPath: await realpath(rawWorkspaceRoot) });
+      const status = await runtime.services.startMcp({ workspaceId: workspace.id });
+      expect(status.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/mcp$/);
+      if (status.url === null) return;
+
+      const client = new Client({ name: 'desktop-live-codex-test', version: '1.0.0' });
+      try {
+        await client.connect(new StreamableHTTPClientTransport(new URL(status.url)));
+        runtime.toolAvailabilityService.setToolEnabled('agent_swarm_run', true);
+        expect((await client.listTools()).tools.map((tool) => tool.name)).not.toContain('agent_swarm_run');
+
+        const saved = await runtime.services.setUserSettings({
+          settings: { ...runtime.getUserSettings(), codexToolsEnabled: true },
+        });
+        await vi.waitFor(async () => {
+          const names = (await client.listTools()).tools.map((tool) => tool.name);
+          expect(names).toContain('agent_swarm_run');
+          expect(names).toContain('codex_run');
+        });
+        const swarmList = await client.callTool({ name: 'agent_swarm_run', arguments: { operation: 'list', workspaceId: workspace.id } });
+        expect(swarmList.isError).not.toBe(true);
+        expect(saved.restartRequired).toBe(false);
+
+        await runtime.services.setUserSettings({
+          settings: { ...runtime.getUserSettings(), codexToolsEnabled: false },
+        });
+        await vi.waitFor(async () => {
+          expect((await client.listTools()).tools.map((tool) => tool.name)).not.toContain('agent_swarm_run');
+        });
+        await expect(runtime.services.getDashboard()).resolves.toMatchObject({ mcp: { url: status.url } });
+      } finally {
+        await client.close().catch(() => undefined);
+      }
+    } finally {
+      await runtime.close();
+    }
+  }, RUNTIME_TEST_TIMEOUT_MS);
+
+  it('publishes Agent Swarm when Codex is enabled before the MCP client connects', async () => {
+    const rawDataRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-runtime-start-codex-data-'));
+    const rawWorkspaceRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-runtime-start-codex-workspace-'));
+    temporaryRoots.push(rawDataRoot, rawWorkspaceRoot);
+    const runtime = createDesktopRuntime(await realpath(rawDataRoot));
+    try {
+      await runtime.services.setUserSettings({ settings: { ...runtime.getUserSettings(), codexToolsEnabled: true } });
+      const workspace = await runtime.services.addWorkspace({ rootPath: await realpath(rawWorkspaceRoot) });
+      expect(runtime.getUserSettings().codexToolsEnabled).toBe(true);
+      expect(runtime.mcpServices.agentSwarm).toBeDefined();
+      expect(new ToolRegistry(runtime.mcpServices, runtime.mcpActor, { codexToolsEnabled: true }).list().map((tool) => tool.name)).toContain('agent_swarm_run');
+      const status = await runtime.services.startMcp({ workspaceId: workspace.id });
+      expect(status.url).not.toBeNull();
+      if (status.url === null) return;
+      const client = new Client({ name: 'desktop-start-codex-test', version: '1.0.0' });
+      try {
+        await client.connect(new StreamableHTTPClientTransport(new URL(status.url)));
+        expect((await client.listTools()).tools.map((tool) => tool.name)).toContain('agent_swarm_run');
+      } finally {
+        await client.close().catch(() => undefined);
+      }
+    } finally {
+      await runtime.close();
+    }
+  }, RUNTIME_TEST_TIMEOUT_MS);
+
+  it('updates a long-lived MCP process when another process changes Codex opt-in', async () => {
+    const rawDataRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-runtime-external-codex-data-'));
+    const rawWorkspaceRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-runtime-external-codex-workspace-'));
+    temporaryRoots.push(rawDataRoot, rawWorkspaceRoot);
+    const dataRoot = await realpath(rawDataRoot);
+    const runtime = createDesktopRuntime(dataRoot, { watchToolAvailability: true });
+    const externalDatabase = new SqliteDatabase(path.join(dataRoot, 'lnwjud.sqlite'));
+    try {
+      const workspace = await runtime.services.addWorkspace({ rootPath: await realpath(rawWorkspaceRoot) });
+      const status = await runtime.services.startMcp({ workspaceId: workspace.id });
+      expect(status.url).not.toBeNull();
+      if (status.url === null) return;
+      const client = new Client({ name: 'desktop-external-codex-test', version: '1.0.0' });
+      try {
+        await client.connect(new StreamableHTTPClientTransport(new URL(status.url)));
+        expect((await client.listTools()).tools.map((tool) => tool.name)).not.toContain('agent_swarm_run');
+
+        const externalSettings = new SqliteSettingsRepository(externalDatabase);
+        externalSettings.set(USER_SETTING_KEYS.codexToolsEnabled, 'true');
+        await vi.waitFor(async () => {
+          expect((await client.listTools()).tools.map((tool) => tool.name)).toContain('agent_swarm_run');
+        });
+
+        externalSettings.set(USER_SETTING_KEYS.codexToolsEnabled, 'false');
+        await vi.waitFor(async () => {
+          expect((await client.listTools()).tools.map((tool) => tool.name)).not.toContain('agent_swarm_run');
+        });
+      } finally {
+        await client.close().catch(() => undefined);
+      }
+    } finally {
+      externalDatabase.close();
+      await runtime.close();
+    }
+  }, RUNTIME_TEST_TIMEOUT_MS);
+
   it('persists user tool availability across a Desktop runtime restart', async () => {
     const rawDataRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-runtime-tool-availability-restart-'));
     temporaryRoots.push(rawDataRoot);

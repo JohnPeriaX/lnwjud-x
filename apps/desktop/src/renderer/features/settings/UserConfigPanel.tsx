@@ -272,7 +272,7 @@ export function UserConfigPanel({ locale, hostPlatform, hostArch, permissionProf
               onChange={(value) => patch({ codexToolsEnabled: value })}
             />
             <div className="codex-tool-preview" aria-label={t('userConfig.codexToolExposure')}>
-              <span>codex_run</span><span>codex_status</span><span>codex_stop</span><span>codex_task_*</span>
+              <span>codex_run</span><span>codex_status</span><span>codex_stop</span><span>codex_task_*</span><span>agent_swarm_run</span>
             </div>
             <p className="hint">{t('userConfig.codexRestartHint')}</p>
           </section>

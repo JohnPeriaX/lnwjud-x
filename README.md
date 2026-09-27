@@ -53,9 +53,17 @@
 
 ## Current published version: v5.6.4
 
-## Current source version: v5.6.4
+## Current source version: v5.6.5
 
 Latest published release: **v5.6.4**. The download buttons above point directly to the v5.6.4 assets. The release is published only after the exact tagged main commit passes the target-native release gates.
+
+### What's new in v5.6.5
+
+- **Agent Swarm appears when enabled:** turn on Codex delegation in Settings and enable `agent_swarm_run` on the Tools page. Saving either setting updates the running MCP tool list, including an active Tunnel or local STDIO connection. You no longer need to restart lnwjud just to expose the tool.
+- **Clearer setup:** Settings now shows `agent_swarm_run` in its tool preview and explains both switches. If ChatGPT still shows an older tool list, refresh or rescan the connected app's tools in ChatGPT.
+- **Reliability fixes since v5.6.4:** the Desktop Agent Stop state remains accurate after a refresh, and concurrent startup no longer exposes a partially written checkpoint encryption key.
+
+See the [Thai troubleshooting guide](docs/USAGE_TH.md#13-doctor--troubleshooting) for simple Agent Swarm setup steps.
 
 ### What's new in v5.6.4
 
@@ -76,15 +84,6 @@ v5.6.3 fixes Secure Tunnel discovery and Codex runtime detection, updates the bu
 - **Bounded recovery storage:** the existing Recovery retention policy now also expires database backups that were rotated into `retention-archive`; the normal default remains 30 days.
 - **Explicit category cleanup:** Recovery Settings adds independently confirmed “delete all” actions for Recovery Trash, checkpoints, and database backups. Backend deletion is scoped to validated lnwjud recovery records/artifacts rather than recursively deleting unrelated files.
 - **Faster CI without weaker gates:** redundant process/extensions test executions were removed from Desktop shards because the same suites remain covered by the all-platform native contract matrix on Windows, macOS, and Linux.
-
-### What's new in v5.6.2
-
-v5.6.2 fixes four reliability issues across the MCP context pipeline, scheduled continuation, and Secure Tunnel UI.
-
-- **Context Economy persists across Modern HTTP requests:** request-scoped MCP server recreation now reuses a transport-scoped Context Economy runtime, so `context_economy_stats` keeps its ledger and repeated context retrievals can produce ledger hits.
-- **Binary context stays metadata-only:** `.DS_Store` is ignored by default, and Base64/binary file reads are detected from the file-reader encoding before text-context assembly, preventing long binary payloads from leaking into `workspace_context`.
-- **Secure Tunnel transition lock:** Settings now receives the App-level tunnel busy state and disables Start/Stop controls while tunnel start or stop is in flight, preventing repeated-click overlap.
-- **Host-safe scheduled claim binding:** Native watchdog wakes can pass their expected `goalId` and `workspaceId` with `claim_scheduled_continuation`; lnwjud validates both identities before liveness or lease mutation while legacy continuation-only callers remain compatible.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for earlier versions and the complete release history.
 
@@ -118,7 +117,7 @@ Installed lnwjud keeps per-user runtime data outside your source repository: `%A
 
 ## What can lnwjud do?
 
-lnwjud exposes **259 tool definitions** through one local runtime and MCP gateway. The default advertised set is 247; all 259 are available when Codex delegation plus Agent Swarm is enabled.
+lnwjud exposes **276 tool definitions** through one local runtime and MCP gateway. The default advertised set is 264; all 276 are available when Codex delegation plus Agent Swarm is enabled.
 
 | Area | Examples |
 | --- | --- |

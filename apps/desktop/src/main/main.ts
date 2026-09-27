@@ -1778,7 +1778,7 @@ function bootstrapMcpStdio(): void {
       activeWorkspaceScopeProvider: () => runtime.getActiveWorkspaceScope(),
       activeWorkspaceScopesProvider: () => runtime.getActiveWorkspaceScopes(),
       hostMutationApprovalProvider: requestNativeMutationApproval,
-      codexToolsEnabled: runtime.getUserSettings().codexToolsEnabled,
+      codexToolsEnabledProvider: () => runtime.getUserSettings().codexToolsEnabled,
       ponytailModeProvider: () => runtime.getUserSettings().ponytailMode,
       toolAvailabilitySnapshotProvider: () => runtime.toolAvailabilityService.snapshot(),
       toolAvailabilitySubscribe: (listener) => runtime.toolAvailabilityService.subscribe(listener),
