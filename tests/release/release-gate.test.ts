@@ -250,13 +250,14 @@ describe('MVP release verification gate', () => {
     expect(release).toContain('node scripts/collect-release-assets.mjs');
     expect(release).toContain('release-assets/*');
     expect(releaseNotes).toContain('`RELEASE_MANIFEST.json`');
-    expect(release).toContain('Generate standardized release notes');
+    expect(release).toContain('Generate and validate user-facing release notes');
     expect(release).toContain('node scripts/release-notes.mjs');
     expect(release).toContain('generate_release_notes: false');
     expect(release).toContain('body_path: release-notes.md');
     expect(release).not.toContain('generate_release_notes: true');
     expect(release).toContain("LNWJUD_RELEASE_ARTIFACT_ONLY: '1'");
     expect(release.indexOf('Download verified target-native CI artifacts')).toBeLessThan(release.indexOf('Verify each downloaded release evidence bundle'));
+    expect(release.indexOf('Generate and validate user-facing release notes')).toBeLessThan(release.indexOf('Download verified target-native CI artifacts'));
     expect(release.indexOf('Verify each downloaded release evidence bundle')).toBeLessThan(release.indexOf('Aggregate target-native artifacts and update feeds'));
     expect(release).not.toContain('verify-release.ps1');
     expect(release).not.toContain('package:windows');
