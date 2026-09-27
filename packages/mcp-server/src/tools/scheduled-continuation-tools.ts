@@ -8,7 +8,10 @@ import { defineTool, missingService, type McpToolContext, type McpToolDefinition
 const continuationId = z.string().min(1).max(128);
 const goalId = z.string().min(1).max(128);
 const leaseToken = z.string().min(1).max(256);
-const connectorMention = z.string().min(2).max(128).regex(/^@[\p{L}\p{N}][\p{L}\p{N}\p{M}._-]*$/u);
+// Keep Unicode validation at runtime: JSON Schema regexes are not portable across
+// clients, and Python validators reject the \p escapes from this expression.
+const connectorMentionPattern = /^@[\p{L}\p{N}][\p{L}\p{N}\p{M}._-]*$/u;
+const connectorMention = z.string().min(2).max(128).refine((value) => connectorMentionPattern.test(value));
 const evidence = z.object({
   kind: z.enum(['path', 'hash', 'task', 'note']),
   value: z.string().min(1).max(1024),

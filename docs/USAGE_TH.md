@@ -1,8 +1,8 @@
-# คู่มือใช้งาน lnwjud v5.6.3 (ภาษาไทย)
+# คู่มือใช้งาน lnwjud v5.6.4 (ภาษาไทย)
 
 lnwjud คือ cross-platform local AI-agent runtime / MCP gateway สำหรับให้ ChatGPT, Codex และ MCP client อื่นทำงานกับเครื่องของคุณ เช่น อ่าน/ค้น/แก้ไฟล์, Git, รันโปรเซส และเครื่องมือพัฒนาอื่น ๆ โดยงานจริงยังทำบนเครื่องของคุณ ความสามารถ Windows-only เช่น WSL, Registry และ Windows Sandbox จะไม่แสดงเป็นพร้อมใช้งานบน macOS/Linux
 
-คู่มือนี้อัปเดตตาม source `v5.6.3`; public release `v5.6.3` คือรุ่นที่เผยแพร่แล้วบน [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/tag/v5.6.3)
+คู่มือนี้อัปเดตตาม source `v5.6.4`; public release `v5.6.3` คือรุ่นที่เผยแพร่แล้วบน [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/tag/v5.6.3)
 
 > สำหรับผู้ใช้ package ของ lnwjud **ไม่ต้องติดตั้ง Node.js และไม่ต้องดาวน์โหลด `tunnel-client` เอง** ตัว release รวม official OpenAI `tunnel-client v0.0.15` ที่ตรงกับ OS และ architecture ของ target ไว้ให้แล้ว
 
@@ -91,8 +91,8 @@ Portable ของ lnwjud หมายถึง **ตัวโปรแกรม
 2. ดูสถานะ ngrok ก่อน: ถ้าขึ้น **READY / ✓ ngrok พร้อมใช้งาน** แปลว่า lnwjud ตรวจ binary ด้วย `ngrok version` แล้ว ไม่ต้องติดตั้งซ้ำ. ถ้ายังเป็น **NOT READY** หน้า Settings จะแสดงวิธีติดตั้งที่รองรับตาม host เท่านั้น: Windows ใช้ช่องทาง Microsoft Store/WinGet, macOS สามารถใช้ Homebrew เมื่อ Homebrew พร้อม, ส่วน Linux หรือ host ที่ lnwjud ไม่มีวิธีติดตั้งอัตโนมัติที่พิสูจน์แล้วจะซ่อนปุ่ม auto-install และเปิดลิงก์ดาวน์โหลด ngrok ทางการแทน. lnwjud ไม่เอา binary ของ OS/architecture อื่นมาติดตั้งข้ามระบบและไม่แอบใช้ `sudo`/แก้ package repository ให้เอง
 3. เปิดหน้า ngrok Authtoken จากปุ่มใน lnwjud แล้ววาง token ครั้งเดียว; lnwjud เก็บ token ผ่าน secure storage ของ host (Windows DPAPI / macOS Keychain / system keyring ที่รองรับบน Linux) และส่งให้ process ผ่าน `NGROK_AUTHTOKEN` เท่านั้น ไม่ใส่ใน command line หรือ config plaintext. ถ้า secure storage ของ host ใช้งานไม่ได้ ระบบจะ fail closed แทนการลดระดับไปเก็บ plaintext
 4. กด **Start Remote MCP**
-5. เมื่อสถานะเป็น RUNNING ให้กด **Copy MCP URL**. สำหรับ ChatGPT Business ให้ Admin/Owner นำ URL `https://...ngrok.app/mcp` ไปตั้งค่า Workspace Settings → Apps → Create เลือก **OAuth**, Scan Tools, Create แล้ว **Publish** ให้ Workspace; สมาชิกทั่วไปไม่ต้องกรอก Server URL เอง
-6. สมาชิกเปิดแอป lnwjud ที่ Publish แล้วกด **Connect** ได้เลย. เมื่อ ChatGPT ใช้ callback ที่รองรับ รวมถึง callback ของ Plugin/App ที่สร้างใหม่รูปแบบ `https://chatgpt.com/connector/oauth/<redirect_id>` browser จะถูก handoff อัตโนมัติไปยัง one-time URL แบบสุ่มบน `127.0.0.1` ของ lnwjud Desktop ก่อน จากนั้นจึงทำ OAuth DCR + Authorization Code + PKCE และ redirect กลับ ChatGPT **โดยไม่ต้องกรอกรหัสหรือกดยืนยันเพิ่ม**. public ngrok endpoint ใช้ localhost ticket นี้แทนไม่ได้; OAuth client ที่ไม่ตรง callback ที่รองรับจะถูกปฏิเสธแบบ fail closed ด้วย `403 access_denied`
+5. เมื่อสถานะเป็น RUNNING ให้กด **Copy MCP URL**. ถ้าสร้างแอปส่วนตัวใน ChatGPT ให้เปิด **Plugins → + → URL ของเซิร์ฟเวอร์** แล้ววาง URL `https://...ngrok.app/mcp` (รวม `/mcp`) เลือก **OAuth**. ใน **การตั้งค่า OAuth ขั้นสูง** ให้เลือก **Dynamic Client Registration (DCR)** แทน **User-Defined OAuth Client**; lnwjud มีระบบออก Client ID ให้อัตโนมัติ จึงไม่ต้องกรอก OAuth client ID/secret หรือ URL ต่าง ๆ ด้วยมือ. สำหรับ ChatGPT Business ให้ Admin/Owner สร้างแอปใน Workspace Settings → Apps แล้ว Publish ให้สมาชิก
+6. เมื่อเชื่อมครั้งแรก ChatGPT จะพาเบราว์เซอร์ไปยังหน้ารับรองของ lnwjud บน `127.0.0.1`; ตรวจชื่อ ChatGPT และ callback แล้วกด **Approve connection** หนึ่งครั้ง จากนั้นระบบจะกลับไปยัง ChatGPT และใช้งานต่อได้. ต้องเปิด lnwjud บนเครื่องเดียวกับเบราว์เซอร์ที่รับรอง. หากหน้ารับรองไม่เปิด ให้ตรวจว่า Remote MCP ยัง RUNNING และลองเชื่อมใหม่. public ngrok endpoint ใช้ localhost ticket นี้แทนไม่ได้; OAuth client ที่ไม่ตรง callback ที่รองรับจะถูกปฏิเสธแบบ fail closed ด้วย `403 access_denied`
 
 ตั้งแต่ v4.62.0 **ไม่ต้องซื้อหรือจดโดเมนเองเพื่อให้ Public MCP URL คงที่**: บัญชี ngrok มี development domain ที่ระบบกำหนดให้ และเมื่อ lnwjud เปิด Remote MCP สำเร็จครั้งแรก lnwjud จะจำ HTTPS origin นั้นไว้ใน encrypted Remote MCP state. ครั้งถัดไป/หลังอัปเดต lnwjud จะส่ง origin เดิมกลับให้ ngrok ผ่าน `--url` และจะหยุดพร้อมแจ้งเตือนแทนการเปลี่ยน URL ของ ChatGPT แบบเงียบ ๆ หาก ngrok ไม่สามารถใช้ URL เดิมได้. Custom domain ยังเป็นทางเลือกเสริม ไม่ใช่ข้อบังคับ. ถ้าตั้งใจเปลี่ยนบัญชี ngrok หรือโดเมน ให้บันทึก ngrok Authtoken ใหม่หนึ่งครั้งเพื่อ reset URL ที่จำไว้ แล้ว Start Remote MCP เพื่อเรียนรู้ URL ใหม่
 
@@ -193,7 +193,20 @@ Runtime key ถูกเก็บด้วย secure storage ของระบ�
 3. เพิ่ม connection ใหม่
 4. เลือก Connection แบบ **Tunnel**
 5. เลือก Tunnel ที่สร้างไว้ หรือใส่ `tunnel_id`
-6. สร้าง connection แล้วตรวจว่าเห็น tools ของ lnwjud
+6. หากใช้ Runtime API key สำหรับ Tunnel ใน lnwjud ให้เลือก **ไม่มีการยืนยันตัวตน** ในฟอร์ม ChatGPT แล้วสร้างแอป MCP; Runtime API key ใช้ยืนยันตัวตนระหว่าง tunnel-client กับ OpenAI อยู่แล้ว ไม่ใช่ OAuth client ID ของแอป MCP
+7. ตรวจว่าเห็น tools ของ lnwjud หาก ChatGPT แจ้ง `Invalid MCP tool schema` ให้อัปเดต lnwjud เป็น v5.6.4 หรือใหม่กว่า
+
+หน้า admin ของ tunnel-client ใช้ `http://127.0.0.1:<พอร์ตปัจจุบัน>/ui` ซึ่งพอร์ตเปลี่ยนได้ทุกครั้งที่ runtime เริ่มใหม่ ดู URL ของ runtime ที่กำลังรันจาก **Settings → Persistent Tunnel Runtime → Tunnel admin UI** หรือบรรทัด `WEB UI` ล่าสุดใน Tunnel Live Logs; อย่าใช้ `/ui` บนพอร์ต Local MCP (`/mcp`) หรือ URL จาก log รอบเก่า
+
+### สำหรับคนที่เคยเปิด Tunnel ไว้ก่อนอัปเดต
+
+1. ติดตั้ง lnwjud v5.6.4 แล้วเปิดโปรแกรมตามปกติ **ใช้ Tunnel ID เดิมได้เลย** ไม่ต้องสร้าง Tunnel ใหม่ หากเปิด Persistent Tunnel Runtime ไว้ โปรแกรมจะเริ่มเชื่อมต่อให้อัตโนมัติ
+2. ดูสถานะที่ **Settings → เชื่อมต่อ ChatGPT → Persistent Tunnel Runtime** ให้ขึ้นว่า Tunnel กำลังทำงาน หากยังไม่ทำงาน ให้กด **Start Tunnel** ครั้งเดียวและรอจนปุ่มกลับมาใช้งานได้
+3. ใน ChatGPT ถ้ามีแอป MCP เดิมอยู่ ให้กด **Refresh** ที่แอปนั้น หากยังไม่มี ให้สร้างแอป MCP โดยเลือก **Tunnel → Tunnel ID เดิม → ไม่มีการยืนยันตัวตน → สร้าง** ไม่ต้องกรอกช่อง OAuth แม้เคยเห็นข้อความ `Unauthorized - Access token is missing`
+4. ถ้า lnwjud แจ้งว่าไม่สามารถตรวจสอบ Tunnel ตัวเก่าได้อย่างปลอดภัย ให้ **รีสตาร์ต Windows** แล้วเปิด lnwjud ใหม่ จากนั้นลองข้อ 2–3 อีกครั้ง โปรแกรมจะไม่ปิด process ที่ยืนยันไม่ได้เอง บน macOS/Linux หากสงสัยว่ามี runtime เก่าค้าง ให้รีสตาร์ตเครื่องก่อนลองใหม่เช่นกัน
+5. หากยังไม่เชื่อม ให้เปิด **Live Logs → Tunnel** และดูข้อความผิดพลาดล่าสุด เมื่อติดต่อผู้ดูแล ให้ส่งเฉพาะข้อความผิดพลาดโดยปิดบัง Runtime API key และข้อมูลส่วนตัว
+
+กรณีที่พบจริงคือมี `tunnel-client` สองตัวใช้ Tunnel ID เดียวกัน ตัวเก่าชี้ไปยัง MCP พอร์ตที่ปิดแล้ว ทำให้บางคำขอจาก ChatGPT ล้มเหลวเป็น `424 Failed Dependency` และอาจเห็น `Unauthorized - Access token is missing` ในหน้าสร้างแอป การเปลี่ยนไปเลือก OAuth ไม่แก้พอร์ตเก่าที่ค้างอยู่ lnwjud v5.6.4 บน Windows จะหยุดเฉพาะตัวเก่าที่ตรวจยืนยันว่าเป็นของโปรแกรมและใช้ Tunnel ID เดียวกัน
 
 ถ้าเพิ่งอัปเดต lnwjud หรือ tool schema เปลี่ยน:
 
@@ -388,8 +401,8 @@ corepack pnpm@10.15.0 package:windows
 ไฟล์ที่ได้จะอยู่ที่:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.6.3.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.6.3.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.6.4.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.6.4.exe
 apps/desktop/dist/installers/latest.yml
 apps/desktop/dist/installers/portable.yml
 ```

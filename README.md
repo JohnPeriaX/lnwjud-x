@@ -53,9 +53,17 @@
 
 ## Current published version: v5.6.3
 
-## Current source version: v5.6.3
+## Current source version: v5.6.4
 
 Latest published release: **v5.6.3**. The download buttons above point directly to the v5.6.3 assets. The release is published only after the exact tagged main commit passes the target-native release gates.
+
+### In the v5.6.4 source build
+
+- **ChatGPT Tunnel after an app restart:** lnwjud reconnects the existing Tunnel ID to its current local MCP port. On Windows, it closes an older duplicate client only after confirming that it belongs to the same lnwjud Tunnel. If verification is inconclusive, restart Windows and open lnwjud again; there is no need to create another Tunnel ID.
+- **Connect in ChatGPT:** choose **Tunnel**, select your existing Tunnel ID, and choose **No authentication** for lnwjud's Runtime API key setup. The Runtime API key belongs in lnwjud, not in ChatGPT's OAuth fields. If the connection already exists, refresh it after updating. Secure Tunnel is for private/developer-mode connections; public plugin submission needs a public HTTPS MCP endpoint.
+- **Easier to use:** Tunnel buttons are disabled while starting, old Live Log entries keep their real timestamps, and the Git changed-files list fills the available window height.
+
+See the [Thai setup and recovery guide](docs/USAGE_TH.md#5-เชื่อม-lnwjud-เข้ากับ-chatgpt) for step-by-step help. The separate ngrok + OAuth option is described there as well.
 
 ### What's new in v5.6.3
 
