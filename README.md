@@ -22,27 +22,27 @@
 </p>
 
 <h2 align="center">Download lnwjud</h2>
-<p align="center">Choose your platform and download the current v5.6.2 release directly.</p>
+<p align="center">Choose your platform and download the current v5.6.3 release directly.</p>
 
 <table align="center">
   <tr>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Setup-5.6.2.exe">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Setup-5.6.3.exe">
         <img src="assets/download/download-windows.svg" width="300" alt="Download lnwjud for Windows" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Portable-5.6.2.exe">Portable x64</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Portable-5.6.3.exe">Portable x64</a></sub>
     </td>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.2-arm64.dmg">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.3-arm64.dmg">
         <img src="assets/download/download-macos.svg" width="300" alt="Download lnwjud for macOS" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.2-x64.dmg">Intel x64 DMG</a> · <a href="docs/INSTALL_MACOS.md">Install guide</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.3-x64.dmg">Intel x64 DMG</a> · <a href="docs/INSTALL_MACOS.md">Install guide</a></sub>
     </td>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.2-x64.deb">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.3-x64.deb">
         <img src="assets/download/download-linux.svg" width="300" alt="Download lnwjud for Linux" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.2-x64.AppImage">x64 AppImage</a> · <a href="docs/INSTALL_LINUX.md">Other architectures</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.3-x64.AppImage">x64 AppImage</a> · <a href="docs/INSTALL_LINUX.md">Other architectures</a></sub>
     </td>
   </tr>
 </table>
@@ -51,11 +51,22 @@
 
 ---
 
-## Current published version: v5.6.2
+## Current published version: v5.6.3
 
-## Current source version: v5.6.2
+## Current source version: v5.6.3
 
-Latest published release: **v5.6.2**. The download buttons above point directly to the v5.6.2 assets. The release is published only after the exact tagged main commit passes the target-native release gates.
+Latest published release: **v5.6.3**. The download buttons above point directly to the v5.6.3 assets. The release is published only after the exact tagged main commit passes the target-native release gates.
+
+### What's new in v5.6.3
+
+v5.6.3 fixes Secure Tunnel discovery and Codex runtime detection, updates the bundled OpenAI tunnel runtime, and prevents recovery data from growing without bound.
+
+- **Secure Tunnel no-auth discovery:** the Desktop MCP listener now returns empty 404 responses for protected-resource metadata candidates, matching the no-auth contract used by `sample_mcp_remote_no_auth` in OpenAI `tunnel-client` and eliminating the previous `invalid character 'N'` failure caused by a `text/plain Not found` body.
+- **OpenAI tunnel-client v0.0.15:** packaged runtimes are pinned to official v0.0.15 target-native artifacts with SHA-256 and Sigstore provenance verification. The daily dependency workflow still checks upstream releases, while installed users receive the new bundled runtime through a normal lnwjud app update.
+- **Windows Codex detection:** Requirements now falls back to the official `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex\\bin` install path when the Desktop process inherited an older PATH, avoiding a false “Codex is not installed” warning after Codex is installed.
+- **Bounded recovery storage:** the existing Recovery retention policy now also expires database backups that were rotated into `retention-archive`; the normal default remains 30 days.
+- **Explicit category cleanup:** Recovery Settings adds independently confirmed “delete all” actions for Recovery Trash, checkpoints, and database backups. Backend deletion is scoped to validated lnwjud recovery records/artifacts rather than recursively deleting unrelated files.
+- **Faster CI without weaker gates:** redundant process/extensions test executions were removed from Desktop shards because the same suites remain covered by the all-platform native contract matrix on Windows, macOS, and Linux.
 
 ### What's new in v5.6.2
 

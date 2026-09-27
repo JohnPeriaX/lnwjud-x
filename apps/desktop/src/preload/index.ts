@@ -52,6 +52,7 @@ import {
   type SetWorkspacePonytailModeRequest,
   type SetGoalPonytailModeRequest,
   type ProcessSummary,
+  type PurgeRecoveryDataRequest,
   type RestoreCheckpointRequest,
   type RestoreRecoveryItemRequest,
   type SaveTunnelApiKeyRequest,
@@ -1039,6 +1040,17 @@ function createBackup(): Promise<BackupSummary> {
   });
 }
 
+function purgeRecoveryData(request: PurgeRecoveryDataRequest): Promise<{ readonly category: PurgeRecoveryDataRequest['category']; readonly deleted: number }> {
+  if (!isRecord(request) || request.userConfirmed !== true
+    || (request.category !== 'trash' && request.category !== 'checkpoints' && request.category !== 'backups')) {
+    return Promise.reject(new Error('Invalid IPC request'));
+  }
+  return invoke(ipcChannels.purgeRecoveryData, request).then((value: unknown) => {
+    if (!isRecord(value) || value.category !== request.category) throw new Error('Invalid IPC response');
+    return { category: request.category, deleted: integerField(value, 'deleted') };
+  });
+}
+
 function scheduleRestoreBackup(request: ScheduleRestoreBackupRequest): Promise<{ readonly scheduled: boolean; readonly restartRequired: boolean }> {
   if (!isRecord(request) || typeof request.backupId !== 'string' || request.backupId.trim().length === 0) return Promise.reject(new Error('Invalid IPC request'));
   return invoke(ipcChannels.scheduleRestoreBackup, { backupId: request.backupId }).then((value: unknown) => {
@@ -1420,6 +1432,7 @@ const api: LnwjudApi = {
   setAiDeletePolicy,
   setStdioPolicy,
   createBackup,
+  purgeRecoveryData,
   scheduleRestoreBackup,
   restoreRecoveryItem,
   restoreCheckpoint,

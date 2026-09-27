@@ -26,16 +26,17 @@ Before packaging a new public version:
 
 `scripts/set-version.mjs` synchronizes version surfaces but intentionally does **not** invent release notes. The release-note entry is a reviewed product artifact.
 
-## Current v5.6.2 release-note coverage
+## Current v5.6.3 release-note coverage
 
-The bundled `5.6.2` entry must describe the reliability fixes that actually ship in this patch:
+The bundled `5.6.3` entry must describe only behavior that actually ships in this patch:
 
-- Context Economy state persists across Modern HTTP requests within the same transport;
-- `.DS_Store` is ignored by default and binary/Base64 reads stay metadata-only in workspace context;
-- Secure Tunnel Start/Stop controls are disabled while a transition is in flight;
-- recurring watchdog wakes carry expected goal/workspace identity, and lnwjud verifies that binding before taking scheduled-goal ownership while preserving continuation-only compatibility.
+- Secure Tunnel protected-resource discovery uses the empty-404 no-auth contract required by the bundled OpenAI `tunnel-client` profile instead of returning a `text/plain Not found` body that is parsed as malformed JSON;
+- the bundled target-native OpenAI `tunnel-client` is v0.0.15 and remains pinned by SHA-256 plus Sigstore provenance;
+- Windows Codex discovery falls back to the official `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex\\bin` installation when the Desktop process PATH is stale;
+- Recovery retention also expires database backups moved into `retention-archive`, using the same configured lifetime (30 days by default);
+- Recovery Settings exposes independently confirmed delete-all actions for Recovery Trash, checkpoints, and database backups, while backend deletion stays limited to validated recovery records/artifacts and never recursively wipes unrelated files.
 
-Historical registry entries remain bundled for exact-version display on older installations.
+CI-only optimization is documented in README/FULL_README and release notes but is not required as an in-app user-facing card. Historical registry entries remain bundled for exact-version display on older installations.
 
 Keep README/FULL_README release notes and Thai/English in-app copy semantically aligned with this registry. Do not add claims for fixes that are not in the packaged artifact.
 
