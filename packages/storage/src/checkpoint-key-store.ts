@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { lstat, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
+import { link, lstat, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { assertSecretPlaintext, type SecretProtector } from '@lnwjud/shared';
 
@@ -32,7 +32,7 @@ export class CheckpointKeyStore {
     const encrypted = await this.options.secretProtector.encrypt('checkpoint_master_key', generated.toString('base64'));
     await mkdir(path.dirname(path.resolve(this.options.filePath)), { recursive: true });
     try {
-      await writeExclusive(this.options.filePath, encrypted);
+      await publishCheckpointKeyExclusive(this.options.filePath, encrypted);
       return generated;
     } catch (error: unknown) {
       if (!isAlreadyExists(error)) throw error;
@@ -88,6 +88,24 @@ async function writeExclusive(filePath: string, contents: string): Promise<void>
     await handle.sync();
   } finally {
     await handle.close();
+  }
+}
+
+// The final pathname must remain absent until the ciphertext is fully written.
+// A hard link publishes the completed same-directory file with exclusive-create
+// semantics, so another process either wins the race or reads a complete key.
+export async function publishCheckpointKeyExclusive(
+  filePath: string,
+  contents: string,
+  stage: (temporaryPath: string, contents: string) => Promise<void> = writeExclusive,
+): Promise<void> {
+  const absolutePath = path.resolve(filePath);
+  const temporaryPath = `${absolutePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  try {
+    await stage(temporaryPath, contents);
+    await link(temporaryPath, absolutePath);
+  } finally {
+    await rm(temporaryPath, { force: true }).catch(() => undefined);
   }
 }
 
