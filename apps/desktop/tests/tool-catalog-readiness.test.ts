@@ -7,7 +7,7 @@ import { ToolCatalogService } from '../src/main/tool-catalog/tool-catalog-servic
 function service(statuses: Readonly<Record<string, 'pass' | 'warn' | 'fail' | 'unknown'>>, options: { profileDecision?: 'ALLOW' | 'ASK' | 'DENY' | 'UNKNOWN'; codexEnabled?: boolean; eccEnabled?: boolean; availabilityOverrides?: Record<string, 'enabled' | 'disabled'> } = {}): { registry: RequirementRegistry; catalog: ToolCatalogService; probes: Record<string, ReturnType<typeof vi.fn>> } {
   const ids = [
     'platform_windows', 'platform_supported', 'registered_workspace', 'active_project', 'executable_git', 'executable_ripgrep', 'codex_runtime', 'wsl_runtime',
-    'local_mcp_listener', 'browser_cdp', 'windows_ui_automation', 'windows_input', 'windows_window', 'windows_ocr', 'native_accessibility', 'native_input', 'native_window', 'native_capture', 'native_office', 'office_desktop',
+    'local_mcp_listener', 'mcp-port', 'browser_cdp', 'windows_ui_automation', 'windows_input', 'windows_window', 'windows_ocr', 'native_accessibility', 'native_input', 'native_window', 'native_capture', 'native_office', 'office_desktop',
     'network_access', 'scheduler_runtime', 'tunnel_runtime', 'external_mcp_connection', 'local_pdf_provider', 'configured_lsp',
     'database_target', 'windows_sandbox', 'browser_event_stream', 'automation_runtime', 'feature_delivery',
   ];
@@ -214,6 +214,21 @@ describe('tool catalog readiness aggregation', () => {
     expect(probes.executable_git).toHaveBeenCalled();
     expect(result.doctor.checks).toHaveLength(registry.ids().length);
     expect(result.catalog.locale).toBe('th');
+  });
+
+  it('recovers a transient MCP identity failure before the normal cache expires', async () => {
+    const { catalog, probes } = service({});
+    probes['mcp-port']!.mockResolvedValueOnce({ status: 'fail' as const }).mockResolvedValue({ status: 'pass' as const });
+
+    const first = await catalog.runDoctor(undefined, 'en');
+    expect(first.checks.find((check) => check.id === 'mcp-port')?.status).toBe('fail');
+    const cached = await catalog.runDoctor(undefined, 'en');
+    expect(cached.checks.find((check) => check.id === 'mcp-port')?.status).toBe('fail');
+    expect(probes['mcp-port']).toHaveBeenCalledTimes(1);
+
+    const recovered = await catalog.recheck(['mcp-port'], 'en');
+    expect(recovered.doctor.checks.find((check) => check.id === 'mcp-port')?.status).toBe('pass');
+    expect(probes['mcp-port']).toHaveBeenCalledTimes(2);
   });
 
   it('treats an absent optional external MCP connection as informational Doctor health', async () => {

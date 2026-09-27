@@ -48,7 +48,7 @@ import {
   writeGuidedTunnelSetupState,
 } from './features/onboarding/guided-tunnel-setup-state.js';
 import { createTranslator } from './i18n/index.js';
-import { markStartupDoctorPassed, startupDoctorCorePassed, startupDoctorNavigationTarget, startupDoctorRequired } from './features/onboarding/startup-doctor-state.js';
+import { STARTUP_CORE_CHECK_IDS, markStartupDoctorPassed, startupDoctorCorePassed, startupDoctorNavigationTarget, startupDoctorRequired } from './features/onboarding/startup-doctor-state.js';
 import { McpDashboardState } from './mcp-dashboard-state.js';
 
 const MAX_CLIENT_LOG_LINES = 30_000;
@@ -361,10 +361,15 @@ export function App(): ReactElement {
     void Promise.all([
       window.lnwjud.runDoctor(),
       window.lnwjud.getToolCatalog({ locale }),
-    ]).then(([report, catalog]) => {
-      setDoctor(report);
-      setToolCatalog(catalog);
-      if (startupDoctorCorePassed(report)) {
+    ]).then(async ([initialReport, initialCatalog]) => {
+      // A cold host can time out one localhost identity probe while MCP is
+      // starting. Recheck the real core requirements before holding onboarding.
+      const result = startupDoctorCorePassed(initialReport)
+        ? { doctor: initialReport, catalog: initialCatalog }
+        : await window.lnwjud.recheckToolCatalog({ locale, requirementIds: STARTUP_CORE_CHECK_IDS });
+      setDoctor(result.doctor);
+      setToolCatalog(result.catalog);
+      if (startupDoctorCorePassed(result.doctor)) {
         try { markStartupDoctorPassed(window.localStorage, appVersion); } catch { /* Re-run next launch if storage is unavailable. */ }
         setStartupDoctorReady(true);
         return;
@@ -871,10 +876,10 @@ export function App(): ReactElement {
 
   async function runDoctor(): Promise<void> {
     try {
-      const [report, catalog] = await Promise.all([
-        window.lnwjud.runDoctor(),
-        window.lnwjud.getToolCatalog({ locale }),
-      ]);
+      const { doctor: report, catalog } = await window.lnwjud.recheckToolCatalog({
+        locale,
+        requirementIds: STARTUP_CORE_CHECK_IDS,
+      });
       setDoctor(report);
       setToolCatalog(catalog);
       if (startupDoctorCorePassed(report) && appVersion !== null) {

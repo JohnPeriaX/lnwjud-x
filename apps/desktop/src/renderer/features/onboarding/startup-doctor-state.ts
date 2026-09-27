@@ -3,11 +3,12 @@ import type { Screen } from '../shell/AppShell.js';
 
 export const STARTUP_DOCTOR_STORAGE_KEY = 'lnwjud.startup-doctor.passed-version.v1';
 
-const STARTUP_CORE_CHECK_IDS = new Set(['os', 'database', 'executable_ripgrep', 'mcp-port']);
+export const STARTUP_CORE_CHECK_IDS = ['os', 'database', 'executable_ripgrep', 'mcp-port'] as const;
+const startupCoreCheckIdSet = new Set<string>(STARTUP_CORE_CHECK_IDS);
 
 export function startupDoctorCorePassed(report: Pick<DoctorReport, 'checks'>): boolean {
-  const coreChecks = report.checks.filter((check) => STARTUP_CORE_CHECK_IDS.has(check.id));
-  return coreChecks.length === STARTUP_CORE_CHECK_IDS.size
+  const coreChecks = report.checks.filter((check) => startupCoreCheckIdSet.has(check.id));
+  return coreChecks.length === STARTUP_CORE_CHECK_IDS.length
     && coreChecks.every((check) => check.required && check.status !== 'fail' && check.status !== 'unknown');
 }
 
