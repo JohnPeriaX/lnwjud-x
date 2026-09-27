@@ -3,6 +3,7 @@ import { releaseNotesForVersion } from '../src/renderer/features/release-notes/r
 
 describe('release notes registry', () => {
   it('resolves the exact installed version only', () => {
+    expect(releaseNotesForVersion('5.6.4')).toMatchObject({ version: '5.6.4' });
     expect(releaseNotesForVersion('5.6.3')).toMatchObject({ version: '5.6.3' });
     expect(releaseNotesForVersion('5.6.2')).toMatchObject({ version: '5.6.2' });
     expect(releaseNotesForVersion('5.6.1')).toMatchObject({ version: '5.6.1' });

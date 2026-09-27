@@ -86,6 +86,7 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
   const [tunnelId, setTunnelId] = useState('');
   const [localTunnelBusy, setLocalTunnelBusy] = useState(false);
   const tunnelBusy = props.tunnelBusy === true || localTunnelBusy;
+  const tunnelControlsLocked = tunnelBusy || props.dashboard.tunnel.state === 'starting';
   const [tunnelMessage, setTunnelMessage] = useState<string | null>(null);
   const [remoteMcpAuthtoken, setRemoteMcpAuthtoken] = useState('');
   const [remoteMcpPublicOrigin, setRemoteMcpPublicOrigin] = useState(remoteMcp.configuredPublicOrigin ?? '');
@@ -901,8 +902,8 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
                   {props.dashboard.tunnel.auth?.message === null || props.dashboard.tunnel.auth?.message === undefined ? null : <p className="hint">{props.dashboard.tunnel.auth.message}</p>}
                   <div className="inline-actions">
                     {!props.dashboard.tunnel.auth?.authReady ? <button type="button" className="btn-save-gold" disabled={oauthBusy || props.dashboard.tunnel.oauth?.available !== true} onClick={() => { void beginOAuthLogin(); }}>{t('settingsPage.signInOauth')}</button> : null}
-                    <button type="button" disabled={tunnelBusy || !guidedTunnelConfigured || props.dashboard.tunnel.state === 'running'} onClick={() => { void props.onStartTunnel(); }}>{t(tunnelPresentation.startKey)}</button>
-                    <button type="button" disabled={tunnelBusy || props.dashboard.tunnel.state === 'stopped'} onClick={() => { void props.onStopTunnel(); }}>{t(tunnelPresentation.stopKey)}</button>
+                    <button type="button" disabled={tunnelControlsLocked || !guidedTunnelConfigured || props.dashboard.tunnel.state === 'running'} onClick={() => { void props.onStartTunnel(); }}>{t(tunnelPresentation.startKey)}</button>
+                    <button type="button" disabled={tunnelControlsLocked || props.dashboard.tunnel.state === 'stopped'} onClick={() => { void props.onStopTunnel(); }}>{t(tunnelPresentation.stopKey)}</button>
                   </div>
                 </section>
               ) : (
@@ -951,7 +952,7 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
               <div className="tunnel-setup-box">
                 <div className="settings-mini-heading"><strong>{t('settingsPage.setupWizard')}</strong><span>{t('settingsPage.setupWizardNoInit')}</span></div>
                 <label className="field-label" htmlFor="tunnel-id">{t('settingsPage.openAiTunnelId')}</label>
-                <div className="form-row"><input id="tunnel-id" placeholder="tunnel_0123456789abcdef..." value={tunnelId} onChange={(event) => setTunnelId(event.target.value)} /><button type="button" className="btn-save-gold" disabled={tunnelBusy} onClick={() => { void configureTunnel(); }}>{tunnelBusy ? t('settingsPage.configuring') : t('settingsPage.configureTunnel')}</button></div>
+                <div className="form-row"><input id="tunnel-id" placeholder="tunnel_0123456789abcdef..." value={tunnelId} onChange={(event) => setTunnelId(event.target.value)} /><button type="button" className="btn-save-gold" disabled={tunnelControlsLocked} onClick={() => { void configureTunnel(); }}>{tunnelBusy ? t('settingsPage.configuring') : t('settingsPage.configureTunnel')}</button></div>
                 <p className="hint">{t('settingsPage.tunnelIdentityHint')}</p>
               </div>
               {savedMessage === null ? null : <div className="toast-success-banner" role="status">✓ {savedMessage}</div>}
@@ -966,13 +967,14 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
                     <div className="setting-field"><span className="field-label">{t('settingsPage.reconnectCount')}</span><strong>{props.dashboard.tunnel.persistent.reconnectCount}</strong></div>
                     <div className="setting-field"><span className="field-label">{t('settingsPage.healthReadyPoll')}</span><strong>{formatTunnelTriState(t, props.dashboard.tunnel.persistent.healthy)} / {formatTunnelTriState(t, props.dashboard.tunnel.persistent.ready)} / {formatTunnelTriState(t, props.dashboard.tunnel.persistent.pollHealthy)}</strong></div>
                     <div className="setting-field"><span className="field-label">{t('settingsPage.localMcp')}</span><code className="settings-path-display">{props.dashboard.tunnel.persistent.localMcpUrl ?? '—'}</code></div>
+                    <div className="setting-field"><span className="field-label">{t('settingsPage.tunnelAdminUi')}</span><code className="settings-path-display">{props.dashboard.tunnel.persistent.uiUrl ?? '—'}</code></div>
                   </div>
                   <div className={props.dashboard.tunnel.persistent.strictZeroDowntime ? 'toast-success-banner' : 'alert-box-warning'}>
                     {props.dashboard.tunnel.persistent.strictZeroDowntime
                       ? t('settingsPage.zeroDowntimeProven')
                       : t('settingsPage.zeroDowntimeUnproven')}
                   </div>
-                  <div className="inline-actions"><button type="button" className="btn-save-gold" disabled={tunnelBusy} onClick={() => { void reconnectSameTunnel(); }}>{t('settingsPage.reconnectSameTunnel')}</button><button type="button" disabled={tunnelBusy || props.dashboard.tunnel.state === 'stopped'} onClick={() => { void stopPersistentTunnel(); }}>{t('settingsPage.stopTunnel')}</button></div>
+                  <div className="inline-actions"><button type="button" className="btn-save-gold" disabled={tunnelControlsLocked} onClick={() => { void reconnectSameTunnel(); }}>{t('settingsPage.reconnectSameTunnel')}</button><button type="button" disabled={tunnelControlsLocked || props.dashboard.tunnel.state === 'stopped'} onClick={() => { void stopPersistentTunnel(); }}>{t('settingsPage.stopTunnel')}</button></div>
                   {props.dashboard.tunnel.persistent.capabilityEvidence === null ? null : <p className="hint">{props.dashboard.tunnel.persistent.capabilityEvidence}</p>}
                 </div>
               )}

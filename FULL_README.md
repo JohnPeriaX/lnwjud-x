@@ -51,11 +51,20 @@ The tunnel is outbound-only: `tunnel-client` runs beside lnwjud, reaches OpenAI
 over outbound HTTPS, forwards MCP work to lnwjud's Desktop loopback HTTP MCP,
 and returns the response without opening a public inbound port on the host.
 
-## Current published version: v5.6.3
+## Current published version: v5.6.4
 
-## Current source version: v5.6.3
+## Current source version: v5.6.4
 
-Latest published release: **v5.6.3**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
+Latest published release: **v5.6.4**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
+
+### What's new in v5.6.4
+
+- **Existing Secure Tunnels recover after restart:** lnwjud updates its local MCP destination when the port changes. On Windows, it checks for an older client using the same lnwjud profile and Tunnel ID and closes it only when its identity can be verified. An unverified client is left alone and shown as an error; restarting Windows is the simple recovery path.
+- **ChatGPT setup uses the same Tunnel ID:** choose Tunnel and No authentication for lnwjud's Runtime API key setup. Store the Runtime API key in lnwjud; do not enter it as an OAuth client ID or secret. Refresh an existing connection after updating lnwjud. Secure Tunnel supports private/developer-mode testing, while public plugin submission requires a public HTTPS MCP endpoint.
+- **Desktop improvements:** Start/Stop buttons stay disabled while a Tunnel starts, Live Logs preserve event times, and the Git changed-files list grows into available window space.
+- **Faster release checks:** CI runs the Windows workspace suite beside the remaining release gate and starts main's target-native package builds beside the test matrix. The aggregate Windows check and exact-SHA release gate still require every result to pass.
+
+Follow the [Thai connection and recovery steps](docs/USAGE_TH.md#5-เชื่อม-lnwjud-เข้ากับ-chatgpt) if ChatGPT still reports a connection error. Remote MCP through ngrok + OAuth is a separate connection method.
 
 ### What's new in v5.6.3
 
@@ -996,8 +1005,8 @@ corepack pnpm@10.15.0 package:windows
 The Windows 10/11 x64 artifacts are written to:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.6.3.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.6.3.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.6.4.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.6.4.exe
 ```
 
 The installer is per-user by default. The portable executable needs no installation but uses the same per-user lnwjud data/settings location. A common installed executable path is:
@@ -2047,6 +2056,7 @@ launch; standalone `git_reset` / `git_clean` capabilities do not exist.
 | Tunnel is not listed in ChatGPT | Associate it with the target ChatGPT workspace and verify Tunnels Read + Use |
 | ChatGPT reports no tools | Check that lnwjud Desktop is running, the profile `server_urls` points to its loopback `/mcp` endpoint, doctor/tunnel health passes, then Refresh connector. |
 | Tunnel doctor cannot reach local MCP | Keep lnwjud Desktop running and use Configure Tunnel again so the profile receives the current loopback `/mcp` endpoint. |
+| ChatGPT shows 424 or “Access token is missing” while creating a no-auth Tunnel connection | Install v5.6.4 or later, open lnwjud, and check that the existing Tunnel is running. On Windows, lnwjud retires an older duplicate only when it verifies the same profile and Tunnel ID. If it cannot verify the old process, restart Windows, reopen lnwjud, then retry or refresh the ChatGPT connection. Do not switch to OAuth to solve a stale local destination. |
 | WORKSPACE_NOT_FOUND | Use the exact registered workspace ID, not a path or display name |
 | PATH_OUTSIDE_WORKSPACE | Register/select the correct root and use a workspace-relative path |
 | A secret file is denied | Check the active read/Strict Roots policy and that the intended root is registered; do not weaken mutation scope to make a read succeed |

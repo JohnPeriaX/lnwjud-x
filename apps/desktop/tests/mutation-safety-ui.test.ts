@@ -52,7 +52,7 @@ const dashboard: DashboardSnapshot = {
   appVersion: APP_VERSION,
 };
 
-function settingsMarkup(locale: 'th' | 'en', overrides: Partial<DashboardSnapshot> = {}, section: 'general' | 'security' | 'mcp' = 'security'): string {
+function settingsMarkup(locale: 'th' | 'en', overrides: Partial<DashboardSnapshot> = {}, section: 'general' | 'security' | 'mcp' | 'tunnel' = 'security'): string {
   return renderToStaticMarkup(createElement(SettingsPage, {
     locale,
     initialSection: section,
@@ -111,13 +111,33 @@ function recoveryMarkup(locale: 'th' | 'en'): string {
 }
 
 describe('mutation safety UI contract', () => {
-  it('renders the actual 5.6.3 application version', () => {
-    expect(APP_VERSION).toBe('5.6.3');
+  it('disables persistent Tunnel actions in Settings while a runtime is starting', () => {
+    const markup = settingsMarkup('en', {
+      tunnel: {
+        ...EMPTY_TUNNEL_STATUS,
+        state: 'starting',
+        hasApiKey: true,
+        runtimeCredentialAvailable: true,
+        profileExists: true,
+        persistent: {
+          enabled: true, tunnelIdMasked: 'tunnel_****', runtimeAlias: 'lnwjud', mode: 'native-managed', state: 'starting',
+          healthy: null, ready: null, pollHealthy: null, reconnectCount: 0, lastConnectedAt: null, lastReconnectAt: null,
+          nextReconnectAt: null, lastErrorCode: null, clientVersion: null, localMcpUrl: null, uiUrl: null,
+          readyBeforeRetire: false, strictZeroDowntime: false, capabilityEvidence: null,
+        },
+      },
+    }, 'tunnel');
+    expect(markup).toContain('<button type="button" class="btn-save-gold" disabled="">Reconnect same Tunnel</button>');
+    expect(markup).toContain('<button type="button" disabled="">Stop Tunnel</button>');
+  });
+
+  it('renders the actual 5.6.4 application version', () => {
+    expect(APP_VERSION).toBe('5.6.4');
     const markup = renderToStaticMarkup(createElement(AppShell, {
       locale: 'en', appVersion: APP_VERSION, hostPlatform: 'win32', mcpRunning: false, desktopFullBypassOn: false, stdioFullBypassOn: false, updateStatus: null, screen: 'settings',
       onNavigate: () => undefined, onLocaleChange: () => undefined, onUpdateAction: () => undefined, children: createElement('div'),
     }));
-    expect(markup).toContain('v5.6.3');
+    expect(markup).toContain('v5.6.4');
     expect(markup).toContain('data-host-platform="win32"');
   });
 

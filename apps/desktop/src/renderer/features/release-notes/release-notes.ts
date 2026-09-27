@@ -21,6 +21,52 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.6.4',
+    categories: [
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          {
+            id: 'tunnel-rebind-after-restart',
+            titleKey: 'whatsNew.564.tunnelRebind.title',
+            descriptionKey: 'whatsNew.564.tunnelRebind.description',
+            badge: 'fixed',
+            tags: ['Secure Tunnel', 'Persistent Runtime', 'restart'],
+          },
+          {
+            id: 'chatgpt-tool-schema',
+            titleKey: 'whatsNew.564.toolSchema.title',
+            descriptionKey: 'whatsNew.564.toolSchema.description',
+            badge: 'fixed',
+            tags: ['ChatGPT', 'MCP', 'Remote MCP'],
+          },
+          {
+            id: 'tunnel-log-timestamps',
+            titleKey: 'whatsNew.564.tunnelLogs.title',
+            descriptionKey: 'whatsNew.564.tunnelLogs.description',
+            badge: 'fixed',
+            tags: ['Tunnel', 'Live Logs'],
+          },
+          {
+            id: 'tunnel-start-controls',
+            titleKey: 'whatsNew.564.tunnelControls.title',
+            descriptionKey: 'whatsNew.564.tunnelControls.description',
+            badge: 'fixed',
+            tags: ['Tunnel', 'Controls'],
+          },
+          {
+            id: 'git-changed-files-height',
+            titleKey: 'whatsNew.564.gitFilesHeight.title',
+            descriptionKey: 'whatsNew.564.gitFilesHeight.description',
+            badge: 'fixed',
+            tags: ['Git', 'Desktop'],
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.6.3',
     categories: [
       {
