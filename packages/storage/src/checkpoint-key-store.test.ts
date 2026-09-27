@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createExplicitKeySecretProtector, type SecretProtector } from '@lnwjud/shared';
-import { CheckpointKeyStore } from './checkpoint-key-store.js';
+import { CheckpointKeyStore, publishCheckpointKeyExclusive } from './checkpoint-key-store.js';
 
 describe('CheckpointKeyStore', () => {
   it('creates a protected 32-byte key and reuses it after restart', async () => {
@@ -44,6 +44,32 @@ describe('CheckpointKeyStore', () => {
       const stores = [1, 2].map(() => new CheckpointKeyStore({ filePath, secretProtector: protector }));
       const keys = await Promise.all(stores.map((store) => store.loadOrCreate()));
       expect(keys[0]).toEqual(keys[1]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not expose the key pathname while its ciphertext is still being written', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-checkpoint-key-publish-'));
+    try {
+      const filePath = path.join(root, 'checkpoint-master.key');
+      let signalPartial!: () => void;
+      let finishWrite!: () => void;
+      const partial = new Promise<void>((resolve) => { signalPartial = resolve; });
+      const finish = new Promise<void>((resolve) => { finishWrite = resolve; });
+      const publishing = publishCheckpointKeyExclusive(filePath, 'complete-ciphertext', async (temporaryPath, contents) => {
+        await writeFile(temporaryPath, 'partial', { flag: 'wx', mode: 0o600 });
+        signalPartial();
+        await finish;
+        await writeFile(temporaryPath, contents, 'utf8');
+      });
+
+      await partial;
+      await expect(readFile(filePath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+      finishWrite();
+      await publishing;
+      expect(await readFile(filePath, 'utf8')).toBe('complete-ciphertext');
+      expect(await readdir(root)).toEqual(['checkpoint-master.key']);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
