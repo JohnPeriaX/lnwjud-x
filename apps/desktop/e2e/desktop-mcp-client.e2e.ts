@@ -166,6 +166,7 @@ test('desktop serves the real MCP client development workflow', async () => {
     const agentActions = page.locator('details.agent-actions-menu');
     await agentActions.locator('summary').click();
     await agentActions.getByRole('button', { name: /^(หยุด Desktop Agent|Stop Desktop Agent)$/ }).click();
+    await expect.poll(async () => (await page!.evaluate(() => window.lnwjud.getDashboard())).mcp.running, { timeout: 30_000 }).toBe(false);
     await expect(page.getByTestId('mcp-status')).toHaveText(/Agent หยุดทำงาน|Agent stopped/, { timeout: 30_000 });
     await browser.close();
     browser = undefined;

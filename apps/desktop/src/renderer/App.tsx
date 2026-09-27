@@ -49,6 +49,7 @@ import {
 } from './features/onboarding/guided-tunnel-setup-state.js';
 import { createTranslator } from './i18n/index.js';
 import { markStartupDoctorPassed, startupDoctorCorePassed, startupDoctorNavigationTarget, startupDoctorRequired } from './features/onboarding/startup-doctor-state.js';
+import { McpDashboardState } from './mcp-dashboard-state.js';
 
 const MAX_CLIENT_LOG_LINES = 30_000;
 
@@ -85,6 +86,7 @@ export function App(): ReactElement {
   const [ponytailPolicyError, setPonytailPolicyError] = useState<string | null>(null);
   const incidentBusyRef = useRef(false);
   const refreshBusyRef = useRef(false);
+  const mcpDashboardStateRef = useRef(new McpDashboardState());
   const logIds = useRef<Set<number>>(new Set());
   const pendingLogLines = useRef<LogLine[]>([]);
   const logFlushTimer = useRef<number | null>(null);
@@ -255,6 +257,7 @@ export function App(): ReactElement {
   const refresh = useCallback(async (): Promise<void> => {
     if (refreshBusyRef.current || updateInstallTransitionRef.current) return;
     refreshBusyRef.current = true;
+    const mcpStatusRevision = mcpDashboardStateRef.current.captureRevision();
     try {
       const [dashboardResult, workspacesResult] = await Promise.allSettled([
         window.lnwjud.getDashboard(),
@@ -262,8 +265,12 @@ export function App(): ReactElement {
       ]);
       const failures: string[] = [];
       if (dashboardResult.status === 'fulfilled') {
-        setDashboard(dashboardResult.value);
-        setLocale(dashboardResult.value.locale);
+        // A dashboard request can start before Stop/Restart and finish afterward.
+        // Its MCP state must not replace the result of the user's action.
+        if (mcpDashboardStateRef.current.isCurrent(mcpStatusRevision)) {
+          setDashboard(dashboardResult.value);
+          setLocale(dashboardResult.value.locale);
+        }
       } else {
         failures.push(errorMessage(dashboardResult.reason, createTranslator(locale)('error.desktopService')));
       }
@@ -526,7 +533,9 @@ export function App(): ReactElement {
   async function stopMcp(): Promise<void> {
     try {
       setMcpBusy(true);
-      await window.lnwjud.stopMcp();
+      const status = await window.lnwjud.stopMcp();
+      mcpDashboardStateRef.current.recordMutation();
+      setDashboard((current) => mcpDashboardStateRef.current.applyStatus(current, status));
       await refresh();
     } catch (cause: unknown) {
       setError(errorMessage(cause, t('error.mcpStop')));
@@ -538,7 +547,9 @@ export function App(): ReactElement {
   async function restartMcp(): Promise<void> {
     try {
       setMcpBusy(true);
-      await window.lnwjud.restartMcp();
+      const status = await window.lnwjud.restartMcp();
+      mcpDashboardStateRef.current.recordMutation();
+      setDashboard((current) => mcpDashboardStateRef.current.applyStatus(current, status));
       await refresh();
     } catch (cause: unknown) {
       setError(errorMessage(cause, t('error.mcpRestart')));
