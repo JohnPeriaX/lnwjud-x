@@ -163,6 +163,7 @@ describe('TunnelController lifecycle', () => {
       getTunnelId: (): string => 'tunnel_fixture012345',
       getRuntimeOwnerPath: (): string => ownerPath,
       setRuntimeOwnerPath: (value): void => { ownerPath = value; },
+      platform: 'win32',
       isExternalTunnelRunning: async (): Promise<boolean> => true,
       createRuntimeAdapter: (): TunnelRuntimeReconcilerAdapter => ({
         runtimeAlias: (): string => 'lnwjud',

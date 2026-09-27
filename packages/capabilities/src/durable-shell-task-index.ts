@@ -38,6 +38,7 @@ export interface DurableShellTaskIndexOptions {
   readonly inspectTask: (taskId: string) => Promise<ActiveTaskInspection>;
   readonly loadLaunchRecord?: (taskId: string) => Promise<DurableTaskLaunchRecord | undefined>;
   readonly now?: () => Date;
+  readonly removeFile?: typeof rm;
 }
 
 export class DurableShellTaskIndex {
@@ -48,6 +49,7 @@ export class DurableShellTaskIndex {
   private readonly launchesPath: string;
   private readonly maxConcurrentTasks: number;
   private readonly now: () => Date;
+  private readonly removeFile: typeof rm;
 
   public constructor(
     private readonly rootDirectory: string,
@@ -60,6 +62,7 @@ export class DurableShellTaskIndex {
     this.launchesPath = path.join(this.indexDirectory, 'launches.jsonl');
     this.maxConcurrentTasks = normalizeMaximum(options.maxConcurrentTasks);
     this.now = options.now ?? ((): Date => new Date());
+    this.removeFile = options.removeFile ?? rm;
   }
 
   public async initialize(): Promise<void> {
@@ -332,13 +335,26 @@ export class DurableShellTaskIndex {
           }), 'utf8');
           return await operation();
         } finally {
-          await handle.close().catch(() => undefined);
-          await rm(this.lockPath, { force: true }).catch(() => undefined);
+          await handle.close();
+          await this.releaseLockFile();
         }
       } catch (error: unknown) {
         if (!isAlreadyExists(error)) throw error;
         await this.reclaimStaleLock();
         if (Date.now() >= deadline) throw new Error('Durable task index lock is busy');
+        await delay(LOCK_RETRY_MS);
+      }
+    }
+  }
+
+  private async releaseLockFile(): Promise<void> {
+    const deadline = Date.now() + LOCK_RELEASE_TIMEOUT_MS;
+    for (;;) {
+      try {
+        await this.removeFile(this.lockPath, { force: true });
+        return;
+      } catch (error: unknown) {
+        if (!isTransientLockReleaseError(error) || Date.now() >= deadline) throw error;
         await delay(LOCK_RETRY_MS);
       }
     }
@@ -376,6 +392,7 @@ interface MarkerRead {
 
 const LOCK_RETRY_MS = 15;
 const LOCK_ACQUIRE_TIMEOUT_MS = 10_000;
+const LOCK_RELEASE_TIMEOUT_MS = 1_000;
 const LOCK_STALE_MS = 30_000;
 const RESERVATION_RECLAIM_GRACE_MS = 30_000;
 const MAX_PAGE_SIZE = 200;
@@ -510,6 +527,10 @@ function isProcessProvenGone(pid: number): boolean {
 
 function isAlreadyExists(error: unknown): boolean {
   return isRecord(error) && error.code === 'EEXIST';
+}
+
+function isTransientLockReleaseError(error: unknown): boolean {
+  return isRecord(error) && (error.code === 'EBUSY' || error.code === 'EPERM' || error.code === 'EACCES');
 }
 
 function isLockRecord(value: unknown): value is { readonly pid: number; readonly acquiredAt: string } {
