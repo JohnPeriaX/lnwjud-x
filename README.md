@@ -22,27 +22,27 @@
 </p>
 
 <h2 align="center">Download lnwjud</h2>
-<p align="center">Choose your platform and download the current v5.6.3 release directly.</p>
+<p align="center">Choose your platform and download the current v5.6.4 release directly.</p>
 
 <table align="center">
   <tr>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Setup-5.6.3.exe">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Setup-5.6.4.exe">
         <img src="assets/download/download-windows.svg" width="300" alt="Download lnwjud for Windows" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Portable-5.6.3.exe">Portable x64</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Portable-5.6.4.exe">Portable x64</a></sub>
     </td>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.3-arm64.dmg">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.4-arm64.dmg">
         <img src="assets/download/download-macos.svg" width="300" alt="Download lnwjud for macOS" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.3-x64.dmg">Intel x64 DMG</a> · <a href="docs/INSTALL_MACOS.md">Install guide</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.4-x64.dmg">Intel x64 DMG</a> · <a href="docs/INSTALL_MACOS.md">Install guide</a></sub>
     </td>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.3-x64.deb">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.4-x64.deb">
         <img src="assets/download/download-linux.svg" width="300" alt="Download lnwjud for Linux" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.3-x64.AppImage">x64 AppImage</a> · <a href="docs/INSTALL_LINUX.md">Other architectures</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.6.4-x64.AppImage">x64 AppImage</a> · <a href="docs/INSTALL_LINUX.md">Other architectures</a></sub>
     </td>
   </tr>
 </table>
@@ -51,17 +51,18 @@
 
 ---
 
-## Current published version: v5.6.3
+## Current published version: v5.6.4
 
 ## Current source version: v5.6.4
 
-Latest published release: **v5.6.3**. The download buttons above point directly to the v5.6.3 assets. The release is published only after the exact tagged main commit passes the target-native release gates.
+Latest published release: **v5.6.4**. The download buttons above point directly to the v5.6.4 assets. The release is published only after the exact tagged main commit passes the target-native release gates.
 
-### In the v5.6.4 source build
+### What's new in v5.6.4
 
 - **ChatGPT Tunnel after an app restart:** lnwjud reconnects the existing Tunnel ID to its current local MCP port. On Windows, it closes an older duplicate client only after confirming that it belongs to the same lnwjud Tunnel. If verification is inconclusive, restart Windows and open lnwjud again; there is no need to create another Tunnel ID.
 - **Connect in ChatGPT:** choose **Tunnel**, select your existing Tunnel ID, and choose **No authentication** for lnwjud's Runtime API key setup. The Runtime API key belongs in lnwjud, not in ChatGPT's OAuth fields. If the connection already exists, refresh it after updating. Secure Tunnel is for private/developer-mode connections; public plugin submission needs a public HTTPS MCP endpoint.
 - **Easier to use:** Tunnel buttons are disabled while starting, old Live Log entries keep their real timestamps, and the Git changed-files list fills the available window height.
+- **Faster release checks:** Windows workspace tests and the remaining release checks run together in CI; main also starts target-native package builds alongside test jobs. The required checks still gate publication.
 
 See the [Thai setup and recovery guide](docs/USAGE_TH.md#5-เชื่อม-lnwjud-เข้ากับ-chatgpt) for step-by-step help. The separate ngrok + OAuth option is described there as well.
 

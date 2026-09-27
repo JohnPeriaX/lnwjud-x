@@ -51,17 +51,18 @@ The tunnel is outbound-only: `tunnel-client` runs beside lnwjud, reaches OpenAI
 over outbound HTTPS, forwards MCP work to lnwjud's Desktop loopback HTTP MCP,
 and returns the response without opening a public inbound port on the host.
 
-## Current published version: v5.6.3
+## Current published version: v5.6.4
 
 ## Current source version: v5.6.4
 
-Latest published release: **v5.6.3**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
+Latest published release: **v5.6.4**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
 
-### In the v5.6.4 source build
+### What's new in v5.6.4
 
 - **Existing Secure Tunnels recover after restart:** lnwjud updates its local MCP destination when the port changes. On Windows, it checks for an older client using the same lnwjud profile and Tunnel ID and closes it only when its identity can be verified. An unverified client is left alone and shown as an error; restarting Windows is the simple recovery path.
 - **ChatGPT setup uses the same Tunnel ID:** choose Tunnel and No authentication for lnwjud's Runtime API key setup. Store the Runtime API key in lnwjud; do not enter it as an OAuth client ID or secret. Refresh an existing connection after updating lnwjud. Secure Tunnel supports private/developer-mode testing, while public plugin submission requires a public HTTPS MCP endpoint.
 - **Desktop improvements:** Start/Stop buttons stay disabled while a Tunnel starts, Live Logs preserve event times, and the Git changed-files list grows into available window space.
+- **Faster release checks:** CI runs the Windows workspace suite beside the remaining release gate and starts main's target-native package builds beside the test matrix. The aggregate Windows check and exact-SHA release gate still require every result to pass.
 
 Follow the [Thai connection and recovery steps](docs/USAGE_TH.md#5-เชื่อม-lnwjud-เข้ากับ-chatgpt) if ChatGPT still reports a connection error. Remote MCP through ngrok + OAuth is a separate connection method.
 

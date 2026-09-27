@@ -26,7 +26,19 @@ Before packaging a new public version:
 
 `scripts/set-version.mjs` synchronizes version surfaces but intentionally does **not** invent release notes. The release-note entry is a reviewed product artifact.
 
-## Current v5.6.3 release-note coverage
+## Current v5.6.4 release-note coverage
+
+The bundled `5.6.4` entry covers behavior verified in the Windows installer:
+
+- an existing Secure Tunnel ID follows the current local MCP port after restart, and Windows retires only a duplicate client verified to belong to the same lnwjud Tunnel;
+- ChatGPT accepts the no-auth MCP tool schema, and the guide separates the Tunnel Runtime API key from ChatGPT OAuth fields;
+- Tunnel Start/Stop controls remain disabled during startup;
+- Live Logs retain each event's original timestamp;
+- the Git changed-files list fills available window space while long lists and diffs remain scrollable.
+
+The CI scheduling change is documented in the release process and README files; it does not need an in-app user-facing card.
+
+## Historical v5.6.3 release-note coverage
 
 The bundled `5.6.3` entry must describe only behavior that actually ships in this patch:
 
@@ -36,7 +48,7 @@ The bundled `5.6.3` entry must describe only behavior that actually ships in thi
 - Recovery retention also expires database backups moved into `retention-archive`, using the same configured lifetime (30 days by default);
 - Recovery Settings exposes independently confirmed delete-all actions for Recovery Trash, checkpoints, and database backups, while backend deletion stays limited to validated recovery records/artifacts and never recursively wipes unrelated files.
 
-CI-only optimization is documented in README/FULL_README and release notes but is not required as an in-app user-facing card. Historical registry entries remain bundled for exact-version display on older installations.
+Historical registry entries remain bundled for exact-version display on older installations.
 
 Keep README/FULL_README release notes and Thai/English in-app copy semantically aligned with this registry. Do not add claims for fixes that are not in the packaged artifact.
 
