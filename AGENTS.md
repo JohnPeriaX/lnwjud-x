@@ -1,5 +1,15 @@
 # Repository agent instructions
 
+## Branch workflow
+
+Do routine development directly on `dev`. Do not create feature, hotfix, or
+`codex/*` branches, or a new worktree for branch isolation, unless the user
+explicitly requests one. Keep `main` for verified `dev -> main` merges through
+the existing pull-request and branch-protection process; do not develop on
+`main`. After earlier temporary branches are merged and no open pull request or
+worktree uses them, remove them so the repository retains only `dev` and
+`main`. Check for uncommitted work and active ownership before any cleanup.
+
 ## Automatic scheduled continuation
 
 When a user-authorized repository task is still incomplete and the user has authorized scheduled continuation, load and follow [`.agents/skills/lnwjud-scheduled-continuation/SKILL.md`](.agents/skills/lnwjud-scheduled-continuation/SKILL.md) as the source of truth. Never create a schedule when the user has explicitly opted out for the current task.

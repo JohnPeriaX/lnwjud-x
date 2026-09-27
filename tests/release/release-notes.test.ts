@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -6,6 +7,27 @@ const repositoryRoot = path.resolve(import.meta.dirname, '..', '..');
 const releaseNotesModuleUrl = pathToFileURL(path.join(repositoryRoot, 'scripts', 'release-notes.mjs')).href;
 
 describe('standardized GitHub release notes', () => {
+  it('keeps the READMEs concise while retaining historical highlights for backfill', async () => {
+    const { extractCuratedHighlights } = await import(releaseNotesModuleUrl);
+    const [readme, fullReadme, releaseHistory] = await Promise.all([
+      readFile(path.join(repositoryRoot, 'README.md'), 'utf8'),
+      readFile(path.join(repositoryRoot, 'FULL_README.md'), 'utf8'),
+      readFile(path.join(repositoryRoot, 'RELEASE_NOTES.md'), 'utf8'),
+    ]);
+    const versions = (markdown: string): string[] => Array.from(
+      markdown.matchAll(/^### (?:Historical: )?What's new in v([0-9.]+)$/gm),
+      (match) => match[1],
+    );
+
+    expect(versions(readme)).toHaveLength(3);
+    expect(versions(fullReadme)).toEqual(versions(readme));
+    expect(readme).toContain('[RELEASE_NOTES.md](RELEASE_NOTES.md)');
+    expect(fullReadme).toContain('[RELEASE_NOTES.md](RELEASE_NOTES.md)');
+    for (const version of [...versions(readme), '5.6.1', '4.52.0']) {
+      expect(extractCuratedHighlights(releaseHistory, `v${version}`, 'engasnm111/lnwjud')).not.toEqual([]);
+    }
+  });
+
   it('classifies conventional entries into the three mandatory sections', async () => {
     const { normalizeReleaseNotesBody } = await import(releaseNotesModuleUrl);
     const sourceBody = `## What's Changed

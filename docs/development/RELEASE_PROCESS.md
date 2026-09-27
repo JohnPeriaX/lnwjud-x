@@ -12,8 +12,9 @@ system is never evidence for another.
 
 ## Release invariants
 
-1. Normal release work happens on `dev`; do not prepare a release by editing
-   `main` directly.
+1. All development happens directly on `dev`; do not create another branch for
+   routine changes or prepare a release by editing `main` directly. Merge the
+   checked `dev -> main` pull request through branch protection.
 2. Root/package versions, Desktop metadata, README current-version text,
    updater filenames, tool counts, and release-facing docs agree before merge.
 3. A release tag points to the exact commit already present on `main`.
@@ -94,10 +95,18 @@ Changelog lines, and preserves release/provenance metadata under **Other
 Changes**. Do not hand-replace the generated body with `## What's Changed` or a
 different heading scheme after publication.
 
+Keep the three newest release highlights in `README.md` and `FULL_README.md`.
+Move older highlights to `RELEASE_NOTES.md` without dropping their detail.
+When preparing a new version, add its exact-version highlights to both READMEs
+and the release history, and remove the oldest README entry in that same change
+so the three-version limit holds before CI. The generator uses the current
+`README.md` section for a new release and `RELEASE_NOTES.md` for historical
+backfill.
+
 Historical cleanup uses `node scripts/release-notes.mjs --backfill --repository
 engasnm111/lnwjud --output review.json` as a dry run first. Inspect the
 before/after JSON for every affected version; versions documented in
-`FULL_README.md` or their tagged `README.md` gain their original user-facing
+`RELEASE_NOTES.md` or their tagged `README.md` gain their original user-facing
 highlights; remaining gaps use reviewed notes in
 `docs/development/HISTORICAL_RELEASE_HIGHLIGHTS.md` and linked release/commit
 evidence. Only add `--apply` after

@@ -30,11 +30,13 @@ Do not silently upgrade the package manager or rewrite the lockfile for an unrel
 
 ## Making changes
 
-- Keep each pull request focused on one coherent change.
+- Make changes directly on `dev`; do not create a new development branch. Keep
+  `main` for the checked `dev -> main` pull request and release history.
+- Keep each change focused and reviewable before it is included in that pull request.
 - Preserve workspace/path/security boundaries; do not bypass permission checks to make a test pass.
 - Avoid hard-coded developer paths, usernames, tokens, ports, or machine-specific assumptions.
 - Add or update tests for behavior changes and regressions.
-- Keep tool catalog, version metadata, README, and release documentation synchronized when your change affects them.
+- Keep tool catalog, version metadata, README, and release documentation synchronized when your change affects them. Show only the three newest versions in `README.md` and `FULL_README.md`; preserve older release highlights in [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
 - Do not bump versions or create release tags unless the change is explicitly a release-preparation change.
 
 ## Verification

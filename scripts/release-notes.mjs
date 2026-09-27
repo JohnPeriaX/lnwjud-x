@@ -393,7 +393,7 @@ async function generateOne(options) {
 async function backfill(options) {
   if (!options.repository) throw new Error('Missing repository. Pass --repository owner/repo or set GITHUB_REPOSITORY.');
   const releases = listPublishedReleases(options.repository);
-  const fullReadme = await readFile(new URL('../FULL_README.md', import.meta.url), 'utf8');
+  const releaseHistory = await readFile(new URL('../RELEASE_NOTES.md', import.meta.url), 'utf8');
   const historicalHighlights = await readFile(new URL('../docs/development/HISTORICAL_RELEASE_HIGHLIGHTS.md', import.meta.url), 'utf8');
   let changed = 0;
   const preview = [];
@@ -407,7 +407,7 @@ async function backfill(options) {
       console.log(`unchanged ${tag}`);
       continue;
     }
-    let highlightEntries = extractCuratedHighlights(fullReadme, tag, options.repository);
+    let highlightEntries = extractCuratedHighlights(releaseHistory, tag, options.repository);
     if (highlightEntries.length === 0) highlightEntries = taggedReadmeHighlights(options.repository, tag);
     if (highlightEntries.length === 0) {
       highlightEntries = extractCuratedHighlights(historicalHighlights, tag, options.repository);
