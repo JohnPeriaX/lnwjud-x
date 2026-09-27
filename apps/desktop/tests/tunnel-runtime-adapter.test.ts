@@ -376,7 +376,7 @@ describe('TunnelRuntimeAdapter', () => {
     expect(call?.[1]).toContain('env:CONTROL_PLANE_API_KEY');
   });
 
-  it('does not report a successful connect while an old local process still needs retirement', async () => {
+  it.runIf(process.platform === 'win32')('does not report a successful connect while an old Windows process still needs retirement', async () => {
     const tunnelId = 'tunnel_0123456789abcdef';
     const mcpServerUrl = 'http://127.0.0.1:18765/mcp';
     const execute = executor({
@@ -391,7 +391,7 @@ describe('TunnelRuntimeAdapter', () => {
     expect(processGuard).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ tunnelId, keepPid: 1234 }));
   });
 
-  it('checks for orphaned local processes after the official alias stops', async () => {
+  it.runIf(process.platform === 'win32')('checks for orphaned Windows processes after the official alias stops', async () => {
     const tunnelId = 'tunnel_0123456789abcdef';
     const execute = executor({
       'runtimes stop lnwjud --json': { stdout: JSON.stringify({ alias: 'lnwjud' }) },

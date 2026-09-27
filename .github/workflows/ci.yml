@@ -589,6 +589,9 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm@10.15.0 install --frozen-lockfile
 
+      - name: Build workspace type declarations
+        run: corepack pnpm@10.15.0 typecheck
+
       - name: Run complete Windows workspace release suite
         run: corepack pnpm@10.15.0 test:release
 

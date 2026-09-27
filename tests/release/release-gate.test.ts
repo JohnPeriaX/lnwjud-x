@@ -145,6 +145,9 @@ describe('MVP release verification gate', () => {
     const requiredJob = workflow.slice(workflow.indexOf('  verify:\n'));
 
     expect(testJob).toContain('run: corepack pnpm@10.15.0 test:release');
+    expect(testJob.indexOf('Build workspace type declarations')).toBeGreaterThan(testJob.indexOf('Install dependencies'));
+    expect(testJob).toContain('run: corepack pnpm@10.15.0 typecheck');
+    expect(testJob.indexOf('Build workspace type declarations')).toBeLessThan(testJob.indexOf('Run complete Windows workspace release suite'));
     expect(testJob).toContain("if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'");
     expect(buildJob).toContain('scripts/verify-release.ps1 -SkipWorkspaceTests');
     expect(buildJob).toContain("if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'");
