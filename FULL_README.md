@@ -53,9 +53,15 @@ and returns the response without opening a public inbound port on the host.
 
 ## Current published version: v5.6.5
 
-## Current source version: v5.6.5
+## Current source version: v5.6.6
 
 Latest published release: **v5.6.5**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
+
+### What's new in v5.6.6
+
+- **Truthful Watcher Goal state:** an open Goal no longer makes the runtime or orchestrator appear busy without observable work. Completion readiness includes plan steps, acceptance criteria, blockers, and active tasks; final closure still requires `finish_goal`.
+- **Detailed Goal snapshots:** Watcher Protocol v1 now provides completion readiness, objective, phase, acceptance checks, task count, and timestamps for each active Goal so the companion Watcher can explain remaining work and detect inactivity.
+- **Configured MCP server names:** Watcher can display the names users set in LNWJUD with their connection state. Launch commands, configuration paths, and secrets are excluded.
 
 ### What's new in v5.6.5
 
@@ -73,17 +79,6 @@ See [RELEASE_NOTES.md](RELEASE_NOTES.md) for complete version history and [Thai 
 - **Faster release checks:** CI runs the Windows workspace suite beside the remaining release gate and starts main's target-native package builds beside the test matrix. The aggregate Windows check and exact-SHA release gate still require every result to pass.
 
 Follow the [Thai connection and recovery steps](docs/USAGE_TH.md#5-เชื่อม-lnwjud-เข้ากับ-chatgpt) if ChatGPT still reports a connection error. Remote MCP through ngrok + OAuth is a separate connection method.
-
-### What's new in v5.6.3
-
-v5.6.3 fixes Secure Tunnel no-auth discovery, makes Windows Codex detection resilient to stale PATH state, upgrades the bundled official OpenAI tunnel runtime to v0.0.15, and hardens Recovery storage retention and cleanup.
-
-- **Secure Tunnel discovery contract:** protected-resource metadata candidates now return the empty 404 expected by OpenAI `tunnel-client`'s `sample_mcp_remote_no_auth` profile instead of a `text/plain Not found` body that was parsed as malformed JSON.
-- **Verified tunnel-client v0.0.15:** target-native artifacts are pinned by SHA-256 and verified against Sigstore provenance during runtime preparation. The repository dependency workflow keeps checking upstream versions daily; installed clients change bundled tunnel runtime through a normal lnwjud release/update.
-- **Codex install fallback on Windows:** discovery checks `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex\\bin` after PATH so the Desktop Requirements view does not falsely report Codex missing when the process inherited a stale environment.
-- **Recovery retention includes rotated DB backups:** database snapshots in `retention-archive` now follow the same configured recovery lifetime (30 days by default) instead of accumulating indefinitely.
-- **Strict delete-all controls:** Recovery Settings can clear Recovery Trash, checkpoints, or database backups independently after confirmation. Each backend deletes only validated lnwjud-owned recovery artifacts or database rows and preserves unrelated files in those storage roots.
-- **CI duplication removed:** process/extensions suites are no longer rerun in each Desktop shard because the same suites remain in the Windows/macOS/Linux native platform contract matrix.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for earlier versions and the complete release history.
 
@@ -607,8 +602,8 @@ corepack pnpm@10.15.0 package:windows
 The Windows 10/11 x64 artifacts are written to:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.6.5.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.6.5.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.6.6.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.6.6.exe
 ```
 
 The installer is per-user by default. The portable executable needs no installation but uses the same per-user lnwjud data/settings location. A common installed executable path is:

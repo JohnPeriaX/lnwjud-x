@@ -1,6 +1,6 @@
 # LNWJUD Watcher API
 
-LNWJUD v5.6.0 introduced the local read-only runtime surface used by the separate **LNWJUD Watcher** Web/PWA, Android, and iOS client. LNWJUD v5.6.1 extends Protocol v1 additively so one snapshot can represent multiple Active Projects and multiple active Durable Goals at the same time.
+LNWJUD v5.6.0 introduced the local read-only runtime surface used by the separate **LNWJUD Watcher** Web/PWA, Android, and iOS client. v5.6.1 added multiple projects and goals. v5.6.6 adds truthful Goal completion readiness and configured MCP plugin names without changing Protocol v1.
 
 ## What starts with Desktop
 
@@ -36,7 +36,7 @@ The local-only response contains:
 
 Keep the token private. In production Desktop it is persisted through LNWJUD's protected secret provider and is separate from MCP, tunnel, and OAuth credentials.
 
-For same-machine use, enter the returned endpoint and token directly in Watcher. Watcher Web/PWA v0.3.0+ remembers that token in browser-local storage for up to 60 days; packaged Desktop and mobile builds keep it in app-local device storage across restarts until the user clears the token or app data.
+For same-machine use, enter the returned endpoint and token directly in Watcher. Watcher v0.2.4+ keeps the token on that device for up to one year, then asks the user to check Settings and pair again. The Android inactivity reminder, when enabled, keeps a separate encrypted copy in Android Keystore protected storage and removes it when monitoring is disabled or the token expires.
 
 For phone/remote use, expose **only port 17890** through zrok, Cloudflare Tunnel, Tailscale Serve/Funnel, ngrok, or your own HTTPS reverse proxy. Then enter the resulting HTTPS URL together with the same Watcher token in the Watcher app.
 
@@ -55,11 +55,14 @@ The response is intentionally bounded and sanitized:
 - stable instance id, hostname, platform
 - `workspaces[]`: every Active Project, each with its active Durable Goals (up to 50 per project), active-operation count, and sanitized Git state
 - workspace-tagged observable agents/workers and activity where the runtime knows the workspace
+- configured MCP server names and their enabled/connected/excluded/lifecycle state in `plugins[]`; launch commands, config paths, and credentials are omitted
 - recent observable activity across all Active Projects
 - compatibility `goal` and `git` fields for the selected/primary project so older Protocol v1 clients continue to work
 - server timestamp
 
 Watcher does not return raw environment variables, provider credentials, MCP secrets, file contents, or hidden model reasoning.
+
+From v5.6.6, each active Goal also reports `lifecycle: "active"`, `completionReady`, `objective`, `currentPhase`, sanitized acceptance-criterion titles/statuses, `activeTaskCount`, `createdAt`, `updatedAt`, and `lastCheckpointAt`. A Goal with completed milestones and acceptance criteria is **ready for explicit finalization**; it remains open until `finish_goal` makes the durable record terminal. An open Goal no longer makes the runtime or orchestrator appear to be executing when there is no observable in-flight operation. Older Protocol v1 clients can ignore these additive fields.
 
 ### Realtime events
 

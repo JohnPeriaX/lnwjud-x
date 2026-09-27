@@ -2,7 +2,7 @@
 
 Operational release sequencing is defined by [`docs/development/RELEASE_PROCESS.md`](../docs/development/RELEASE_PROCESS.md). This checklist records current-version acceptance evidence and does not override that sequence.
 
-**Current version:** `v5.6.5` - Windows installer `lnwjud-Setup-5.6.5.exe` and portable executable `lnwjud-Portable-5.6.5.exe`; MCP registry **276 total definitions / 264 advertised by default / all 276 with Codex delegation plus Agent Swarm enabled**.
+**Current version:** `v5.6.6` - Windows installer `lnwjud-Setup-5.6.6.exe` and portable executable `lnwjud-Portable-5.6.6.exe`; MCP registry **276 total definitions / 264 advertised by default / all 276 with Codex delegation plus Agent Swarm enabled**.
 
 Before tagging any new version, add its plain-language `What's new in vX.Y.Z` bullets to `README.md`, `FULL_README.md`, and `RELEASE_NOTES.md`, then preview the generated GitHub Release body. The release generator must stop if that README section is missing or contains no real change; empty `Features` or `Bug Fixes` sections and `- None.` placeholders must not be published. Keep only the newest three versions in the READMEs and preserve detailed history in `RELEASE_NOTES.md` for later audit and backfill.
 
