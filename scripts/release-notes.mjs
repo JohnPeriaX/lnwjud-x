@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import console from 'node:console';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import process from 'node:process';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, URL } from 'node:url';
 
 const FULL_CHANGELOG_PATTERN = /^\*\*Full Changelog(?::)?\*\*:?\s*(\S+)\s*$/i;
 const BULLET_PATTERN = /^\s*[-*]\s+(.+?)\s*$/;
@@ -71,6 +71,26 @@ function runGhJson(args) {
   return text ? JSON.parse(text) : null;
 }
 
+function localCommitEntries(repository, tag, previousTag) {
+  if (!previousTag) return ['Initial public release.'];
+  const result = spawnSync('git', ['log', '--no-merges', '--format=%H%x00%s', `${previousTag}..${tag}`], {
+    encoding: 'utf8',
+    windowsHide: true,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.error || result.status !== 0) return null;
+  return commitLinesToEntries(repository, result.stdout.split(/\r?\n/));
+}
+
+function taggedReadmeHighlights(repository, tag) {
+  const result = spawnSync('git', ['show', `${tag}:README.md`], {
+    encoding: 'utf8',
+    windowsHide: true,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  return result.status === 0 ? extractCuratedHighlights(result.stdout, tag, repository) : [];
+}
+
 function stripHeadingDecoration(value) {
   return value
     .replace(/(?:🚀|🐛|🐞|🪲|🧹|📝|🔧|⚙️?)/gu, '')
@@ -104,8 +124,13 @@ function dedupeEntries(entries) {
   const result = [];
   for (const entry of entries) {
     const normalized = entry.trim();
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
+    if (!normalized || /^none\.?$/i.test(normalized)) continue;
+    const key = normalized
+      .replace(/\s+by\s+@[\w-]+\s+in\s+https:\/\/github\.com\/\S+$/i, '')
+      .replace(/\s+\(\[`[0-9a-f]+`\]\(https:\/\/github\.com\/\S+\/commit\/[0-9a-f]+\)\)$/i, '')
+      .toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
     result.push(normalized);
   }
   return result;
@@ -147,7 +172,7 @@ export function extractReleaseEntries(body = '') {
     if (bullet) {
       flushParagraph();
       const entry = bullet[1]?.trim();
-      if (!entry || FULL_CHANGELOG_PATTERN.test(entry)) continue;
+      if (!entry || /^none\.?$/i.test(entry) || FULL_CHANGELOG_PATTERN.test(entry)) continue;
       const target = section === 'auto' ? classifyReleaseEntry(entry) : section;
       categories[target].push(entry);
       continue;
@@ -155,7 +180,7 @@ export function extractReleaseEntries(body = '') {
 
     if (sawHeading) {
       const target = section === 'auto' ? classifyReleaseEntry(line) : section;
-      categories[target].push(line);
+      if (!/^none\.?$/i.test(line)) categories[target].push(line);
     } else {
       paragraph.push(line);
     }
@@ -177,13 +202,18 @@ export function extractFullChangelog(body = '') {
   return undefined;
 }
 
-function entryCount(categories) {
-  return categories.features.length + categories.fixes.length + categories.other.length;
+function mergeCategories(primary, fallback) {
+  return {
+    features: dedupeEntries([...primary.features, ...fallback.features]),
+    fixes: dedupeEntries([...primary.fixes, ...fallback.fixes]),
+    other: dedupeEntries([...primary.other, ...fallback.other]),
+  };
 }
 
-function mergeCategories(primary, fallback) {
-  if (entryCount(primary) > 0) return primary;
-  return fallback;
+export function extractPreviousTag(body, tag) {
+  const url = extractFullChangelog(body);
+  const match = url?.match(/\/compare\/([^/]+)\.\.\.([^/?#]+)/);
+  return match?.[2] === tag ? match[1] : undefined;
 }
 
 function buildFullChangelogUrl(repository, previousTag, tag) {
@@ -193,16 +223,45 @@ function buildFullChangelogUrl(repository, previousTag, tag) {
 }
 
 function renderCategory(title, entries) {
-  const lines = entries.length > 0 ? entries.map((entry) => `- ${entry}`) : ['- None.'];
-  return [`## ${title}`, '', ...lines].join('\n');
+  return [`## ${title}`, '', ...entries.map((entry) => `- ${entry}`)].join('\n');
 }
 
-export function renderReleaseNotes({ categories, fullChangelogUrl }) {
+export function extractCuratedHighlights(markdown, tag, repository) {
+  const version = tag.replace(/^v/, '');
+  const heading = new RegExp(`^###\\s+(?:Historical:\\s*)?What's new in v${version.replaceAll('.', '\\.')}\\s*$`, 'i');
+  const entries = [];
+  let inSection = false;
+  let continuingBullet = false;
+  for (const rawLine of markdown.replaceAll('\r\n', '\n').split('\n')) {
+    const line = rawLine.trim();
+    if (/^#{2,3}\s+/.test(line)) {
+      if (inSection) break;
+      inSection = heading.test(line);
+      continuingBullet = false;
+      continue;
+    }
+    if (!inSection) continue;
+    if (rawLine.startsWith('- ')) {
+      entries.push(line.slice(2));
+      continuingBullet = true;
+    } else if (continuingBullet && /^\s{2,}\S/.test(rawLine) && !line.startsWith('- ')) {
+      entries[entries.length - 1] += ` ${line}`;
+    } else if (!line) {
+      continuingBullet = false;
+    }
+  }
+  return dedupeEntries(entries.map((entry) => entry.replace(/\]\((?!https?:\/\/|#)([^)]+)\)/g, (_, path) =>
+    `](https://github.com/${repository}/blob/${tag}/${path})`)));
+}
+
+export function renderReleaseNotes({ categories, highlights = [], fullChangelogUrl }) {
   const sections = [
-    renderCategory('Features', categories.features),
-    renderCategory('Bug Fixes', categories.fixes),
-    renderCategory('Other Changes', categories.other),
-  ];
+    highlights.length > 0 && renderCategory('Highlights', highlights),
+    categories.features.length > 0 && renderCategory('Features', categories.features),
+    categories.fixes.length > 0 && renderCategory('Bug Fixes', categories.fixes),
+    categories.other.length > 0 && renderCategory('Other Changes', categories.other),
+  ].filter(Boolean);
+  if (sections.length === 0) throw new Error('Release notes contain no changes to publish.');
   if (fullChangelogUrl) sections.push(`**Full Changelog**: ${fullChangelogUrl}`);
   return `${sections.join('\n\n')}\n`;
 }
@@ -214,18 +273,28 @@ export function normalizeReleaseNotesBody({
   tag,
   previousTag,
   additionalOtherEntries = [],
+  additionalEntries = [],
+  highlightEntries = [],
 }) {
   const sourceCategories = extractReleaseEntries(sourceBody);
   const fallbackCategories = extractReleaseEntries(fallbackBody);
   const categories = mergeCategories(sourceCategories, fallbackCategories);
+  for (const entry of additionalEntries) categories[classifyReleaseEntry(entry)].push(entry);
+  categories.features = dedupeEntries(categories.features);
+  categories.fixes = dedupeEntries(categories.fixes);
   categories.other = dedupeEntries([...additionalOtherEntries, ...categories.other]);
+
+  const changes = [...categories.features, ...categories.fixes, ...categories.other];
+  if (highlightEntries.length === 0 && !changes.some((entry) => !isReleaseAdministrativeEntry(entry))) {
+    throw new Error(`Release ${tag ?? ''} has no substantive change notes.`);
+  }
 
   const fullChangelogUrl =
     extractFullChangelog(sourceBody) ??
     extractFullChangelog(fallbackBody) ??
     buildFullChangelogUrl(repository, previousTag, tag);
 
-  return renderReleaseNotes({ categories, fullChangelogUrl });
+  return renderReleaseNotes({ categories, highlights: dedupeEntries(highlightEntries), fullChangelogUrl });
 }
 
 function generatedNotes(repository, tag, previousTag) {
@@ -236,37 +305,34 @@ function generatedNotes(repository, tag, previousTag) {
 }
 
 function compareCommitEntries(repository, tag, previousTag) {
+  const local = localCommitEntries(repository, tag, previousTag);
+  if (local !== null) return local;
   if (!previousTag) return ['Initial public release.'];
   const comparison = runGhJson(['api', `repos/${repository}/compare/${previousTag}...${tag}`]);
   const commits = Array.isArray(comparison?.commits) ? comparison.commits : [];
-  const entries = [];
-  for (const commit of commits) {
+  return commitLinesToEntries(repository, commits.map((commit) => {
     const message = commit?.commit?.message?.split(/\r?\n/, 1)?.[0]?.trim();
-    const sha = commit?.sha;
-    if (!message || !sha || /^Merge pull request\b/i.test(message)) continue;
-    const shortSha = sha.slice(0, 7);
-    entries.push(`${message} ([\`${shortSha}\`](https://github.com/${repository}/commit/${sha}))`);
+    return commit?.sha && message ? `${commit.sha}\0${message}` : '';
+  }));
+}
+
+function commitLinesToEntries(repository, lines) {
+  const entries = [];
+  for (const line of lines) {
+    const [sha, message] = line.split('\0');
+    if (!sha || !message || /^Merge\b/i.test(message) || isReleaseAdministrativeEntry(message)) continue;
+    entries.push(`${message} ([\`${sha.slice(0, 7)}\`](https://github.com/${repository}/commit/${sha}))`);
   }
   return dedupeEntries(entries);
 }
 
-function generatedOrCommitFallback(repository, tag, previousTag) {
-  let body = '';
-  try {
-    body = generatedNotes(repository, tag, previousTag);
-  } catch (error) {
-    console.warn(`GitHub generated notes unavailable for ${tag}: ${error instanceof Error ? error.message : String(error)}`);
-  }
-  if (entryCount(extractReleaseEntries(body)) > 0) return body;
-
-  const categories = { features: [], fixes: [], other: [] };
-  for (const entry of compareCommitEntries(repository, tag, previousTag)) {
-    categories[classifyReleaseEntry(entry)].push(entry);
-  }
-  return renderReleaseNotes({
-    categories,
-    fullChangelogUrl: buildFullChangelogUrl(repository, previousTag, tag),
-  });
+function isReleaseAdministrativeEntry(entry) {
+  if (/^(?:Published from the exact successful CI commit|Release artifacts include|The release contains target-native|chore\(release\):\s*(?:bump|release)\b)/i.test(entry)) return true;
+  const title = entry
+    .replace(/\s+by\s+@[\w-]+\s+in\s+https:\/\/github\.com\/\S+$/i, '')
+    .replace(/\s+\(\[`[0-9a-f]+`\]\(https:\/\/github\.com\/\S+\/commit\/[0-9a-f]+\)\)$/i, '')
+    .trim();
+  return /^release(?::|\s)\s*(?:lnwjud\s+)?v\d+\.\d+\.\d+$/i.test(title);
 }
 
 function listPublishedReleases(repository) {
@@ -295,13 +361,25 @@ async function generateOne(options) {
   if (!options.tag) throw new Error('Missing tag. Pass --tag vX.Y.Z or set GITHUB_REF_NAME.');
 
   const previousTag = options.previousTag ?? latestPublishedTag(options.repository, options.tag);
-  const fallbackBody = generatedOrCommitFallback(options.repository, options.tag, previousTag);
+  const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
+  const highlightEntries = extractCuratedHighlights(readme, options.tag, options.repository);
+  if (highlightEntries.length === 0) {
+    throw new Error(`README.md needs a "What's new in ${options.tag}" section with real bullet points before release publication.`);
+  }
+  let sourceBody = '';
+  try {
+    sourceBody = generatedNotes(options.repository, options.tag, previousTag);
+  } catch (error) {
+    console.warn(`GitHub generated notes unavailable for ${options.tag}: ${error instanceof Error ? error.message : String(error)}`);
+  }
   const body = normalizeReleaseNotesBody({
-    sourceBody: fallbackBody,
+    sourceBody,
     repository: options.repository,
     tag: options.tag,
     previousTag,
     additionalOtherEntries: futureReleaseMetadata(options.commit),
+    additionalEntries: compareCommitEntries(options.repository, options.tag, previousTag),
+    highlightEntries,
   });
 
   if (options.output) {
@@ -315,21 +393,32 @@ async function generateOne(options) {
 async function backfill(options) {
   if (!options.repository) throw new Error('Missing repository. Pass --repository owner/repo or set GITHUB_REPOSITORY.');
   const releases = listPublishedReleases(options.repository);
+  const fullReadme = await readFile(new URL('../FULL_README.md', import.meta.url), 'utf8');
+  const historicalHighlights = await readFile(new URL('../docs/development/HISTORICAL_RELEASE_HIGHLIGHTS.md', import.meta.url), 'utf8');
   let changed = 0;
+  const preview = [];
 
   for (let index = 0; index < releases.length; index += 1) {
     const release = releases[index];
     const tag = release.tag_name;
-    const previousTag = releases[index + 1]?.tag_name;
     const sourceBody = typeof release.body === 'string' ? release.body : '';
-    const sourceEntries = extractReleaseEntries(sourceBody);
-    const fallbackBody = entryCount(sourceEntries) > 0 ? '' : generatedOrCommitFallback(options.repository, tag, previousTag);
+    const previousTag = extractPreviousTag(sourceBody, tag) ?? releases[index + 1]?.tag_name;
+    if (!/^\s*[-*]\s+None\.?\s*$/im.test(sourceBody)) {
+      console.log(`unchanged ${tag}`);
+      continue;
+    }
+    let highlightEntries = extractCuratedHighlights(fullReadme, tag, options.repository);
+    if (highlightEntries.length === 0) highlightEntries = taggedReadmeHighlights(options.repository, tag);
+    if (highlightEntries.length === 0) {
+      highlightEntries = extractCuratedHighlights(historicalHighlights, tag, options.repository);
+    }
     const normalized = normalizeReleaseNotesBody({
       sourceBody,
-      fallbackBody,
       repository: options.repository,
       tag,
       previousTag,
+      additionalEntries: compareCommitEntries(options.repository, tag, previousTag),
+      highlightEntries,
     });
 
     if (normalized.trim() === sourceBody.trim()) {
@@ -338,6 +427,7 @@ async function backfill(options) {
     }
 
     changed += 1;
+    preview.push({ tag, before: sourceBody, after: normalized });
     if (!options.apply) {
       console.log(`would update ${tag}`);
       continue;
@@ -347,15 +437,19 @@ async function backfill(options) {
     console.log(`updated ${tag}`);
   }
 
+  if (options.output) {
+    await writeFile(options.output, JSON.stringify(preview, null, 2), 'utf8');
+    console.log(`Wrote release-note review data to ${options.output}`);
+  }
   console.log(`${options.apply ? 'Updated' : 'Would update'} ${changed} of ${releases.length} published releases.`);
 }
 
 function printHelp() {
   console.log(`Usage:
   node scripts/release-notes.mjs --tag vX.Y.Z --repository owner/repo [--commit SHA] [--output release-notes.md]
-  node scripts/release-notes.mjs --backfill --repository owner/repo [--apply]
+  node scripts/release-notes.mjs --backfill --repository owner/repo [--output review.json] [--apply]
 
-The generated body always contains these headings in this order:
+The generated body contains only nonempty headings in this order:
   ## Features
   ## Bug Fixes
   ## Other Changes

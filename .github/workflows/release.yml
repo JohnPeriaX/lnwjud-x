@@ -38,6 +38,17 @@ jobs:
             exit 1
           fi
 
+      - name: Generate and validate user-facing release notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node scripts/release-notes.mjs \
+            --tag "${GITHUB_REF_NAME}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit "${GITHUB_SHA}" \
+            --output release-notes.md
+
       - name: Download verified target-native CI artifacts for the exact commit
         shell: bash
         env:
@@ -152,17 +163,6 @@ jobs:
           LNWJUD_RELEASE_ASSETS_DIRECTORY: ${{ github.workspace }}/release-assets
           LNWJUD_RELEASE_COMMIT: ${{ github.sha }}
         run: node scripts/collect-release-assets.mjs
-
-      - name: Generate standardized release notes
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          node scripts/release-notes.mjs \
-            --tag "${GITHUB_REF_NAME}" \
-            --repository "${GITHUB_REPOSITORY}" \
-            --commit "${GITHUB_SHA}" \
-            --output release-notes.md
 
       - name: Publish verified cross-platform release assets
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
