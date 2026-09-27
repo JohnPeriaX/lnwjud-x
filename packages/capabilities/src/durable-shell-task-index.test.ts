@@ -58,6 +58,37 @@ describe('DurableShellTaskIndex', () => {
     await replacement.release('new-task', 'a'.repeat(64));
   });
 
+  it('retries transient lock-file deletion before another store instance acquires the index', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-durable-index-lock-release-'));
+    temporaryRoots.push(root);
+    let lockRemovalAttempts = 0;
+    const index = new DurableShellTaskIndex(root, {
+      maxConcurrentTasks: 1,
+      inspectTask: async (): Promise<'terminal'> => 'terminal',
+      removeFile: async (filename, options): Promise<void> => {
+        if (path.basename(filename.toString()) === 'index.lock' && lockRemovalAttempts++ === 0) {
+          throw Object.assign(new Error('lock is still busy'), { code: 'EPERM' });
+        }
+        await rm(filename, options);
+      },
+    });
+
+    await index.initialize();
+    expect(lockRemovalAttempts).toBeGreaterThanOrEqual(2);
+
+    const replacement = new DurableShellTaskIndex(root, {
+      maxConcurrentTasks: 1,
+      inspectTask: async (): Promise<'terminal'> => 'terminal',
+    });
+    await expect(replacement.reserve({
+      taskId: 'next-task',
+      requestDigest: 'b'.repeat(64),
+      ownerClientId: 'chatgpt',
+      ownerWorkspaceId: 'workspace-a',
+    })).resolves.toMatchObject({ ok: true, value: { activeTasks: 1, created: true } });
+    await replacement.release('next-task', 'b'.repeat(64));
+  });
+
   it('serializes reservations across store instances so the active limit cannot be raced', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-durable-index-limit-'));
     temporaryRoots.push(root);
