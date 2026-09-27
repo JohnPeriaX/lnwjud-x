@@ -36,6 +36,11 @@ export class ToolAvailabilityService {
     return this.listeners.size;
   }
 
+  /** Re-evaluate host-owned eligibility without changing a user's per-tool preference. */
+  public notifyEligibilityChanged(): void {
+    this.emit();
+  }
+
   public setToolEnabled(name: string, enabled: boolean): ToolAvailabilitySnapshot {
     const normalizedName = normalizeToolName(name);
     const preference: ToolAvailabilityOverride = enabled ? 'enabled' : 'disabled';
@@ -64,9 +69,24 @@ export class ToolAvailabilityService {
     return true;
   }
 
-  public watch(intervalMs: number = 1_000): () => void {
+  public watch(intervalMs: number = 1_000, eligibilityProvider?: () => boolean): () => void {
     const normalizedInterval = Number.isFinite(intervalMs) ? Math.max(100, Math.trunc(intervalMs)) : 1_000;
-    const timer = setInterval(() => { this.refreshFromStore(); }, normalizedInterval);
+    const readEligibility = (): boolean => {
+      try {
+        return eligibilityProvider?.() === true;
+      } catch {
+        return false;
+      }
+    };
+    let eligibility = readEligibility();
+    const timer = setInterval(() => {
+      const availabilityChanged = this.refreshFromStore();
+      const nextEligibility = readEligibility();
+      if (nextEligibility !== eligibility) {
+        eligibility = nextEligibility;
+        if (!availabilityChanged) this.emit();
+      }
+    }, normalizedInterval);
     timer.unref?.();
     return (): void => clearInterval(timer);
   }

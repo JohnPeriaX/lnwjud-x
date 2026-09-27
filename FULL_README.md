@@ -53,9 +53,17 @@ and returns the response without opening a public inbound port on the host.
 
 ## Current published version: v5.6.4
 
-## Current source version: v5.6.4
+## Current source version: v5.6.5
 
 Latest published release: **v5.6.4**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
+
+### What's new in v5.6.5
+
+- **Agent Swarm follows live settings:** enable Codex delegation in Settings and `agent_swarm_run` on the Tools page. The running MCP tool list updates immediately for active Desktop HTTP/Tunnel sessions and local STDIO connections, without restarting lnwjud.
+- **Setup explains both switches:** the Settings preview includes `agent_swarm_run`; if a ChatGPT app still uses an older tool snapshot, refresh or rescan its tools in ChatGPT.
+- **Additional reliability fixes since v5.6.4:** Desktop Agent Stop status remains accurate after refresh, and concurrent startup cannot expose a partially created checkpoint encryption key.
+
+See [RELEASE_NOTES.md](RELEASE_NOTES.md) for complete version history and [Thai troubleshooting](docs/USAGE_TH.md#13-doctor--troubleshooting) for step-by-step Agent Swarm setup.
 
 ### What's new in v5.6.4
 
@@ -76,15 +84,6 @@ v5.6.3 fixes Secure Tunnel no-auth discovery, makes Windows Codex detection resi
 - **Recovery retention includes rotated DB backups:** database snapshots in `retention-archive` now follow the same configured recovery lifetime (30 days by default) instead of accumulating indefinitely.
 - **Strict delete-all controls:** Recovery Settings can clear Recovery Trash, checkpoints, or database backups independently after confirmation. Each backend deletes only validated lnwjud-owned recovery artifacts or database rows and preserves unrelated files in those storage roots.
 - **CI duplication removed:** process/extensions suites are no longer rerun in each Desktop shard because the same suites remain in the Windows/macOS/Linux native platform contract matrix.
-
-### What's new in v5.6.2
-
-v5.6.2 fixes four reliability issues across the MCP context pipeline, scheduled continuation, and Secure Tunnel UI.
-
-- **Context Economy persists across Modern HTTP requests:** request-scoped MCP server recreation now reuses a transport-scoped Context Economy runtime, so `context_economy_stats` keeps its ledger and repeated context retrievals can produce ledger hits.
-- **Binary context stays metadata-only:** `.DS_Store` is ignored by default, and Base64/binary file reads are detected from the file-reader encoding before text-context assembly, preventing long binary payloads from leaking into `workspace_context`.
-- **Secure Tunnel transition lock:** Settings now receives the App-level tunnel busy state and disables Start/Stop controls while tunnel start or stop is in flight, preventing repeated-click overlap.
-- **Host-safe scheduled claim binding:** Native watchdog wakes can pass their expected `goalId` and `workspaceId` with `claim_scheduled_continuation`; lnwjud validates both identities before liveness or lease mutation while legacy continuation-only callers remain compatible.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for earlier versions and the complete release history.
 
@@ -608,8 +607,8 @@ corepack pnpm@10.15.0 package:windows
 The Windows 10/11 x64 artifacts are written to:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.6.4.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.6.4.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.6.5.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.6.5.exe
 ```
 
 The installer is per-user by default. The portable executable needs no installation but uses the same per-user lnwjud data/settings location. A common installed executable path is:
@@ -1351,10 +1350,14 @@ persisted by this telemetry.
 | codex_task_status | READ | Reads state for an owned Codex task |
 | codex_task_logs | READ | Reads bounded logs for an owned Codex task |
 | codex_stop | EXECUTE | Stops only a Codex task launched by lnwjud |
+| agent_swarm_run | EXECUTE | Lists or inspects owned Agent Swarm runs; starting or cancelling a bounded read-only swarm requires trusted host approval |
 
 Typical flow: codex_run → inspect task status/logs → inspect git_diff → run checks.
 Codex still operates as an opaque child agent; the workspace-write sandbox
 narrows its mode but does not make its changes automatically recoverable.
+To expose `agent_swarm_run`, enable Codex delegation in Settings and enable that
+tool on the Tools page. Changes reach an active MCP connection immediately;
+ChatGPT may need its connected app tools refreshed or rescanned.
 
 ### Local desktop capabilities
 

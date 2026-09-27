@@ -144,6 +144,8 @@ export interface ToolRegistryOptions {
   readonly hostMutationApprovalProvider?: (request: HostMutationApprovalRequest) => boolean | Promise<boolean>;
   /** Exposes quota-consuming Codex delegation tools. Disabled unless explicitly enabled. */
   readonly codexToolsEnabled?: boolean;
+  /** Reads the host's current Codex opt-in so existing MCP sessions can follow settings changes. */
+  readonly codexToolsEnabledProvider?: () => boolean;
   /** Current persisted global Ponytail coding policy. Missing or invalid values fail safely to OFF. */
   readonly ponytailModeProvider?: () => PonytailMode;
   /** Shared by transport-scoped server factories so exact skill activation survives per-request registry recreation. */
@@ -197,6 +199,7 @@ export class ToolRegistry {
   private readonly systemEligibleToolNames: ReadonlySet<string>;
   private readonly defaultExposedToolNames: ReadonlySet<string>;
   private readonly toolAvailabilitySnapshotProvider: () => ToolAvailabilitySnapshot;
+  private readonly codexToolsEnabledProvider: () => boolean;
   private readonly services: McpApplicationServices;
   private readonly actor: FileActor;
   private readonly diagnostic: DiagnosticLogger | undefined;
@@ -239,6 +242,7 @@ export class ToolRegistry {
     this.hostMutationApprovalProvider = options.hostMutationApprovalProvider;
     this.activityWorkspaceResolver = normalizeActivityWorkspaceResolver(services, actor);
     this.maxToolDurationMs = normalizeToolResponseBudget(options.maxToolDurationMs);
+    this.codexToolsEnabledProvider = options.codexToolsEnabledProvider ?? ((): boolean => options.codexToolsEnabled === true);
     const contextEconomy = options.contextEconomy ?? new ContextEconomyRuntime();
     const automation = services.automation ?? services.automationFactory?.create(
       new AutomationRuntimeAdapter(this, actor),
@@ -285,15 +289,11 @@ export class ToolRegistry {
     ];
     const exposedAllBaseTools = allBaseTools.map((tool) => withToolEnvelopes(tool));
     const systemEligibleBaseTools = exposedAllBaseTools.filter((tool) => {
-      if (isCodexDelegationTool(tool.name) && options.codexToolsEnabled !== true) return false;
       if (tool.name === 'agent_swarm_run' && services.agentSwarm === undefined) return false;
       const catalogEntry = upgradeCatalogEntry(tool.name);
       return catalogEntry === undefined || isAdvertisedDeliveryState(catalogEntry.deliveryState);
     });
-    const defaultExposedBaseTools = systemEligibleBaseTools.filter((tool) => {
-      if (isCodexDelegationTool(tool.name)) return options.codexToolsEnabled === true;
-      return true;
-    });
+    const defaultExposedBaseTools = systemEligibleBaseTools;
     const exposedBatchTools = batchTools({
       invoke: (name, input, signal) => this.invoke(name, input, undefined, signal),
       describe: (name) => exposedAllBaseTools.find((tool) => tool.name === name),
@@ -347,6 +347,13 @@ export class ToolRegistry {
   }
 
   private isEffectivelyExposed(name: string): boolean {
+    if (isCodexDelegationTool(name)) {
+      try {
+        if (this.codexToolsEnabledProvider() !== true) return false;
+      } catch {
+        return false;
+      }
+    }
     if (name.startsWith('ecc_') && name !== 'ecc_status' && this.services.eccEnabledProvider !== undefined) {
       try {
         if (this.services.eccEnabledProvider() !== true) return false;
@@ -1346,7 +1353,7 @@ function summarizeMutationForApproval(toolName: string, input: unknown, activeWo
       lines.push(`launchCount = ${taskIds.length}`);
       if (taskIds.length > 0) lines.push(`taskIds = ${JSON.stringify(taskIds)}`);
     }
-    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.6.4 enforces read-only child sandboxes.');
+    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.6.5 enforces read-only child sandboxes.');
     return boundedApprovalSummary(lines);
   }
   const projectKind = projectCommandKind(toolName);

@@ -53,6 +53,8 @@ export interface McpServerOptions {
   readonly activeProjectProvider?: () => ActiveProjectScope | null;
   /** Exposes quota-consuming Codex delegation tools. Disabled unless explicitly enabled. */
   readonly codexToolsEnabled?: boolean;
+  /** Reads the current Codex opt-in for live tool exposure. */
+  readonly codexToolsEnabledProvider?: () => boolean;
   /** Current persisted global Ponytail mode. Workspace/goal overrides are resolved by ToolRegistry at execution time. */
   readonly ponytailModeProvider?: () => PonytailMode;
   /** Shared activation/review state for transport factories that recreate MCP servers per request. */
@@ -98,6 +100,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
     ...(options.workspaceScopeResolver === undefined ? {} : { workspaceScopeResolver: options.workspaceScopeResolver }),
     ...(options.activeProjectProvider === undefined ? {} : { activeProjectProvider: options.activeProjectProvider }),
     ...(options.codexToolsEnabled === undefined ? {} : { codexToolsEnabled: options.codexToolsEnabled }),
+    ...(options.codexToolsEnabledProvider === undefined ? {} : { codexToolsEnabledProvider: options.codexToolsEnabledProvider }),
     ...(options.ponytailModeProvider === undefined ? {} : { ponytailModeProvider: options.ponytailModeProvider }),
     ...(options.ponytailActivationLedger === undefined ? {} : { ponytailActivationLedger: options.ponytailActivationLedger }),
     ...(options.toolAvailabilitySnapshotProvider === undefined ? {} : { toolAvailabilitySnapshotProvider: options.toolAvailabilitySnapshotProvider }),
