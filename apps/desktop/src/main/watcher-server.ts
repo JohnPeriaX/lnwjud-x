@@ -28,6 +28,16 @@ export interface WatcherGoalSnapshot {
   }>;
   readonly workspaceId?: string;
   readonly workspaceName?: string;
+  /** The durable record remains active until finish_goal completes. */
+  readonly lifecycle?: 'active';
+  readonly completionReady?: boolean;
+  readonly objective?: string;
+  readonly currentPhase?: string;
+  readonly acceptanceCriteria?: ReadonlyArray<{ readonly id: string; readonly title: string; readonly status: 'pending' | 'completed' | 'blocked' }>;
+  readonly activeTaskCount?: number;
+  readonly createdAt?: string;
+  readonly updatedAt?: string;
+  readonly lastCheckpointAt?: string;
 }
 
 export interface WatcherGitSnapshot {
@@ -67,6 +77,17 @@ export interface WatcherSnapshot {
     readonly task?: string;
     readonly workspaceId?: string;
     readonly workspaceName?: string;
+    readonly provider?: 'lnwjud' | 'codex';
+    readonly toolName?: string;
+    readonly startedAt?: string;
+  }>;
+  readonly plugins?: ReadonlyArray<{
+    readonly name: string;
+    readonly provider: 'mcp';
+    readonly enabled: boolean;
+    readonly connected: boolean;
+    readonly excluded: boolean;
+    readonly lifecycle: 'disconnected' | 'connected' | 'termination_unverified';
   }>;
   readonly activity: readonly WatcherActivityEvent[];
   readonly git: WatcherGitSnapshot;

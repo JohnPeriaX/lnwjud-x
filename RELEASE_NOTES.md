@@ -2,6 +2,12 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.6.6
+
+- **Watcher Goal status is truthful:** an open Durable Goal no longer makes the runtime or orchestrator look busy without an observable in-flight operation. Completed plan steps, acceptance criteria, blockers, and tracked blocking tasks determine whether the Goal is ready for explicit `finish_goal` finalization. No Goal is silently closed just because its checklist reached 100%.
+- **Richer read-only Watcher Protocol v1:** active Goal snapshots include completion readiness, phase, bounded objective, acceptance checks, task count, and timestamps. Watcher can show outstanding acceptance checks and detect a quiet open Goal without mistaking a lease heartbeat for progress.
+- **Configured plugin names:** Watcher snapshots now include the user-configured MCP server names known to LNWJUD, with connection and lifecycle state. Launch commands, configuration paths, and secrets are never sent. Plugin names from unrelated hosts remain unavailable unless those hosts expose them to LNWJUD.
+
 ### What's new in v5.6.5
 
 - **Agent Swarm visibility updates without restarting lnwjud:** enabling or disabling Codex delegation now updates the live MCP tool list. The per-tool `agent_swarm_run` switch still applies, and turning Codex delegation off immediately hides Codex and Agent Swarm tools. Active Desktop HTTP/Tunnel sessions receive the change; local STDIO detects Settings changes written by the Desktop process.

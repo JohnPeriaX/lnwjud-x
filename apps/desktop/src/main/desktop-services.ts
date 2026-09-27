@@ -202,6 +202,7 @@ import { OAuthTunnelAuthProvider, type TunnelOAuthProvisioningBackend } from './
 import { TunnelOAuthLoginManager } from './tunnel-oauth-login-manager.js';
 import { TunnelOAuthSessionStore } from './tunnel-oauth-store.js';
 import { startWatcherServer, type WatcherActivityEvent, type WatcherServerHandle, type WatcherSnapshot, type WatcherStatus } from './watcher-server.js';
+import { watcherGoalFromRecord, watcherPluginsFromServers } from './watcher-projection.js';
 
 const actor: FileActor = { clientId: 'desktop-renderer', clientName: `${APP_NAME} desktop` };
 const mcpActor: FileActor = { clientId: 'desktop-mcp-http', clientName: `${APP_NAME} desktop MCP` };
@@ -753,23 +754,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
             gitService.log(actor, workspace.id, { maxCommits: 1 }),
           ]);
           const workspaceInflight = inflight.filter((entry) => entry.workspaceId === workspace.id);
-          const goalSnapshots = goals.map((goal) => {
-            const blocked = goal.blockers.length > 0;
-            return {
-              id: goal.id,
-              key: goal.goalKey,
-              status: blocked ? 'blocked' as const : 'running' as const,
-              currentTask: goal.nextAction,
-              blockers: [...goal.blockers],
-              milestones: goal.plan.steps.map((step) => ({
-                id: step.id,
-                title: step.title,
-                status: step.status,
-              })),
-              workspaceId: workspace.id,
-              workspaceName: workspace.displayName,
-            };
-          });
+          const goalSnapshots = goals.map((goal) => watcherGoalFromRecord(goal, workspace.displayName));
           const git: WatcherSnapshot['git'] = {
             branch: gitBranch.ok ? gitBranch.value ?? '' : '',
             commit: gitLog.ok ? gitLog.value.entries[0]?.hash.slice(0, 12) ?? '' : '',
@@ -784,6 +769,8 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
         const primaryWorkspace = workspaceStates.find((item) => item.workspace.id === selected?.id) ?? workspaceStates[0];
         const primaryGoal = primaryWorkspace?.goalSnapshots[0] ?? null;
         const allGoals = workspaceStates.flatMap((item) => item.goalSnapshots);
+        const pluginListing = await extensionsService.listMcpServers().catch(() => null);
+        const plugins = pluginListing?.ok ? watcherPluginsFromServers(pluginListing.value.servers) : [];
 
         const checkpointActivity: WatcherActivityEvent[] = workspaceStates.flatMap((item) => (
           item.goals.flatMap((goal) => (
@@ -811,7 +798,6 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
         const agents = workspaceStates.flatMap((item): WatcherSnapshot['agents'] => {
           const latestInflight = [...item.inflight].sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0];
           const hasBlockedGoal = item.goalSnapshots.some((goal) => goal.status === 'blocked');
-          const hasRunnableGoal = item.goalSnapshots.some((goal) => goal.status !== 'blocked');
           const primaryWorkspaceGoal = item.goalSnapshots[0];
           let orchestratorTask = latestInflight?.targetSummary?.slice(0, 500)
             ?? latestInflight?.toolName.replaceAll('_', ' ').slice(0, 500);
@@ -819,13 +805,14 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
             orchestratorTask = primaryWorkspaceGoal.currentTask.slice(0, 500);
           }
           let orchestratorStatus: WatcherStatus = 'idle';
-          if (item.inflight.length > 0 || hasRunnableGoal) orchestratorStatus = 'running';
+          if (item.inflight.length > 0) orchestratorStatus = 'running';
           else if (hasBlockedGoal) orchestratorStatus = 'blocked';
           const workspaceAgents: Array<WatcherSnapshot['agents'][number]> = [{
             id: `lnwjud:${item.workspace.id}`,
             name: '@lnwjud',
             role: 'Orchestrator',
             status: orchestratorStatus,
+            provider: 'lnwjud',
             ...(orchestratorTask === undefined || orchestratorTask.length === 0 ? {} : { task: orchestratorTask }),
             workspaceId: item.workspace.id,
             workspaceName: item.workspace.displayName,
@@ -837,6 +824,9 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
               name: 'Codex',
               role: 'Implementation / Review',
               status: 'running',
+              provider: 'codex',
+              toolName: entry.toolName,
+              startedAt: entry.startedAt,
               ...(entry.targetSummary === undefined ? {} : { task: entry.targetSummary.slice(0, 500) }),
               workspaceId: item.workspace.id,
               workspaceName: item.workspace.displayName,
@@ -855,14 +845,14 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
             name: '@lnwjud',
             role: 'Runtime',
             status: 'running',
+            provider: 'lnwjud',
             ...(unscopedTask === undefined || unscopedTask.length === 0 ? {} : { task: unscopedTask }),
           });
         }
 
-        const hasRunnableGoal = allGoals.some((goal) => goal.status !== 'blocked');
         const allGoalsBlocked = allGoals.length > 0 && allGoals.every((goal) => goal.status === 'blocked');
         let runtimeStatus: WatcherStatus = 'idle';
-        if (inflight.length > 0 || hasRunnableGoal) runtimeStatus = 'running';
+        if (inflight.length > 0) runtimeStatus = 'running';
         else if (allGoalsBlocked) runtimeStatus = 'blocked';
 
         return {
@@ -888,6 +878,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
             git: item.git,
           })),
           agents,
+          plugins,
           activity,
           git: primaryWorkspace?.git ?? { branch: '', commit: '', clean: true, changedFiles: 0 },
         };

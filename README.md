@@ -53,9 +53,15 @@
 
 ## Current published version: v5.6.5
 
-## Current source version: v5.6.5
+## Current source version: v5.6.6
 
 Latest published release: **v5.6.5**. The download buttons above point directly to the v5.6.5 assets. The release is published only after the exact tagged main commit passes the target-native release gates.
+
+### What's new in v5.6.6
+
+- **Watcher shows the real Goal state:** an open Goal no longer makes the runtime look busy when there is no observable work. Completed milestones alone do not close it; acceptance criteria, blockers, and active tasks determine whether it is ready for `finish_goal`.
+- **More detail in Watcher:** active Goal snapshots now include completion readiness, phase, objective, acceptance checks, active task count, and timestamps, so the companion app can show what is still pending and identify quiet Goals.
+- **Your configured MCP names:** Watcher can display MCP server names and connection state from LNWJUD. Commands, configuration paths, and credentials stay private.
 
 ### What's new in v5.6.5
 
@@ -73,17 +79,6 @@ See the [Thai troubleshooting guide](docs/USAGE_TH.md#13-doctor--troubleshooting
 - **Faster release checks:** Windows workspace tests and the remaining release checks run together in CI; main also starts target-native package builds alongside test jobs. The required checks still gate publication.
 
 See the [Thai setup and recovery guide](docs/USAGE_TH.md#5-เชื่อม-lnwjud-เข้ากับ-chatgpt) for step-by-step help. The separate ngrok + OAuth option is described there as well.
-
-### What's new in v5.6.3
-
-v5.6.3 fixes Secure Tunnel discovery and Codex runtime detection, updates the bundled OpenAI tunnel runtime, and prevents recovery data from growing without bound.
-
-- **Secure Tunnel no-auth discovery:** the Desktop MCP listener now returns empty 404 responses for protected-resource metadata candidates, matching the no-auth contract used by `sample_mcp_remote_no_auth` in OpenAI `tunnel-client` and eliminating the previous `invalid character 'N'` failure caused by a `text/plain Not found` body.
-- **OpenAI tunnel-client v0.0.15:** packaged runtimes are pinned to official v0.0.15 target-native artifacts with SHA-256 and Sigstore provenance verification. The daily dependency workflow still checks upstream releases, while installed users receive the new bundled runtime through a normal lnwjud app update.
-- **Windows Codex detection:** Requirements now falls back to the official `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex\\bin` install path when the Desktop process inherited an older PATH, avoiding a false “Codex is not installed” warning after Codex is installed.
-- **Bounded recovery storage:** the existing Recovery retention policy now also expires database backups that were rotated into `retention-archive`; the normal default remains 30 days.
-- **Explicit category cleanup:** Recovery Settings adds independently confirmed “delete all” actions for Recovery Trash, checkpoints, and database backups. Backend deletion is scoped to validated lnwjud recovery records/artifacts rather than recursively deleting unrelated files.
-- **Faster CI without weaker gates:** redundant process/extensions test executions were removed from Desktop shards because the same suites remain covered by the all-platform native contract matrix on Windows, macOS, and Linux.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for earlier versions and the complete release history.
 
