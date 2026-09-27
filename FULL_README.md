@@ -51,11 +51,22 @@ The tunnel is outbound-only: `tunnel-client` runs beside lnwjud, reaches OpenAI
 over outbound HTTPS, forwards MCP work to lnwjud's Desktop loopback HTTP MCP,
 and returns the response without opening a public inbound port on the host.
 
-## Current published version: v5.6.2
+## Current published version: v5.6.3
 
-## Current source version: v5.6.2
+## Current source version: v5.6.3
 
-Latest published release: **v5.6.2**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
+Latest published release: **v5.6.3**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
+
+### What's new in v5.6.3
+
+v5.6.3 fixes Secure Tunnel no-auth discovery, makes Windows Codex detection resilient to stale PATH state, upgrades the bundled official OpenAI tunnel runtime to v0.0.15, and hardens Recovery storage retention and cleanup.
+
+- **Secure Tunnel discovery contract:** protected-resource metadata candidates now return the empty 404 expected by OpenAI `tunnel-client`'s `sample_mcp_remote_no_auth` profile instead of a `text/plain Not found` body that was parsed as malformed JSON.
+- **Verified tunnel-client v0.0.15:** target-native artifacts are pinned by SHA-256 and verified against Sigstore provenance during runtime preparation. The repository dependency workflow keeps checking upstream versions daily; installed clients change bundled tunnel runtime through a normal lnwjud release/update.
+- **Codex install fallback on Windows:** discovery checks `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex\\bin` after PATH so the Desktop Requirements view does not falsely report Codex missing when the process inherited a stale environment.
+- **Recovery retention includes rotated DB backups:** database snapshots in `retention-archive` now follow the same configured recovery lifetime (30 days by default) instead of accumulating indefinitely.
+- **Strict delete-all controls:** Recovery Settings can clear Recovery Trash, checkpoints, or database backups independently after confirmation. Each backend deletes only validated lnwjud-owned recovery artifacts or database rows and preserves unrelated files in those storage roots.
+- **CI duplication removed:** process/extensions suites are no longer rerun in each Desktop shard because the same suites remain in the Windows/macOS/Linux native platform contract matrix.
 
 ### What's new in v5.6.2
 
@@ -659,7 +670,7 @@ Cloudflare/Custom must proxy the **protected gateway target shown in Settings**,
 
 Use this path only when you specifically prefer the official outbound-only Secure MCP Tunnel transport or your organization requires it. **Tunnel ID + Runtime API key is an alternative/advanced setup, not the default Quick Start path.**
 
-The Secure MCP Tunnel flow requires a Platform tunnel ID and a runtime API key. Published target-native packages include the official OpenAI `tunnel-client v0.0.14` for the packaged OS and architecture, with pinned checksum, license, and provenance evidence. Release users do **not** download or extract a separate tunnel-client package. Creating or editing a tunnel requires **Tunnels Read + Manage**; the runtime key needs **Tunnels Read + Use**.
+The Secure MCP Tunnel flow requires a Platform tunnel ID and a runtime API key. Published target-native packages include the official OpenAI `tunnel-client v0.0.15` for the packaged OS and architecture, with pinned checksum, license, and provenance evidence. Release users do **not** download or extract a separate tunnel-client package. Creating or editing a tunnel requires **Tunnels Read + Manage**; the runtime key needs **Tunnels Read + Use**.
 
 1. Open [OpenAI Platform tunnel settings](https://platform.openai.com/settings/organization/tunnels).
 2. Create a tunnel named `lnwjud` and associate it with the Platform organization and ChatGPT workspace that should use it.
@@ -742,7 +753,7 @@ public ngrok URL นี้ชี้เข้า OAuth gateway แยกต่า
 6. รอ Configure/Doctor ผ่าน แล้วกด **Start Tunnel**
 7. ใน ChatGPT เพิ่ม Connection แบบ **Tunnel** แล้วเลือก tunnel ที่สร้างไว้หรือใส่ `tunnel_id`
 
-`lnwjud-Setup-5.0.0.exe` และ `lnwjud-Portable-5.0.0.exe` รวม official OpenAI `tunnel-client v0.0.14` มาให้แล้ว จึง **ไม่ต้องดาวน์โหลด `tunnel-client.exe` เอง** ช่อง path เป็น override สำหรับ troubleshooting เท่านั้น; หากต้องการกลับไปใช้ตัว bundled ให้ล้าง override แล้วเลือก **Use bundled** อย่างชัดเจน
+`lnwjud-Setup-5.0.0.exe` และ `lnwjud-Portable-5.0.0.exe` รวม official OpenAI `tunnel-client v0.0.15` มาให้แล้ว จึง **ไม่ต้องดาวน์โหลด `tunnel-client.exe` เอง** ช่อง path เป็น override สำหรับ troubleshooting เท่านั้น; หากต้องการกลับไปใช้ตัว bundled ให้ล้าง override แล้วเลือก **Use bundled** อย่างชัดเจน
 
 `Persistent Tunnel Identity` จำ Tunnel ID แยกจาก Run/Stop intent. เมื่อผู้ใช้กด **Stop Tunnel** lnwjud จะคงสถานะ stopped ข้ามการ restart และจะไม่ auto-reconnect จนกด Start อีกครั้ง. หากเปลี่ยน custom/bundled client ขณะ runtime ทำงาน ระบบจะหยุดและยืนยัน owner เดิมก่อน commit path ใหม่เพื่อไม่ให้มี runtime ซ้อน
 
@@ -985,8 +996,8 @@ corepack pnpm@10.15.0 package:windows
 The Windows 10/11 x64 artifacts are written to:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.6.2.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.6.2.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.6.3.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.6.3.exe
 ```
 
 The installer is per-user by default. The portable executable needs no installation but uses the same per-user lnwjud data/settings location. A common installed executable path is:
@@ -1152,7 +1163,7 @@ key is exposed, revoke it and create a replacement.
 ### 3. tunnel-client for installed releases
 
 The Windows x64 installer already bundles official OpenAI
-`tunnel-client v0.0.14`, so normal installed-release setup requires no separate
+`tunnel-client v0.0.15`, so normal installed-release setup requires no separate
 download or stable external executable path. The Settings path field is only a
 manual override/troubleshooting control.
 

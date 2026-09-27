@@ -110,6 +110,7 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
   const [checkpointVisibleCount, setCheckpointVisibleCount] = useState(RECOVERY_PAGE_SIZE);
   const [backupVisibleCount, setBackupVisibleCount] = useState(RECOVERY_PAGE_SIZE);
   const [retentionBusy, setRetentionBusy] = useState(false);
+  const [purgeBusyCategory, setPurgeBusyCategory] = useState<'trash' | 'checkpoints' | 'backups' | null>(null);
   const [eccBusy, setEccBusy] = useState(false);
   const [eccMessage, setEccMessage] = useState<string | null>(null);
   const [factoryResetBusy, setFactoryResetBusy] = useState(false);
@@ -357,6 +358,29 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
       setRecoveryError(cause instanceof Error ? cause.message : t('settingsPage.retentionSaveFailed'));
     } finally {
       setRetentionBusy(false);
+    }
+  }
+
+  async function purgeRecoveryData(category: 'trash' | 'checkpoints' | 'backups'): Promise<void> {
+    const confirmKey = category === 'trash' ? 'settingsPage.deleteTrashConfirm'
+      : category === 'checkpoints' ? 'settingsPage.deleteCheckpointsConfirm'
+        : 'settingsPage.deleteBackupsConfirm';
+    if (!window.confirm(t(confirmKey))) return;
+    setPurgeBusyCategory(category);
+    if (category === 'backups') setBackupError(null);
+    else setRecoveryError(null);
+    try {
+      const result = await window.lnwjud.purgeRecoveryData({ category, userConfirmed: true });
+      await props.onRefresh();
+      const message = t('settingsPage.deletedRecoveryCount', { count: result.deleted });
+      if (category === 'backups') setBackupMessage(message);
+      else setRecoveryMessage(message);
+    } catch (cause: unknown) {
+      const message = cause instanceof Error ? cause.message : t('settingsPage.deleteRecoveryFailed');
+      if (category === 'backups') setBackupError(message);
+      else setRecoveryError(message);
+    } finally {
+      setPurgeBusyCategory(null);
     }
   }
 
@@ -981,7 +1005,7 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
                     {[7, 14, 30, 60, 90, 180, 365].map((days) => <option key={days} value={days}>{days} {t('settingsPage.days')}</option>)}
                   </select>
                 </div>
-                <div className="settings-mini-heading"><strong>{t('settingsPage.deletedBackups')}</strong><span>{props.dashboard.recovery.trashItems.length}</span></div>
+                <div className="settings-mini-heading"><strong>{t('settingsPage.deletedBackups')}</strong><div className="inline-actions"><span>{props.dashboard.recovery.trashItems.length}</span><button type="button" disabled={purgeBusyCategory !== null || recoveryBusyId !== null} onClick={() => { void purgeRecoveryData('trash'); }}>{purgeBusyCategory === 'trash' ? t('settingsPage.deleting') : t('settingsPage.deleteAllTrash')}</button></div></div>
                 {props.dashboard.recovery.trashItems.length === 0 ? <EmptyState>{t('settingsPage.recoveryEmpty')}</EmptyState> : (
                   <div className="backup-list settings-backup-list recovery-scroll-list" onScroll={(event) => { if (nearScrollEnd(event)) setTrashVisibleCount((current) => Math.min(props.dashboard.recovery.trashItems.length, current + RECOVERY_PAGE_SIZE)); }}>{props.dashboard.recovery.trashItems.slice(0, trashVisibleCount).map((item) => (
                     <div key={item.recoveryId} className="backup-item">
@@ -990,7 +1014,7 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
                     </div>
                   ))}</div>
                 )}
-                <div className="settings-mini-heading"><strong>{t('settingsPage.checkpoints')}</strong><span>{props.dashboard.recovery.checkpoints.length}</span></div>
+                <div className="settings-mini-heading"><strong>{t('settingsPage.checkpoints')}</strong><div className="inline-actions"><span>{props.dashboard.recovery.checkpoints.length}</span><button type="button" disabled={purgeBusyCategory !== null || recoveryBusyId !== null} onClick={() => { void purgeRecoveryData('checkpoints'); }}>{purgeBusyCategory === 'checkpoints' ? t('settingsPage.deleting') : t('settingsPage.deleteAllCheckpoints')}</button></div></div>
                 {props.dashboard.recovery.checkpoints.length === 0 ? <EmptyState>{t('settingsPage.noCheckpoints')}</EmptyState> : (
                   <div className="backup-list settings-backup-list recovery-scroll-list" onScroll={(event) => { if (nearScrollEnd(event)) setCheckpointVisibleCount((current) => Math.min(props.dashboard.recovery.checkpoints.length, current + RECOVERY_PAGE_SIZE)); }}>{props.dashboard.recovery.checkpoints.slice(0, checkpointVisibleCount).map((checkpoint) => {
                     const paths = checkpoint.files.map((file) => file.path);
@@ -1007,7 +1031,7 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
                     ⚠️ {t('backup.crossHostNotice')} {props.dashboard.restoreNotice.relinkRequired ? t('backup.crossHostRelink') : null} {props.dashboard.restoreNotice.incomplete ? t('backup.crossHostSecret') : null}
                   </div>
                 ) : null}
-                <SettingsCardHeading icon="▣" title={t('settingsPage.databaseBackup')} subtitle={t('settingsPage.sqliteSnapshots')} action={<button type="button" className="btn-save-gold" disabled={backupBusy} onClick={() => { void createBackupNow(); }}>{backupBusy ? t('settingsPage.working') : t('settingsPage.backupNow')}</button>} />
+                <SettingsCardHeading icon="▣" title={t('settingsPage.databaseBackup')} subtitle={t('settingsPage.sqliteSnapshots')} action={<div className="inline-actions"><button type="button" className="btn-save-gold" disabled={backupBusy || purgeBusyCategory !== null} onClick={() => { void createBackupNow(); }}>{backupBusy ? t('settingsPage.working') : t('settingsPage.backupNow')}</button><button type="button" disabled={backupBusy || purgeBusyCategory !== null} onClick={() => { void purgeRecoveryData('backups'); }}>{purgeBusyCategory === 'backups' ? t('settingsPage.deleting') : t('settingsPage.deleteAllBackups')}</button></div>} />
                 {props.dashboard.backups.length === 0 ? <EmptyState>{t('settingsPage.noBackups')}</EmptyState> : (
                   <div className="backup-list settings-backup-list recovery-scroll-list" onScroll={(event) => { if (nearScrollEnd(event)) setBackupVisibleCount((current) => Math.min(props.dashboard.backups.length, current + RECOVERY_PAGE_SIZE)); }}>{props.dashboard.backups.slice(0, backupVisibleCount).map((backup) => (
                     <div key={backup.id} className="backup-item"><div><strong>{formatDateTime(backup.createdAt, '—', props.locale)}</strong><p className="hint">{backup.reason} · {formatBytes(backup.sizeBytes)}{backup.hostCompatibility === 'cross_host' ? ` · ${t('backup.crossHostLabel')}` : ''}</p></div><button type="button" disabled={backupBusy || props.dashboard.tunnel.state === 'running' || props.dashboard.mcp.running} onClick={() => { void scheduleRestore(backup.id); }}>{t('settingsPage.restoreBackup')}</button></div>

@@ -21,6 +21,58 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.6.3',
+    categories: [
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          {
+            id: 'secure-tunnel-discovery',
+            titleKey: 'whatsNew.563.tunnelDiscovery.title',
+            descriptionKey: 'whatsNew.563.tunnelDiscovery.description',
+            badge: 'fixed',
+            tags: ['Secure Tunnel', 'OAuth discovery', 'tunnel-client'],
+          },
+          {
+            id: 'codex-runtime-discovery',
+            titleKey: 'whatsNew.563.codexRuntime.title',
+            descriptionKey: 'whatsNew.563.codexRuntime.description',
+            badge: 'fixed',
+            tags: ['Codex', 'Windows', 'runtime'],
+          },
+          {
+            id: 'tunnel-client-0015',
+            titleKey: 'whatsNew.563.tunnelClient.title',
+            descriptionKey: 'whatsNew.563.tunnelClient.description',
+            badge: 'improved',
+            tags: ['Secure Tunnel', 'tunnel-client', '0.0.15'],
+          },
+        ],
+      },
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          {
+            id: 'recovery-retention',
+            titleKey: 'whatsNew.563.recoveryRetention.title',
+            descriptionKey: 'whatsNew.563.recoveryRetention.description',
+            badge: 'fixed',
+            tags: ['Recovery', 'Backup', 'retention'],
+          },
+          {
+            id: 'recovery-delete-controls',
+            titleKey: 'whatsNew.563.recoveryDelete.title',
+            descriptionKey: 'whatsNew.563.recoveryDelete.description',
+            badge: 'new',
+            tags: ['Recovery Trash', 'checkpoints', 'backup'],
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.6.2',
     categories: [
       {
