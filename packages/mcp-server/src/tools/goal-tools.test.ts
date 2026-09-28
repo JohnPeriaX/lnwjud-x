@@ -83,6 +83,46 @@ describe('durable goal MCP tools', () => {
     expect(byName.get('get_goal')?.parse({ goalId: 'goal-1', workspaceId: 'workspace-1', goalKey: 'key' })).toMatchObject({ ok: false });
   });
 
+  it('forwards Engineering Harness gate updates and review findings from checkpoint_goal', async () => {
+    let checkpointRequest: unknown;
+    const context = {
+      actor,
+      contextEconomy: new ContextEconomyRuntime(),
+      services: {
+        goals: {
+          async checkpointGoal(_actor: unknown, request: unknown) {
+            checkpointRequest = request;
+            return ok({});
+          },
+        },
+      },
+    } as unknown as McpToolContext;
+    const checkpointTool = tool(context, 'checkpoint_goal');
+    const engineeringGateUpdates = [
+      { gateId: 'diff', status: 'passed', evidence: {
+        source: 'host_observed', observedAt: '2026-09-28T00:00:00.000Z', workspaceId: 'workspace-1',
+        commit: '33e1419', command: 'git diff --check', runId: 'host-task-1', exitCode: 0,
+        conclusion: 'passed', artifact: 'diff-check.log',
+      } },
+      { gateId: 'docs_impact', status: 'not_applicable', reason: 'No documentation change is needed.' },
+    ];
+    const engineeringReviewFindings = [
+      { id: 'review-1', title: 'Reviewed reported issue', severity: 'non_blocking', state: 'resolved', reason: 'Fix verified.', source: 'independent-review' },
+    ];
+    const parsed = checkpointTool.parse({
+      goalId: 'goal-1', leaseToken: 'lease-token', expectedRevision: 1,
+      currentPhase: 'verify', summary: 'Ready to finish.', stepUpdates: [], nextAction: 'Finish.',
+      blockers: [], evidence: [], trackedTasks: [], engineeringGateUpdates, engineeringReviewFindings,
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error('checkpoint_goal input was rejected');
+
+    const result = await checkpointTool.execute(parsed.value, new AbortController().signal);
+
+    expect(result.ok).toBe(true);
+    expect(checkpointRequest).toMatchObject({ engineeringGateUpdates, engineeringReviewFindings });
+  });
+
   it('run_goal returns immediately and never invokes process/capability execution', async () => {
     let runs = 0;
     let runRequest: unknown;
