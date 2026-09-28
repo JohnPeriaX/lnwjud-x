@@ -51,11 +51,11 @@ The tunnel is outbound-only: `tunnel-client` runs beside lnwjud, reaches OpenAI
 over outbound HTTPS, forwards MCP work to lnwjud's Desktop loopback HTTP MCP,
 and returns the response without opening a public inbound port on the host.
 
-## Current published version: v5.6.6
+## Current published version: v5.7.0
 
 ## Current source version: v5.7.0
 
-Latest published release: **v5.6.6**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
+Latest published release: **v5.7.0**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
 
 ### What's new in v5.7.0
 
@@ -195,13 +195,13 @@ Choose the guide for the host you will run lnwjud on:
 
 1. Download the latest published installer from
    [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/latest).
-   Current published Windows 10/11 x64 v5.6.6 artifacts are `lnwjud-Setup-5.6.6.exe` (recommended installer) and `lnwjud-Portable-5.6.6.exe` (no installation required).
+   Current published Windows 10/11 x64 v5.7.0 artifacts are `lnwjud-Setup-5.7.0.exe` (recommended installer) and `lnwjud-Portable-5.7.0.exe` (no installation required).
 2. Run the NSIS installer and launch **lnwjud Agent Control Center**.
 3. Add or select the project/workspace you want lnwjud to operate on.
 4. Review **Settings** before attaching an AI client, especially Permission
    Profile and Unrestricted Mode.
 
-If you prefer not to install the app, run the currently published `lnwjud-Portable-5.6.6.exe` directly.
+If you prefer not to install the app, run the currently published `lnwjud-Portable-5.7.0.exe` directly.
 Portable mode uses the same per-user lnwjud data/settings location as the installer;
 it is a portable executable, not a keep-all-data-next-to-the-EXE mode.
 Automatic updates preserve the distribution you chose. Installer users read
