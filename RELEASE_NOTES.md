@@ -2,6 +2,10 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.7.1
+
+- **Engineering Harness checkpoint fix:** `checkpoint_goal` now forwards gate updates and review findings to the Goal service. Accepted updates persist in the durable Goal instead of silently leaving the gate state unchanged.
+
 ### What's new in v5.7.0
 
 - **Opt in to Engineering Harness:** enable it in Settings and select a preset for coding work. It defaults Off, supports project overrides, and respects existing permissions.
