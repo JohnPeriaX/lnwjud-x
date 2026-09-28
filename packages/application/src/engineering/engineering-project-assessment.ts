@@ -111,7 +111,7 @@ export class EngineeringProjectAssessmentService {
         targetDirectory = path.dirname(targetDirectory);
         break;
       } catch (error) {
-        if (!isMissing(error)) throw error;
+        if (!isPathLookupMiss(error)) throw error;
         const parentDirectory = path.dirname(targetDirectory);
         if (parentDirectory === targetDirectory) {
           targetDirectory = rootPath;
@@ -185,6 +185,10 @@ function relativeSlash(rootPath: string, targetPath: string): string {
 function pathContains(rootPath: string, targetPath: string): boolean {
   const relative = path.relative(rootPath, targetPath);
   return relative.length === 0 || (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`));
+}
+
+function isPathLookupMiss(error: unknown): boolean {
+  return isRecord(error) && (error.code === 'ENOENT' || error.code === 'ENOTDIR');
 }
 
 function isMissing(error: unknown): boolean {
