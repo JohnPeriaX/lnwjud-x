@@ -21,6 +21,24 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.7.1',
+    categories: [
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          {
+            id: 'engineering-checkpoint-gate-results',
+            titleKey: 'whatsNew.571.checkpointResults.title',
+            descriptionKey: 'whatsNew.571.checkpointResults.description',
+            badge: 'fixed',
+            tags: ['Engineering Harness', 'checkpoint', 'diff', 'docs_impact'],
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.7.0',
     categories: [
       {
