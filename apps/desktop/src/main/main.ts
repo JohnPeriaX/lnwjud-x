@@ -235,6 +235,9 @@ const defaultUserSettings: UserSettings = {
   codexToolsEnabled: false,
   eccEnabled: false,
   ponytailMode: 'off',
+  engineeringHarness: { schemaVersion: 1, enabled: false, profile: 'senior', applyTo: 'coding_projects', autoProjectAssessment: true },
+  engineeringHarnessWorkspaceOverrides: {},
+  engineeringHarnessDiagnostic: null,
   updateAutoCheck: true,
   updateCheckOnStartup: true,
   updateIntervalMinutes: 30,
@@ -297,6 +300,16 @@ const defaultDesktopServices: DesktopIpcServices = {
     tunnel: emptyTunnel,
     remoteMcp: emptyRemoteMcp,
     settings: defaultUserSettings,
+    engineeringHarnessStatus: {
+      workspaceId: null,
+      enabled: false,
+      source: 'unavailable',
+      profile: 'senior',
+      policyDigest: null,
+      reasons: ['No workspace is selected.'],
+      diagnostic: null,
+      task: null,
+    },
     hostPlatform: supportedHostPlatform(process.platform),
     hostArch: process.arch === 'arm64' ? 'arm64' : 'x64',
     appVersion: APP_VERSION,
@@ -1275,6 +1288,9 @@ function parseUserSettings(record: Record<string, unknown>): UserSettings {
     codexToolsEnabled: booleanField(record.codexToolsEnabled, 'codexToolsEnabled'),
     eccEnabled: record.eccEnabled === undefined ? false : booleanField(record.eccEnabled, 'eccEnabled'),
     ponytailMode: ponytailModeField(record.ponytailMode),
+    ...(record.engineeringHarness === undefined ? {} : { engineeringHarness: engineeringHarnessSettingsField(record.engineeringHarness) }),
+    ...(record.engineeringHarnessWorkspaceOverrides === undefined ? {} : { engineeringHarnessWorkspaceOverrides: engineeringHarnessWorkspaceOverridesField(record.engineeringHarnessWorkspaceOverrides) }),
+    ...(record.engineeringHarnessDiagnostic === undefined ? {} : { engineeringHarnessDiagnostic: engineeringHarnessDiagnosticField(record.engineeringHarnessDiagnostic) }),
     updateAutoCheck: booleanField(record.updateAutoCheck, 'updateAutoCheck'),
     updateCheckOnStartup: booleanField(record.updateCheckOnStartup, 'updateCheckOnStartup'),
     updateIntervalMinutes: boundedInteger(record.updateIntervalMinutes, 'updateIntervalMinutes', 5, 24 * 60),
@@ -1329,6 +1345,57 @@ function permissionDecision(value: unknown, field: string): 'ALLOW' | 'ASK' | 'D
 function ponytailModeField(value: unknown): 'off' | 'lite' | 'full' | 'ultra' {
   if (value === 'off' || value === 'lite' || value === 'full' || value === 'ultra') return value;
   throw new Error('Invalid IPC payload: ponytailMode');
+}
+
+function engineeringHarnessSettingsField(value: unknown): NonNullable<UserSettings['engineeringHarness']> {
+  if (!isRecord(value)
+    || Object.keys(value).some((key) => !['schemaVersion', 'enabled', 'profile', 'applyTo', 'autoProjectAssessment', 'custom'].includes(key))
+    || value.schemaVersion !== 1
+    || typeof value.enabled !== 'boolean'
+    || (value.profile !== 'standard' && value.profile !== 'senior' && value.profile !== 'strict' && value.profile !== 'custom')
+    || (value.applyTo !== 'coding_projects' && value.applyTo !== 'all_workspaces')
+    || typeof value.autoProjectAssessment !== 'boolean') throw new Error('Invalid IPC payload: engineeringHarness');
+  const custom = value.custom;
+  if (custom !== undefined && (!isRecord(custom)
+    || Object.keys(custom).some((key) => !['analysis', 'review', 'validation', 'docsImpactCheck'].includes(key))
+    || (custom.analysis !== 'focused' && custom.analysis !== 'cross_file')
+    || (custom.review !== 'risk_based' && custom.review !== 'always')
+    || (custom.validation !== 'risk_based' && custom.validation !== 'strict')
+    || typeof custom.docsImpactCheck !== 'boolean')) throw new Error('Invalid IPC payload: engineeringHarness.custom');
+  return {
+    schemaVersion: 1,
+    enabled: value.enabled,
+    profile: value.profile,
+    applyTo: value.applyTo,
+    autoProjectAssessment: value.autoProjectAssessment,
+    ...(custom === undefined ? {} : { custom: {
+      analysis: custom.analysis as 'focused' | 'cross_file',
+      review: custom.review as 'risk_based' | 'always',
+      validation: custom.validation as 'risk_based' | 'strict',
+      docsImpactCheck: custom.docsImpactCheck as boolean,
+    } }),
+  };
+}
+
+function engineeringHarnessWorkspaceOverridesField(value: unknown): NonNullable<UserSettings['engineeringHarnessWorkspaceOverrides']> {
+  if (!isRecord(value) || Object.keys(value).length > 256) throw new Error('Invalid IPC payload: engineeringHarnessWorkspaceOverrides');
+  const result: Record<string, { readonly mode: 'on' | 'off'; readonly profile?: 'standard' | 'senior' | 'strict' | 'custom' }> = {};
+  for (const [workspaceId, entry] of Object.entries(value)) {
+    if (workspaceId.trim().length === 0 || workspaceId.length > 128 || !isRecord(entry)
+      || (entry.mode !== 'on' && entry.mode !== 'off')
+      || Object.keys(entry).some((key) => key !== 'mode' && key !== 'profile')
+      || (entry.profile !== undefined && entry.profile !== 'standard' && entry.profile !== 'senior' && entry.profile !== 'strict' && entry.profile !== 'custom')) {
+      throw new Error('Invalid IPC payload: engineeringHarnessWorkspaceOverrides');
+    }
+    result[workspaceId] = { mode: entry.mode, ...(entry.profile === undefined ? {} : { profile: entry.profile }) };
+  }
+  return result;
+}
+
+function engineeringHarnessDiagnosticField(value: unknown): Exclude<UserSettings['engineeringHarnessDiagnostic'], undefined> {
+  if (value === null) return null;
+  if (value === 'invalid_json' || value === 'invalid_shape' || value === 'unsupported_schema_version') return value;
+  throw new Error('Invalid IPC payload: engineeringHarnessDiagnostic');
 }
 
 function ponytailModeOverrideField(value: unknown): 'inherit' | 'off' | 'lite' | 'full' | 'ultra' {
@@ -1780,6 +1847,11 @@ function bootstrapMcpStdio(): void {
       hostMutationApprovalProvider: requestNativeMutationApproval,
       codexToolsEnabledProvider: () => runtime.getUserSettings().codexToolsEnabled,
       ponytailModeProvider: () => runtime.getUserSettings().ponytailMode,
+      engineeringHarnessEnabledProvider: (): boolean => {
+        const settings = runtime.getUserSettings();
+        return settings.engineeringHarness?.enabled === true
+          || Object.values(settings.engineeringHarnessWorkspaceOverrides ?? {}).some((entry) => entry.mode === 'on');
+      },
       toolAvailabilitySnapshotProvider: () => runtime.toolAvailabilityService.snapshot(),
       toolAvailabilitySubscribe: (listener) => runtime.toolAvailabilityService.subscribe(listener),
       onError: (error): void => {

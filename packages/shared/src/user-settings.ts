@@ -29,6 +29,8 @@ export const USER_SETTING_KEYS = Object.freeze({
   tunnelAutoReconnect: 'tunnel_auto_reconnect',
   tunnelMaxAutoRestarts: 'tunnel_max_auto_restarts',
   recoveryRetentionDays: 'recovery_retention_days',
+  engineeringHarnessSettings: 'engineering_harness_settings_v1',
+  engineeringHarnessWorkspaceOverrides: 'engineering_harness_workspace_overrides_v1',
 });
 
 export const DEFAULT_MCP_CALL_TIMEOUT_MS = 60_000;
@@ -46,6 +48,43 @@ export const DEFAULT_RECOVERY_RETENTION_DAYS = 30;
 
 export type CloseBehavior = 'tray' | 'quit';
 export type PermissionDecisionSetting = 'ALLOW' | 'ASK' | 'DENY';
+export type EngineeringProfile = 'standard' | 'senior' | 'strict' | 'custom';
+export type EngineeringApplyTo = 'coding_projects' | 'all_workspaces';
+export type EngineeringHarnessDiagnostic = 'invalid_json' | 'invalid_shape' | 'unsupported_schema_version';
+
+export interface EngineeringHarnessSettings {
+  readonly schemaVersion: 1;
+  readonly enabled: boolean;
+  readonly profile: EngineeringProfile;
+  readonly applyTo: EngineeringApplyTo;
+  readonly autoProjectAssessment: boolean;
+  readonly custom?: {
+    readonly analysis: 'focused' | 'cross_file';
+    readonly review: 'risk_based' | 'always';
+    readonly validation: 'risk_based' | 'strict';
+    readonly docsImpactCheck: boolean;
+  };
+}
+
+export interface ParsedEngineeringHarnessSettings {
+  readonly settings: EngineeringHarnessSettings;
+  readonly diagnostic: EngineeringHarnessDiagnostic | null;
+}
+
+export interface EngineeringHarnessWorkspaceOverride {
+  readonly mode: 'on' | 'off';
+  readonly profile?: EngineeringProfile;
+}
+
+export type EngineeringHarnessWorkspaceOverrides = Readonly<Record<string, EngineeringHarnessWorkspaceOverride>>;
+
+export const DEFAULT_ENGINEERING_HARNESS_SETTINGS: EngineeringHarnessSettings = Object.freeze({
+  schemaVersion: 1,
+  enabled: false,
+  profile: 'senior',
+  applyTo: 'coding_projects',
+  autoProjectAssessment: true,
+});
 
 export interface CustomPermissionSettings {
   readonly read: PermissionDecisionSetting;
@@ -149,6 +188,115 @@ export function serializeCustomPermissionSettings(value: CustomPermissionSetting
     dangerous: parseDecision(value.dangerous, 'DENY'),
     allowedExecutables: [...new Set(value.allowedExecutables.map((entry) => entry.trim()).filter((entry) => entry.length > 0))],
   });
+}
+
+const MAX_ENGINEERING_HARNESS_SETTING_BYTES = 16 * 1024;
+
+export function parseEngineeringHarnessSettings(value: string | null | undefined): ParsedEngineeringHarnessSettings {
+  if (value === null || value === undefined || value.trim().length === 0) {
+    return { settings: DEFAULT_ENGINEERING_HARNESS_SETTINGS, diagnostic: null };
+  }
+  if (new TextEncoder().encode(value).byteLength > MAX_ENGINEERING_HARNESS_SETTING_BYTES) {
+    return { settings: DEFAULT_ENGINEERING_HARNESS_SETTINGS, diagnostic: 'invalid_shape' };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value) as unknown;
+  } catch {
+    return { settings: DEFAULT_ENGINEERING_HARNESS_SETTINGS, diagnostic: 'invalid_json' };
+  }
+  if (!isRecord(parsed)) return { settings: DEFAULT_ENGINEERING_HARNESS_SETTINGS, diagnostic: 'invalid_shape' };
+  if (parsed.schemaVersion !== 1) return { settings: DEFAULT_ENGINEERING_HARNESS_SETTINGS, diagnostic: 'unsupported_schema_version' };
+  if (typeof parsed.enabled !== 'boolean'
+    || !isEngineeringProfile(parsed.profile)
+    || !isEngineeringApplyTo(parsed.applyTo)
+    || typeof parsed.autoProjectAssessment !== 'boolean'
+    || !hasOnlyKeys(parsed, ['schemaVersion', 'enabled', 'profile', 'applyTo', 'autoProjectAssessment', 'custom'])) {
+    return { settings: DEFAULT_ENGINEERING_HARNESS_SETTINGS, diagnostic: 'invalid_shape' };
+  }
+  const custom = parsed.custom === undefined ? undefined : parseEngineeringCustomSettings(parsed.custom);
+  if (custom === null) {
+    return { settings: DEFAULT_ENGINEERING_HARNESS_SETTINGS, diagnostic: 'invalid_shape' };
+  }
+  return {
+    settings: {
+      schemaVersion: 1,
+      enabled: parsed.enabled,
+      profile: parsed.profile,
+      applyTo: parsed.applyTo,
+      autoProjectAssessment: parsed.autoProjectAssessment,
+      ...(custom === undefined ? {} : { custom }),
+    },
+    diagnostic: null,
+  };
+}
+
+export function serializeEngineeringHarnessSettings(value: EngineeringHarnessSettings): string {
+  return JSON.stringify({
+    schemaVersion: 1,
+    enabled: value.enabled === true,
+    profile: isEngineeringProfile(value.profile) ? value.profile : DEFAULT_ENGINEERING_HARNESS_SETTINGS.profile,
+    applyTo: isEngineeringApplyTo(value.applyTo) ? value.applyTo : DEFAULT_ENGINEERING_HARNESS_SETTINGS.applyTo,
+    autoProjectAssessment: value.autoProjectAssessment === true,
+    ...(value.custom === undefined ? {} : { custom: value.custom }),
+  });
+}
+
+export function parseEngineeringHarnessWorkspaceOverrides(value: string | null | undefined): EngineeringHarnessWorkspaceOverrides {
+  if (value === null || value === undefined || value.trim().length === 0) return {};
+  if (new TextEncoder().encode(value).byteLength > 64 * 1024) return {};
+  let parsed: unknown;
+  try { parsed = JSON.parse(value) as unknown; } catch { return {}; }
+  if (!isRecord(parsed) || Object.keys(parsed).length > 256) return {};
+  const result: Record<string, EngineeringHarnessWorkspaceOverride> = {};
+  for (const [workspaceId, entry] of Object.entries(parsed)) {
+    if (workspaceId.trim().length === 0 || workspaceId.length > 128 || !isRecord(entry)) return {};
+    if (!hasOnlyKeys(entry, ['mode', 'profile']) || (entry.mode !== 'on' && entry.mode !== 'off')) return {};
+    if (entry.profile !== undefined && !isEngineeringProfile(entry.profile)) return {};
+    result[workspaceId] = {
+      mode: entry.mode,
+      ...(entry.profile === undefined ? {} : { profile: entry.profile }),
+    };
+  }
+  return result;
+}
+
+export function serializeEngineeringHarnessWorkspaceOverrides(value: EngineeringHarnessWorkspaceOverrides): string {
+  const entries = Object.entries(value)
+    .filter(([workspaceId, entry]) => workspaceId.trim().length > 0 && workspaceId.length <= 128 && (entry.mode === 'on' || entry.mode === 'off'))
+    .slice(0, 256)
+    .map(([workspaceId, entry]) => [workspaceId, {
+      mode: entry.mode,
+      ...(entry.profile === undefined || !isEngineeringProfile(entry.profile) ? {} : { profile: entry.profile }),
+    }]);
+  return JSON.stringify(Object.fromEntries(entries));
+}
+
+function parseEngineeringCustomSettings(value: unknown): EngineeringHarnessSettings['custom'] | null {
+  if (!isRecord(value) || !hasOnlyKeys(value, ['analysis', 'review', 'validation', 'docsImpactCheck'])) return null;
+  if ((value.analysis !== 'focused' && value.analysis !== 'cross_file')
+    || (value.review !== 'risk_based' && value.review !== 'always')
+    || (value.validation !== 'risk_based' && value.validation !== 'strict')
+    || typeof value.docsImpactCheck !== 'boolean') return null;
+  return {
+    analysis: value.analysis,
+    review: value.review,
+    validation: value.validation,
+    docsImpactCheck: value.docsImpactCheck,
+  };
+}
+
+function isEngineeringProfile(value: unknown): value is EngineeringProfile {
+  return value === 'standard' || value === 'senior' || value === 'strict' || value === 'custom';
+}
+
+function isEngineeringApplyTo(value: unknown): value is EngineeringApplyTo {
+  return value === 'coding_projects' || value === 'all_workspaces';
+}
+
+function hasOnlyKeys(value: Readonly<Record<string, unknown>>, keys: readonly string[]): boolean {
+  const allowed = new Set(keys);
+  return Object.keys(value).every((key) => allowed.has(key));
 }
 
 function parseDecision(value: unknown, fallback: PermissionDecisionSetting): PermissionDecisionSetting {

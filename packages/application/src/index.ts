@@ -26,3 +26,7 @@ export * from './agent-swarm-types.js';
 export * from './agent-swarm-service.js';
 export * from './automation-service.js';
 export * from './automation-verifier.js';
+export * from './engineering/engineering-policy.js';
+export * from './engineering/engineering-project-assessment.js';
+export * from './engineering/engineering-preparation-service.js';
+export * from './engineering/engineering-workflow.js';

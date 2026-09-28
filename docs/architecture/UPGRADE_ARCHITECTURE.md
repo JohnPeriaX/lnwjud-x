@@ -1,6 +1,6 @@
 # lnwjud upgrade architecture contract
 
-Status: God-Tier local-first implementation checkpoint synchronized for `v5.6.6`.
+Status: God-Tier local-first implementation checkpoint synchronized for `v5.7.0`.
 
 This document is the architectural boundary for the upgrade roadmap. It describes
 the existing runtime before Phase 01 and the invariants every later phase must
@@ -42,7 +42,7 @@ MCP clients (ChatGPT / Codex / Claude / other agents)
              MCP stdio or loopback Streamable HTTP
                          |
                          v
-                  ToolRegistry (276 total definitions; 264 default; all 276 with Codex + Agent Swarm)
+                  ToolRegistry (279 total definitions; 267 default; all 279 with Codex + Agent Swarm)
                          |
        +-----------------+------------------+
        |                 |                  |

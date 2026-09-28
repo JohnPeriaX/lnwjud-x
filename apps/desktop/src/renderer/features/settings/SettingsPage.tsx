@@ -53,7 +53,7 @@ interface SettingsPageProps {
   readonly requestedSection?: { readonly section: SettingsSection; readonly focus?: SettingsFocusTarget; readonly requestId: number } | undefined;
 }
 
-export type SettingsSection = 'general' | 'security' | 'tools' | 'mcp' | 'tunnel' | 'backup';
+export type SettingsSection = 'general' | 'security' | 'engineering' | 'tools' | 'mcp' | 'tunnel' | 'backup';
 export type SettingsFocusTarget = 'security-profile' | 'tools-ecc' | 'tools-codex' | 'tools-local-providers' | 'mcp-servers';
 type DestructiveApprovalKey = keyof DestructiveDeletePolicy['approvals'];
 
@@ -477,6 +477,7 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
   const navItems: readonly { id: SettingsSection; icon: string; title: string; description: string }[] = [
     { id: 'general', icon: '⌘', title: t('settingsPage.nav.general'), description: t('settingsPage.nav.generalDesc') },
     { id: 'security', icon: '◇', title: t('settingsPage.nav.security'), description: t('settingsPage.nav.securityDesc') },
+    { id: 'engineering', icon: '⌘', title: t('settingsPage.nav.engineering'), description: t('settingsPage.nav.engineeringDesc') },
     { id: 'tools', icon: '◎', title: t('settingsPage.nav.tools'), description: t('settingsPage.nav.toolsDesc') },
     { id: 'mcp', icon: '⬡', title: 'MCP & Extensions', description: t('settingsPage.nav.mcpDesc') },
     { id: 'tunnel', icon: '↗', title: t('settingsPage.nav.tunnel'), description: t('settingsPage.nav.tunnelDesc') },
@@ -672,6 +673,8 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
               permissionProfile={props.dashboard.permissionProfile}
               stdioPermissionProfile={props.dashboard.stdioPermissionProfile}
               settings={props.dashboard.settings}
+              selectedWorkspace={props.dashboard.selectedWorkspace}
+              engineeringStatus={props.dashboard.engineeringHarnessStatus}
               section={userConfigSection}
               unrestricted={props.dashboard.unrestricted}
               onUnrestrictedChange={props.onUnrestrictedChange}

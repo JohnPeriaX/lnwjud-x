@@ -539,9 +539,78 @@ function dashboard(value: unknown): DashboardSnapshot {
     tunnel: tunnelStatus(value.tunnel),
     remoteMcp: remoteMcpStatus(value.remoteMcp),
     settings: userSettings(value.settings),
+    engineeringHarnessStatus: engineeringHarnessStatus(value.engineeringHarnessStatus),
     hostPlatform,
     hostArch,
     appVersion: stringField(value, 'appVersion'),
+  };
+}
+
+function engineeringHarnessStatus(value: unknown): DashboardSnapshot['engineeringHarnessStatus'] {
+  if (!isRecord(value)) throw new Error('Invalid IPC response');
+  const workspaceId = value.workspaceId;
+  const source = value.source;
+  const profile = value.profile;
+  const policyDigest = value.policyDigest;
+  const diagnostic = value.diagnostic;
+  if ((workspaceId !== null && typeof workspaceId !== 'string')
+    || typeof value.enabled !== 'boolean'
+    || !['global', 'workspace', 'project', 'task_scope', 'project_signal', 'unavailable'].includes(String(source))
+    || !['standard', 'senior', 'strict', 'custom'].includes(String(profile))
+    || (policyDigest !== null && typeof policyDigest !== 'string')
+    || (diagnostic !== null && diagnostic !== 'invalid_json' && diagnostic !== 'invalid_shape' && diagnostic !== 'unsupported_schema_version')) {
+    throw new Error('Invalid IPC response');
+  }
+  const reasons = stringList(value.reasons);
+  let task: DashboardSnapshot['engineeringHarnessStatus']['task'] = null;
+  if (value.task !== null) {
+    if (!isRecord(value.task) || !Array.isArray(value.task.gates)) throw new Error('Invalid IPC response');
+    const primaryTaskKind = value.task.primaryTaskKind;
+    const riskTier = value.task.riskTier;
+    const deliveryScope = value.task.deliveryScope;
+    if (!['feature', 'bugfix', 'refactor', 'review', 'incident', 'release', 'maintenance', 'docs', 'unknown'].includes(String(primaryTaskKind))
+      || !['low', 'medium', 'high', 'critical'].includes(String(riskTier))
+      || !['local', 'commit', 'push', 'pull_request', 'merge', 'release', 'deploy'].includes(String(deliveryScope))) {
+      throw new Error('Invalid IPC response');
+    }
+    task = {
+      goalId: stringField(value.task, 'goalId'),
+      goalKey: stringField(value.task, 'goalKey'),
+      currentPhase: stringField(value.task, 'currentPhase'),
+      nextAction: stringField(value.task, 'nextAction'),
+      primaryTaskKind: primaryTaskKind as NonNullable<DashboardSnapshot['engineeringHarnessStatus']['task']>['primaryTaskKind'],
+      riskTier: riskTier as NonNullable<DashboardSnapshot['engineeringHarnessStatus']['task']>['riskTier'],
+      deliveryScope: deliveryScope as NonNullable<DashboardSnapshot['engineeringHarnessStatus']['task']>['deliveryScope'],
+      gates: value.task.gates.map((entry: unknown) => {
+        if (!isRecord(entry)) throw new Error('Invalid IPC response');
+        const applicability = entry.applicability;
+        const status = entry.status;
+        const evidenceSource = entry.evidenceSource;
+        if (!['required', 'optional', 'not_applicable'].includes(String(applicability))
+          || !['pending', 'running', 'passed', 'failed', 'blocked', 'not_applicable', 'stale'].includes(String(status))
+          || (evidenceSource !== undefined && evidenceSource !== 'host_observed' && evidenceSource !== 'user_attested')) {
+          throw new Error('Invalid IPC response');
+        }
+        return {
+          id: stringField(entry, 'id'),
+          title: stringField(entry, 'title'),
+          applicability: applicability as 'required' | 'optional' | 'not_applicable',
+          status: status as 'pending' | 'running' | 'passed' | 'failed' | 'blocked' | 'not_applicable' | 'stale',
+          reason: stringField(entry, 'reason'),
+          ...(evidenceSource === undefined ? {} : { evidenceSource }),
+        };
+      }),
+    };
+  }
+  return {
+    workspaceId: workspaceId as string | null,
+    enabled: value.enabled,
+    source: source as DashboardSnapshot['engineeringHarnessStatus']['source'],
+    profile: profile as DashboardSnapshot['engineeringHarnessStatus']['profile'],
+    policyDigest: policyDigest as string | null,
+    reasons,
+    diagnostic: diagnostic as DashboardSnapshot['engineeringHarnessStatus']['diagnostic'],
+    task,
   };
 }
 

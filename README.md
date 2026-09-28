@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Cross-platform local AI-agent runtime and MCP gateway</strong><br />
-  <em>276 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 264 are advertised by default and all 276 when Codex delegation plus Agent Swarm is enabled.</em>
+  <em>279 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 267 are advertised by default and all 279 when Codex delegation plus Agent Swarm is enabled.</em>
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D4" />
   <img alt="Node" src="https://img.shields.io/badge/Node.js-24.x-339933" />
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-276%20tools-6f42c1" />
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-279%20tools-6f42c1" />
 </p>
 
 <h2 align="center">Download lnwjud</h2>
@@ -53,9 +53,18 @@
 
 ## Current published version: v5.6.6
 
-## Current source version: v5.6.6
+## Current source version: v5.7.0
 
 Latest published release: **v5.6.6**. The download buttons above point directly to the v5.6.6 assets. The release is published only after the exact tagged main commit passes the target-native release gates.
+
+### What's new in v5.7.0
+
+- **Engineering Harness is opt-in:** choose a workflow preset and project override for coding tasks. It stays Off until you enable it.
+- **Durable plans resume safely:** substantive tasks keep plans, acceptance checks, checkpoints, and evidence in the existing Goal.
+- **Mutation and evidence gates enforce scope:** active Harness binds first-party changes to the current task. Pending, stale, or local-only evidence cannot pass hosted gates.
+- **Authorized continuation handles failures:** it works through fixable failures and keeps goal ownership and checkpoint details across handoffs.
+
+See the [Thai Engineering Harness guide](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for setup and workflow details.
 
 ### What's new in v5.6.6
 
@@ -70,15 +79,6 @@ Latest published release: **v5.6.6**. The download buttons above point directly 
 - **Reliability fixes since v5.6.4:** the Desktop Agent Stop state remains accurate after a refresh, and concurrent startup no longer exposes a partially written checkpoint encryption key.
 
 See the [Thai troubleshooting guide](docs/USAGE_TH.md#13-doctor--troubleshooting) for simple Agent Swarm setup steps.
-
-### What's new in v5.6.4
-
-- **ChatGPT Tunnel after an app restart:** lnwjud reconnects the existing Tunnel ID to its current local MCP port. On Windows, it closes an older duplicate client only after confirming that it belongs to the same lnwjud Tunnel. If verification is inconclusive, restart Windows and open lnwjud again; there is no need to create another Tunnel ID.
-- **Connect in ChatGPT:** choose **Tunnel**, select your existing Tunnel ID, and choose **No authentication** for lnwjud's Runtime API key setup. The Runtime API key belongs in lnwjud, not in ChatGPT's OAuth fields. If the connection already exists, refresh it after updating. Secure Tunnel is for private/developer-mode connections; public plugin submission needs a public HTTPS MCP endpoint.
-- **Easier to use:** Tunnel buttons are disabled while starting, old Live Log entries keep their real timestamps, and the Git changed-files list fills the available window height.
-- **Faster release checks:** Windows workspace tests and the remaining release checks run together in CI; main also starts target-native package builds alongside test jobs. The required checks still gate publication.
-
-See the [Thai setup and recovery guide](docs/USAGE_TH.md#5-เชื่อม-lnwjud-เข้ากับ-chatgpt) for step-by-step help. The separate ngrok + OAuth option is described there as well.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for earlier versions and the complete release history.
 
@@ -108,11 +108,26 @@ See [Install lnwjud on Linux](docs/INSTALL_LINUX.md) for AppImage/DEB installati
 
 ### Local data vs workspace metadata
 
-Installed lnwjud keeps per-user runtime data outside your source repository: `%APPDATA%\lnwjud` on Windows, `~/Library/Application Support/lnwjud` on macOS, and `$XDG_DATA_HOME/lnwjud` (or `~/.local/share/lnwjud`) on Linux unless `LNWJUD_DATA_PATH` is explicitly set. A workspace may contain `.lnwjud/project-profile.json` for project-scoped policy such as Ponytail mode; `.lnwjud/` is local metadata and is ignored by this repository.
+Installed lnwjud keeps per-user runtime data outside your source repository: `%APPDATA%\lnwjud` on Windows, `~/Library/Application Support/lnwjud` on macOS, and `$XDG_DATA_HOME/lnwjud` (or `~/.local/share/lnwjud`) on Linux unless `LNWJUD_DATA_PATH` is explicitly set. A workspace may contain `.lnwjud/project-profile.json` for project-scoped policy such as Ponytail or Engineering Harness mode/profile; `.lnwjud/` is local metadata and is ignored by this repository.
+
+### Engineering Harness (opt-in)
+
+Engineering Harness is **Off by default**. Enable it in **Settings → Engineering Harness** when you want lnwjud to turn a substantive coding request into a durable, risk-based workflow instead of treating every request the same way.
+
+- **Presets:** Standard, **Senior** (recommended), Strict, or Custom.
+- **Scope:** coding projects/tasks by default, with an optional per-workspace On/Off + preset override.
+- **Policy precedence:** explicit workspace/project opt-out wins; project policy can strengthen a preset but cannot silently weaken an explicit user opt-out.
+- **Durability:** `engineering_start_task` reuses the existing durable Goal authority. Requirement changes increment the Goal intent revision and stale only affected Engineering gates instead of resetting proven work.
+- **Evidence:** required checks remain Pending/Running/Failed/Stale until observed evidence satisfies them. Host-observed mechanical checks are not replaced by a model assertion.
+- **Enforcement:** first-party development mutations such as guarded file edits, Git, shell/process/project commands, verification, Codex/Agent Swarm and worktree operations require the current `engineeringTask` binding when Harness is active. Existing permission, Active Project, recovery, Full Bypass and rolling `goalLease` rules still apply independently.
+- **Advisory boundary:** external `mcp_call`, general Office/web/native-UI routes are not mechanically Engineering-guarded in v5.7.0; their existing security/permission controls remain authoritative.
+- **No hidden writes:** project assessment and the Settings project-profile preview do not write repository files, commit, push, deploy, or create a Scheduled Task by themselves.
+
+For the Thai setup and workflow guide, see [docs/USAGE_TH.md](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow).
 
 ## What can lnwjud do?
 
-lnwjud exposes **276 tool definitions** through one local runtime and MCP gateway. The default advertised set is 264; all 276 are available when Codex delegation plus Agent Swarm is enabled.
+lnwjud exposes **279 tool definitions** through one local runtime and MCP gateway. The default advertised set is 267; all 279 are available when Codex delegation plus Agent Swarm is enabled.
 
 | Area | Examples |
 | --- | --- |

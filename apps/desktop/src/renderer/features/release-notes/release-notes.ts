@@ -21,6 +21,44 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.7.0',
+    categories: [
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          {
+            id: 'engineering-harness-workflow',
+            titleKey: 'whatsNew.570.engineeringHarness.title',
+            descriptionKey: 'whatsNew.570.engineeringHarness.description',
+            badge: 'new',
+            tags: ['Engineering Harness', 'Durable Goals', 'workflow'],
+          },
+          {
+            id: 'engineering-harness-settings',
+            titleKey: 'whatsNew.570.engineeringSettings.title',
+            descriptionKey: 'whatsNew.570.engineeringSettings.description',
+            badge: 'new',
+            tags: ['Settings', 'Thai', 'English'],
+          },
+        ],
+      },
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          {
+            id: 'engineering-harness-evidence',
+            titleKey: 'whatsNew.570.engineeringEvidence.title',
+            descriptionKey: 'whatsNew.570.engineeringEvidence.description',
+            badge: 'improved',
+            tags: ['Evidence', 'Review', 'Full Bypass'],
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.6.5',
     categories: [
       {

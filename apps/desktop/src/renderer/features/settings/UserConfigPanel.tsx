@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type {
+  DashboardEngineeringHarnessStatus,
+  EngineeringProfile,
   ExtraMcpServerSettings,
   PermissionDecisionSetting,
   PermissionProfileName,
@@ -12,7 +14,7 @@ import { createTranslator } from '../../i18n/index.js';
 import { SettingsCardHeading, StatusMessage, EmptyState } from '../ui/UiPrimitives.js';
 import { SettingSwitch } from './SettingSwitch.js';
 
-export type UserConfigSection = 'general' | 'security' | 'tools' | 'mcp' | 'tunnel';
+export type UserConfigSection = 'general' | 'security' | 'engineering' | 'tools' | 'mcp' | 'tunnel';
 
 interface UserConfigPanelProps {
   readonly locale: UiLocale;
@@ -21,6 +23,8 @@ interface UserConfigPanelProps {
   readonly permissionProfile: PermissionProfileName;
   readonly stdioPermissionProfile: PermissionProfileName;
   readonly settings?: UserSettings;
+  readonly selectedWorkspace?: { readonly id: string; readonly displayName: string } | null;
+  readonly engineeringStatus?: DashboardEngineeringHarnessStatus;
   readonly section: UserConfigSection | null;
   readonly unrestricted: boolean;
   readonly onUnrestrictedChange: (enabled: boolean) => Promise<boolean>;
@@ -45,6 +49,9 @@ const DEFAULT_USER_SETTINGS: UserSettings = {
   mcpAllowedHostnames: [],
   codexToolsEnabled: false,
   ponytailMode: 'off',
+  engineeringHarness: { schemaVersion: 1, enabled: false, profile: 'senior', applyTo: 'coding_projects', autoProjectAssessment: true },
+  engineeringHarnessWorkspaceOverrides: {},
+  engineeringHarnessDiagnostic: null,
   updateAutoCheck: true,
   updateCheckOnStartup: true,
   updateIntervalMinutes: 30,
@@ -58,7 +65,7 @@ const DEFAULT_USER_SETTINGS: UserSettings = {
   extensions: { mode: 'enable_all', disabledServers: [], enabledServers: [], disabledSkillRoots: [], extraSkillRoots: [], extraMcpServers: [] },
 };
 
-export function UserConfigPanel({ locale, hostPlatform, hostArch, permissionProfile, stdioPermissionProfile, settings, section, unrestricted, onUnrestrictedChange, onSave, onInstallPdfProvider, embedded = false }: UserConfigPanelProps): ReactElement {
+export function UserConfigPanel({ locale, hostPlatform, hostArch, permissionProfile, stdioPermissionProfile, settings, selectedWorkspace = null, engineeringStatus, section, unrestricted, onUnrestrictedChange, onSave, onInstallPdfProvider, embedded = false }: UserConfigPanelProps): ReactElement {
   const t = createTranslator(locale);
   const effectiveSettings = settings ?? DEFAULT_USER_SETTINGS;
   const persistedSettingsFingerprint = JSON.stringify(effectiveSettings);
@@ -74,6 +81,19 @@ export function UserConfigPanel({ locale, hostPlatform, hostArch, permissionProf
   const [pdfInstallMessage, setPdfInstallMessage] = useState<string | null>(null);
   const [pdfInstallError, setPdfInstallError] = useState<string | null>(null);
   const [unrestrictedMessage, setUnrestrictedMessage] = useState<string | null>(null);
+  const engineering = draft.engineeringHarness ?? DEFAULT_USER_SETTINGS.engineeringHarness!;
+  const selectedEngineeringOverride = selectedWorkspace === null
+    ? undefined
+    : draft.engineeringHarnessWorkspaceOverrides?.[selectedWorkspace.id];
+  const engineeringGateLabels = {
+    pending: t('userConfig.engineeringGate.pending'),
+    running: t('userConfig.engineeringGate.running'),
+    passed: t('userConfig.engineeringGate.passed'),
+    failed: t('userConfig.engineeringGate.failed'),
+    blocked: t('userConfig.engineeringGate.blocked'),
+    not_applicable: t('userConfig.engineeringGate.not_applicable'),
+    stale: t('userConfig.engineeringGate.stale'),
+  } as const;
 
   useEffect(() => {
     if (dirty || persistedSettingsFingerprint === lastPersistedSettingsFingerprint.current) return;
@@ -93,6 +113,40 @@ export function UserConfigPanel({ locale, hostPlatform, hostArch, permissionProf
 
   function patchExtensions(next: Partial<UserSettings['extensions']>): void {
     setDraft((previous) => ({ ...previous, extensions: { ...previous.extensions, ...next } }));
+    markDirty();
+  }
+
+  function patchEngineering(next: Partial<NonNullable<UserSettings['engineeringHarness']>>): void {
+    setDraft((previous) => ({
+      ...previous,
+      engineeringHarness: {
+        ...(previous.engineeringHarness ?? DEFAULT_USER_SETTINGS.engineeringHarness!),
+        ...next,
+      },
+    }));
+    markDirty();
+  }
+
+  function setWorkspaceEngineeringMode(mode: 'inherit' | 'on' | 'off'): void {
+    if (selectedWorkspace === null) return;
+    setDraft((previous) => {
+      const overrides = { ...(previous.engineeringHarnessWorkspaceOverrides ?? {}) };
+      if (mode === 'inherit') delete overrides[selectedWorkspace.id];
+      else overrides[selectedWorkspace.id] = { mode, ...(overrides[selectedWorkspace.id]?.profile === undefined ? {} : { profile: overrides[selectedWorkspace.id]!.profile }) };
+      return { ...previous, engineeringHarnessWorkspaceOverrides: overrides };
+    });
+    markDirty();
+  }
+
+  function setWorkspaceEngineeringProfile(profile: 'inherit' | EngineeringProfile): void {
+    if (selectedWorkspace === null || selectedEngineeringOverride?.mode !== 'on') return;
+    setDraft((previous) => {
+      const overrides = { ...(previous.engineeringHarnessWorkspaceOverrides ?? {}) };
+      overrides[selectedWorkspace.id] = profile === 'inherit'
+        ? { mode: 'on' }
+        : { mode: 'on', profile };
+      return { ...previous, engineeringHarnessWorkspaceOverrides: overrides };
+    });
     markDirty();
   }
 
@@ -257,6 +311,138 @@ export function UserConfigPanel({ locale, hostPlatform, hostArch, permissionProf
               placeholder={isWindowsHost ? 'python.exe\ndocker.exe\ndotnet.exe' : 'python\ndocker\ndotnet'}
               onChange={(value) => patchCustom({ allowedExecutables: value })}
             />
+          </section>
+        </>
+      ) : null}
+
+      {section === 'engineering' ? (
+        <>
+          <section className="panel settings-card settings-card-polished" aria-label={t('userConfig.engineeringTitle')}>
+            <SettingsCardHeading
+              icon="⌘"
+              title={t('userConfig.engineeringTitle')}
+              subtitle={t('userConfig.engineeringSubtitle')}
+              badge={engineering.enabled ? t('status.enabled') : t('status.defaultOff')}
+            />
+            <SettingSwitch
+              checked={engineering.enabled}
+              label={t('userConfig.engineeringEnabled')}
+              description={t('userConfig.engineeringEnabledDesc')}
+              onChange={(value) => patchEngineering({ enabled: value })}
+            />
+            <div className="setting-grid two-col">
+              <div className="setting-field">
+                <label className="field-label" htmlFor="engineering-profile">{t('userConfig.engineeringProfile')}</label>
+                <select id="engineering-profile" className="settings-select" value={engineering.profile} onChange={(event) => patchEngineering({ profile: event.target.value === 'standard' || event.target.value === 'strict' || event.target.value === 'custom' ? event.target.value : 'senior' })}>
+                  <option value="senior">{t('userConfig.engineeringProfileSenior')}</option>
+                  <option value="standard">{t('userConfig.engineeringProfileStandard')}</option>
+                  <option value="strict">{t('userConfig.engineeringProfileStrict')}</option>
+                  <option value="custom">{t('userConfig.engineeringProfileCustom')}</option>
+                </select>
+              </div>
+              <div className="setting-field">
+                <label className="field-label" htmlFor="engineering-scope">{t('userConfig.engineeringScope')}</label>
+                <select id="engineering-scope" className="settings-select" value={engineering.applyTo} onChange={(event) => patchEngineering({ applyTo: event.target.value === 'all_workspaces' ? 'all_workspaces' : 'coding_projects' })}>
+                  <option value="coding_projects">{t('userConfig.engineeringScopeCoding')}</option>
+                  <option value="all_workspaces">{t('userConfig.engineeringScopeAll')}</option>
+                </select>
+              </div>
+            </div>
+            <div className="setting-field">
+              <strong>{t('userConfig.engineeringAssessment')}</strong>
+              <p className="hint">{t('userConfig.engineeringAssessmentDesc')}</p>
+            </div>
+            {engineering.profile === 'custom' ? (
+              <div className="setting-grid two-col" aria-label={t('userConfig.engineeringCustomTitle')}>
+                <div className="setting-field">
+                  <label className="field-label" htmlFor="engineering-analysis">{t('userConfig.engineeringAnalysis')}</label>
+                  <select id="engineering-analysis" className="settings-select" value={engineering.custom?.analysis ?? 'cross_file'} onChange={(event) => patchEngineering({ custom: { analysis: event.target.value === 'focused' ? 'focused' : 'cross_file', review: engineering.custom?.review ?? 'risk_based', validation: engineering.custom?.validation ?? 'risk_based', docsImpactCheck: engineering.custom?.docsImpactCheck ?? true } })}>
+                    <option value="focused">{t('userConfig.engineeringAnalysisFocused')}</option>
+                    <option value="cross_file">{t('userConfig.engineeringAnalysisCrossFile')}</option>
+                  </select>
+                </div>
+                <div className="setting-field">
+                  <label className="field-label" htmlFor="engineering-review">{t('userConfig.engineeringReview')}</label>
+                  <select id="engineering-review" className="settings-select" value={engineering.custom?.review ?? 'risk_based'} onChange={(event) => patchEngineering({ custom: { analysis: engineering.custom?.analysis ?? 'cross_file', review: event.target.value === 'always' ? 'always' : 'risk_based', validation: engineering.custom?.validation ?? 'risk_based', docsImpactCheck: engineering.custom?.docsImpactCheck ?? true } })}>
+                    <option value="risk_based">{t('userConfig.engineeringRiskBased')}</option>
+                    <option value="always">{t('userConfig.engineeringAlways')}</option>
+                  </select>
+                </div>
+                <div className="setting-field">
+                  <label className="field-label" htmlFor="engineering-validation">{t('userConfig.engineeringValidation')}</label>
+                  <select id="engineering-validation" className="settings-select" value={engineering.custom?.validation ?? 'risk_based'} onChange={(event) => patchEngineering({ custom: { analysis: engineering.custom?.analysis ?? 'cross_file', review: engineering.custom?.review ?? 'risk_based', validation: event.target.value === 'strict' ? 'strict' : 'risk_based', docsImpactCheck: engineering.custom?.docsImpactCheck ?? true } })}>
+                    <option value="risk_based">{t('userConfig.engineeringRiskBased')}</option>
+                    <option value="strict">{t('userConfig.engineeringStrict')}</option>
+                  </select>
+                </div>
+                <SettingSwitch checked={engineering.custom?.docsImpactCheck ?? true} label={t('userConfig.engineeringDocsImpact')} description={t('userConfig.engineeringDocsImpactDesc')} onChange={(value) => patchEngineering({ custom: { analysis: engineering.custom?.analysis ?? 'cross_file', review: engineering.custom?.review ?? 'risk_based', validation: engineering.custom?.validation ?? 'risk_based', docsImpactCheck: value } })} />
+              </div>
+            ) : null}
+            <p className="hint">{t('userConfig.engineeringNoAutoWrite')}</p>
+            {draft.engineeringHarnessDiagnostic === undefined || draft.engineeringHarnessDiagnostic === null ? null : (
+              <StatusMessage tone="warning" role="alert" prefix="⚠️ ">{t('userConfig.engineeringDiagnostic', { diagnostic: draft.engineeringHarnessDiagnostic })}</StatusMessage>
+            )}
+          </section>
+
+          <section className="panel settings-card settings-card-polished" aria-label={t('userConfig.engineeringWorkspaceTitle')}>
+            <SettingsCardHeading
+              icon="⌂"
+              title={t('userConfig.engineeringWorkspaceTitle')}
+              subtitle={selectedWorkspace === null ? t('userConfig.engineeringNoWorkspace') : selectedWorkspace.displayName}
+              badge={engineeringStatus?.enabled ? t('status.enabled') : t('status.off')}
+            />
+            {selectedWorkspace === null ? <EmptyState>{t('userConfig.engineeringNoWorkspace')}</EmptyState> : (
+              <>
+                <div className="setting-grid two-col">
+                  <div className="setting-field">
+                    <label className="field-label" htmlFor="engineering-workspace-mode">{t('userConfig.engineeringWorkspaceMode')}</label>
+                    <select id="engineering-workspace-mode" className="settings-select" value={selectedEngineeringOverride?.mode ?? 'inherit'} onChange={(event) => setWorkspaceEngineeringMode(event.target.value === 'on' || event.target.value === 'off' ? event.target.value : 'inherit')}>
+                      <option value="inherit">{t('userConfig.engineeringWorkspaceInherit')}</option>
+                      <option value="on">{t('status.on')}</option>
+                      <option value="off">{t('status.off')}</option>
+                    </select>
+                  </div>
+                  {selectedEngineeringOverride?.mode === 'on' ? (
+                    <div className="setting-field">
+                      <label className="field-label" htmlFor="engineering-workspace-profile">{t('userConfig.engineeringWorkspaceProfile')}</label>
+                      <select id="engineering-workspace-profile" className="settings-select" value={selectedEngineeringOverride.profile ?? 'inherit'} onChange={(event) => setWorkspaceEngineeringProfile(event.target.value === 'standard' || event.target.value === 'senior' || event.target.value === 'strict' || event.target.value === 'custom' ? event.target.value : 'inherit')}>
+                        <option value="inherit">{t('userConfig.engineeringWorkspaceInheritProfile')}</option>
+                        <option value="senior">{t('userConfig.engineeringProfileSenior')}</option>
+                        <option value="standard">{t('userConfig.engineeringProfileStandard')}</option>
+                        <option value="strict">{t('userConfig.engineeringProfileStrict')}</option>
+                        <option value="custom">{t('userConfig.engineeringProfileCustom')}</option>
+                      </select>
+                    </div>
+                  ) : null}
+                </div>
+                <details className="engineering-profile-preview">
+                  <summary>{t('userConfig.engineeringProfilePreview')}</summary>
+                  <pre>{JSON.stringify({ engineering: { mode: 'inherit', profile: selectedEngineeringOverride?.profile ?? engineering.profile } }, null, 2)}</pre>
+                  <p className="hint">{t('userConfig.engineeringProfilePreviewHint')}</p>
+                </details>
+                {engineeringStatus === undefined ? <StatusMessage tone="neutral">{t('userConfig.engineeringStatusLoading')}</StatusMessage> : (
+                  <div className="engineering-status-stack" aria-live="polite">
+                    <p><strong>{t('userConfig.engineeringEffectivePolicy')}:</strong> {engineeringStatus.enabled ? `${engineeringStatus.profile} · ${engineeringStatus.source}` : t('status.off')}</p>
+                    {engineeringStatus.reasons.map((reason) => <p className="hint" key={reason}>{reason}</p>)}
+                    {engineeringStatus.task === null ? <EmptyState>{t('userConfig.engineeringNoActiveTask')}</EmptyState> : (
+                      <div className="engineering-task-status">
+                        <p><strong>{t('userConfig.engineeringTask')}:</strong> {engineeringStatus.task.primaryTaskKind} · {engineeringStatus.task.riskTier} · {engineeringStatus.task.currentPhase}</p>
+                        <p><strong>{t('userConfig.engineeringNextAction')}:</strong> {engineeringStatus.task.nextAction || t('userConfig.engineeringNone')}</p>
+                        <div className="mcp-server-settings-list" aria-label={t('userConfig.engineeringChecks')}>
+                          {engineeringStatus.task.gates.map((gate) => (
+                            <article className="mcp-server-settings-item" key={gate.id}>
+                              <div className="section-heading"><strong>{gate.title}</strong><span>{engineeringGateLabels[gate.status]}</span></div>
+                              <p className="hint">{gate.reason}</p>
+                              {gate.evidenceSource === undefined ? null : <p className="hint">{t('userConfig.engineeringEvidenceSource')}: {gate.evidenceSource}</p>}
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </section>
         </>
       ) : null}

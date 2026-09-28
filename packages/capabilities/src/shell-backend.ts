@@ -14,6 +14,7 @@ import {
   type Result,
 } from '@lnwjud/domain';
 import { createProcessTreeTerminator, PathExecutableResolver, toSpawnInvocation, type ExecutableResolver, type ProcessTreeTerminator } from '@lnwjud/process';
+import { engineeringCommandFingerprint, formatEngineeringCommand } from '@lnwjud/shared';
 import type { CapabilityBackend } from './local-capability-service.js';
 import { prohibitedAgentCommandReason, riskyAgentCommandReason } from './agent-command-policy.js';
 import { DurableShellTaskStore } from './durable-shell-task-store.js';
@@ -94,6 +95,7 @@ export interface ShellCapabilityOptions {
 
 interface ShellTaskRecord {
   readonly taskId: string;
+  readonly commandFingerprint: string;
   readonly child: ChildProcess;
   readonly includeStdout: boolean;
   readonly includeStderr: boolean;
@@ -184,7 +186,7 @@ export class ShellCapabilityBackend implements CapabilityBackend {
       if (record.owner.workspaceId !== workspaceId) {
         return err(appError('PERMISSION_DENIED', 'Task belongs to another or unknown workspace'));
       }
-      return ok(this.snapshot(record));
+      return ok({ ...this.snapshot(record), command_fingerprint: record.commandFingerprint });
     }
     if (this.durableStore !== undefined) return this.durableStore.snapshotForGoalLiveness(taskId, workspaceId);
     return err(appError('PROCESS_NOT_FOUND', 'Task was not found'));
@@ -314,6 +316,7 @@ export class ShellCapabilityBackend implements CapabilityBackend {
     const completion = new Promise<void>((resolve) => { resolveCompletion = resolve; });
     const record: ShellTaskRecord = {
       taskId: randomUUID(),
+      commandFingerprint: engineeringCommandFingerprint(formatEngineeringCommand(request.executable!, request.arguments)),
       child,
       includeStdout: request.includeStdout,
       includeStderr: request.includeStderr,
@@ -498,6 +501,7 @@ export class ShellCapabilityBackend implements CapabilityBackend {
     const taskId = request.automationDispatch?.taskId ?? randomUUID();
     const durableRequest = {
       taskId,
+      commandFingerprint: engineeringCommandFingerprint(formatEngineeringCommand(request.executable!, request.arguments)),
       executable: invocation.executable,
       arguments: invocation.args,
       cwd,
