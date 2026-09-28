@@ -119,7 +119,7 @@ export function resolveEngineeringPolicy(input: ResolveEngineeringPolicyInput): 
 export function classifyEngineeringTaskScope(objective: string): EngineeringTaskScope {
   const normalized = objective.trim().toLowerCase();
   if (normalized.length === 0) return 'unknown';
-  if (/(\b(code|coding|bug|fix|implement|refactor|api|sdk|database|schema|auth|test|lint|typecheck|compile|build|deploy|release|package|dependency|function|class|module|repository|repo|css|frontend|backend|migration)\b|โค้ด|โปรแกรม|บั๊ก|แก้บั๊ก|ฐานข้อมูล|ทดสอบ|รีแฟคเตอร์|ดีพลอย)/i.test(normalized)) return 'coding';
+  if (/(\b(code|coding|bug|fix|implement|refactor|api|sdk|database|schema|auth|test|lint|typecheck|compile|build|deploy|release|package|dependency|function|class|module|repository|repo|css|frontend|backend|migration|commits?|diff|pull request)\b|โค้ด|โปรแกรม|บั๊ก|แก้บั๊ก|ฐานข้อมูล|ทดสอบ|รีแฟคเตอร์|ดีพลอย|คอมมิต|รีวิวโค้ด|ตรวจโค้ด)/i.test(normalized)) return 'coding';
   if (/(\b(email|invoice|restaurant|weather|flight|translate|translation|image|photo|recipe)\b|อีเมล|ใบเสนอราคา|ร้านอาหาร|อากาศ|เที่ยวบิน|แปล|รูปภาพ|อาหาร)/i.test(normalized)) return 'non_code';
   return 'unknown';
 }

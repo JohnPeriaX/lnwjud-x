@@ -1379,7 +1379,20 @@ async function resolveEngineeringAdmission(
       || engineeringTask.deliveryScope !== preparedTask.value.workflow.deliveryScope) {
       return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'The prepared Engineering task classification is stale. Re-run engineering_prepare_task before mutation.', true));
     }
-    if (!preparedTask.value.policy.enabled) return ok(undefined);
+    if (!preparedTask.value.policy.enabled) {
+      // A caller-selected non-coding objective must not disable admission for
+      // a mutation in a workspace where coding work is still protected.
+      if (ENGINEERING_LIGHTWEIGHT_MUTATION_TOOLS.has(toolName) && !isCodingMutation(toolName, toolInput)) return ok(undefined);
+      const codingPolicy = await services.engineeringPreparation.prepare(workspaceId, `Modify software code through ${toolName}`);
+      if (!codingPolicy.ok) return err(codingPolicy.error);
+      if (codingPolicy.value.policy.enabled) {
+        return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'This mutation needs a coding Engineering task. Prepare the actual software task before mutation.', true));
+      }
+      return ok(undefined);
+    }
+    if (!engineeringMutationWithinScope(engineeringTask.scopedPath, toolName, toolInput)) {
+      return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'Mutation target is outside the prepared Engineering task scope. Re-prepare the task for the affected path.', true));
+    }
     const lightweight = preparedTask.value.workflow.riskTier === 'low'
       && preparedTask.value.workflow.deliveryScope === 'local'
       && (preparedTask.value.workflow.primaryTaskKind === 'docs' || preparedTask.value.workflow.primaryTaskKind === 'maintenance');
@@ -1429,6 +1442,9 @@ async function resolveEngineeringAdmission(
   if (engineeringTask.scopedPath !== selected.engineering.scopedPath) {
     return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'The Engineering task binding scope is stale. Re-run engineering_start_task before mutation.', true));
   }
+  if (!engineeringMutationWithinScope(selected.engineering.scopedPath, toolName, toolInput)) {
+    return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'Mutation target is outside the durable Engineering task scope. Re-prepare and reconcile the task for the affected path.', true));
+  }
   const prepared = await services.engineeringPreparation.prepare(workspaceId, selected.objective, selected.engineering.scopedPath);
   if (!prepared.ok) return err(prepared.error);
   if (!prepared.value.policy.enabled) {
@@ -1443,6 +1459,33 @@ async function resolveEngineeringAdmission(
     return err(appError('ENGINEERING_POLICY_CHANGED', 'Engineering policy changed since this task was prepared. Re-run engineering_start_task to reconcile affected gates before mutation.', true));
   }
   return ok(undefined);
+}
+
+function engineeringMutationWithinScope(scopedPath: string | undefined, toolName: string, input: unknown): boolean {
+  if (scopedPath === undefined || !isRecord(input)) return true;
+  const targets: string[] = [];
+  const add = (value: unknown): void => { if (typeof value === 'string') targets.push(value); };
+  if (['write_file', 'edit_file', 'delete_file', 'restore_deleted_file', 'lsp_rename'].includes(toolName)) add(input.path);
+  else if (toolName === 'move_file' || toolName === 'copy_file') {
+    add(input.sourcePath);
+    add(input.destinationPath);
+  } else if (toolName === 'apply_patch' && Array.isArray(input.files)) {
+    for (const file of input.files) if (isRecord(file)) add(file.path);
+  }
+  // Opaque commands have no trustworthy file target at this layer. The scope
+  // check covers path-bearing first-party mutations; other routes stay advisory.
+  if (targets.length === 0) return true;
+  const normalize = (value: string): string | undefined => {
+    const slashed = value.replaceAll('\\', '/');
+    if (path.posix.isAbsolute(slashed) || path.win32.isAbsolute(value)) return undefined;
+    const normalized = path.posix.normalize(slashed);
+    return normalized === '..' || normalized.startsWith('../') ? undefined : normalized;
+  };
+  const scope = normalize(scopedPath);
+  return scope !== undefined && targets.every((target) => {
+    const normalized = normalize(target);
+    return normalized !== undefined && (scope === '.' || normalized === scope || normalized.startsWith(`${scope}/`));
+  });
 }
 
 function startGoalMutationFenceHeartbeat(

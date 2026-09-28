@@ -27,6 +27,7 @@ export interface EngineeringProjectAssessment {
   readonly projectProfileStatus: EngineeringProjectProfileStatus;
   readonly projectProfileFreshness?: string;
   readonly fingerprint: string;
+  readonly codeGraphIndexed?: boolean;
   readonly warnings: readonly string[];
 }
 
@@ -38,6 +39,7 @@ export class EngineeringProjectAssessmentService {
     if (!detected.ok) throw new Error(detected.error.message);
 
     const warnings: string[] = [];
+    const codeGraphIndexed = await hasCodeGraphIndex(rootPath);
     const instructionCandidates = await this.agentInstructionCandidates(rootPath, scopedPath);
     const instructions = await Promise.all(instructionCandidates.map(async ({ filePath, scopePath }) => {
       const result = await readBoundedText(filePath, AGENTS_MAX_BYTES, rootPath);
@@ -82,6 +84,7 @@ export class EngineeringProjectAssessmentService {
       instructions: instructions.map((entry) => ({ path: entry.path, status: entry.status, freshness: entry.freshness ?? null })),
       projectProfileStatus,
       projectProfileFreshness: rawProfile.freshness ?? null,
+      codeGraphIndexed,
     })).digest('hex');
 
     return {
@@ -91,6 +94,7 @@ export class EngineeringProjectAssessmentService {
       projectProfileStatus,
       ...(rawProfile.freshness === undefined ? {} : { projectProfileFreshness: rawProfile.freshness }),
       fingerprint,
+      codeGraphIndexed,
       warnings,
     };
   }
@@ -135,6 +139,15 @@ export class EngineeringProjectAssessmentService {
       candidates.push({ filePath: path.join(current, 'AGENTS.md'), scopePath: current });
     }
     return candidates;
+  }
+}
+
+async function hasCodeGraphIndex(rootPath: string): Promise<boolean> {
+  try {
+    const [realRoot, realIndex] = await Promise.all([realpath(rootPath), realpath(path.join(rootPath, '.codegraph'))]);
+    return pathContains(realRoot, realIndex) && (await stat(realIndex)).isDirectory();
+  } catch {
+    return false;
   }
 }
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { classifyEngineeringRisk, classifyEngineeringTaskKind, inferDeliveryScope, planEngineeringWorkflow } from './engineering-workflow.js';
 import type { EngineeringProjectAssessment } from './engineering-project-assessment.js';
 
-const assessment = (instruction = ''): EngineeringProjectAssessment => ({
+const assessment = (instruction = '', codeGraphIndexed = false): EngineeringProjectAssessment => ({
   project: {
     rootPath: 'C:/repo',
     kind: 'node',
@@ -19,6 +19,7 @@ const assessment = (instruction = ''): EngineeringProjectAssessment => ({
   projectProfile: {},
   projectProfileStatus: 'missing',
   fingerprint: 'fingerprint',
+  codeGraphIndexed,
   warnings: [],
 });
 
@@ -44,12 +45,26 @@ describe('engineering workflow routing', () => {
     expect(inferDeliveryScope('Fix locally and validate')).toBe('local');
     expect(inferDeliveryScope('Fix and open a PR')).toBe('pull_request');
     expect(inferDeliveryScope('Release version 5.7.0')).toBe('release');
+    expect(inferDeliveryScope('Fix the bug locally; do not push or release')).toBe('local');
+    expect(classifyEngineeringTaskKind('Fix the bug locally; do not push or release')).toBe('bugfix');
   });
 
   it('records CodeGraph-first project instructions without claiming availability', () => {
-    const planned = planEngineeringWorkflow('Refactor the auth service', assessment('When .codegraph exists, use CodeGraph first.'));
+    const planned = planEngineeringWorkflow('Refactor the auth service', assessment('When .codegraph exists, use CodeGraph first.', true));
     expect(planned.selectedCodeIntelligence).toBe('codegraph');
-    expect(planned.codeIntelligenceReason).toMatch(/availability must still be verified/i);
+    expect(planEngineeringWorkflow('Refactor the auth service', assessment('When .codegraph exists, use CodeGraph first.')).selectedCodeIntelligence).toBe('lsp_search');
+  });
+
+  it('includes explicit project architecture and required-platform checks in the gate plan', () => {
+    const prepared = assessment();
+    const planned = planEngineeringWorkflow('Refactor the auth service', {
+      ...prepared,
+      projectProfile: { engineering: { architecture: { checkCommand: 'pnpm lint:arch' }, requiredPlatforms: ['win32', 'linux'] } },
+    });
+    expect(planned.gates.find((gate) => gate.id === 'architecture')).toMatchObject({ applicability: 'required', status: 'pending', checkCommand: 'pnpm lint:arch' });
+    expect(planned.gates.find((gate) => gate.id === 'cross_platform')).toMatchObject({ applicability: 'required', status: 'pending' });
+    expect(planned.gates.find((gate) => gate.id === 'architecture')?.checkCommand).toBe('pnpm lint:arch');
+    expect(planned.gates.find((gate) => gate.id === 'cross_platform')?.reason).toContain('win32');
   });
 
   it('applies Standard, Senior, Strict, and Custom policy differences to analysis and gates', () => {

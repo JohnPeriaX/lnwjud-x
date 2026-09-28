@@ -95,6 +95,7 @@ function inactiveAssessment(rootPath: string): EngineeringProjectAssessment {
     projectProfile: {},
     projectProfileStatus: 'missing',
     fingerprint: 'engineering-inactive-no-project-scan',
+    codeGraphIndexed: false,
     warnings: [],
   };
 }

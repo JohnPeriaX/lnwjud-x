@@ -50,7 +50,19 @@ export interface EngineeringGateDefinition {
   readonly status: EngineeringGateStatus;
   readonly reason: string;
   readonly basedOnUserIntentRevision: number;
+  readonly checkCommand?: string;
   readonly evidence?: EngineeringGateEvidence;
+}
+
+/** Required proof gates cannot be dismissed by a free-form reason. */
+export function mayMarkEngineeringGateNotApplicable(gate: EngineeringGateDefinition): boolean {
+  return gate.applicability !== 'required' || gate.id === 'docs_impact' || gate.id === 'independent_review';
+}
+
+const HOST_OBSERVED_GATE_IDS = new Set(['diff', 'focused_validation', 'integration', 'restart_persistence', 'architecture', 'cross_platform', 'exact_sha_ci', 'package']);
+
+export function requiresHostObservedEngineeringEvidence(gateId: string): boolean {
+  return HOST_OBSERVED_GATE_IDS.has(gateId);
 }
 
 /**

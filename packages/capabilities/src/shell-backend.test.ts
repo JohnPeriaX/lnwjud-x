@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { automationShellRequestDigest, ok, type Result } from '@lnwjud/domain';
+import { engineeringCommandFingerprint, formatEngineeringCommand } from '@lnwjud/shared';
 import { ShellCapabilityBackend, withAutomationShellDispatchContext } from './shell-backend.js';
 import { CAPABILITY_TASK_OWNER_METADATA_KEY } from './task-ownership.js';
 
@@ -18,6 +19,28 @@ afterEach(async () => {
 });
 
 describe('ShellCapabilityBackend', () => {
+  it('binds trusted task observations to the launched command across memory and durable storage', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-shell-evidence-'));
+    temporaryRoots.push(root);
+    const owner = { metadata: { [CAPABILITY_TASK_OWNER_METADATA_KEY]: { clientId: 'client-1', sessionId: 'session-1', workspaceId: 'workspace-1' } } };
+    const expected = engineeringCommandFingerprint(formatEngineeringCommand(process.execPath, ['--version']));
+    const memory = new ShellCapabilityBackend({ allowedRoots: [root] });
+    const memoryRun = await memory.execute({ operation: 'run', executable: process.execPath, arguments: ['--version'], cwd: root,
+      execution: 'foreground', userConfirmed: true, ...owner });
+    expect(memoryRun).toMatchObject({ ok: true, value: { task_id: expect.any(String) } });
+    if (!memoryRun.ok) return;
+    await expect(memory.statusForGoalLiveness('workspace-1', String(memoryRun.value.task_id)))
+      .resolves.toMatchObject({ ok: true, value: { command_fingerprint: expected } });
+    const durable = new ShellCapabilityBackend({ allowedRoots: [root], taskStateDirectory: path.join(root, '.tasks') });
+    const durableRun = await durable.execute({ operation: 'run', executable: process.execPath, arguments: ['--version'], cwd: root,
+      execution: 'background', userConfirmed: true, ...owner });
+    expect(durableRun).toMatchObject({ ok: true, value: { task_id: expect.any(String) } });
+    if (!durableRun.ok) return;
+    const reopened = new ShellCapabilityBackend({ allowedRoots: [root], taskStateDirectory: path.join(root, '.tasks') });
+    await expect(reopened.statusForGoalLiveness('workspace-1', String(durableRun.value.task_id)))
+      .resolves.toMatchObject({ ok: true, value: { command_fingerprint: expected } });
+  });
+
   it('rejects a public run request that tries to select a reserved task ID', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-shell-public-id-'));
     temporaryRoots.push(root);

@@ -3,6 +3,7 @@ import {
   GoalStateError,
   appError,
   err,
+  mayMarkEngineeringGateNotApplicable,
   ok,
   type GoalCheckpointRecord,
   type GoalCheckpointResumeContext,
@@ -350,7 +351,7 @@ export interface ListGoalsResult {
 }
 
 export interface EngineeringGateEvidenceVerifier {
-  verify(workspaceId: string, evidence: EngineeringGateEvidence): Promise<boolean>;
+  verify(workspaceId: string, evidence: EngineeringGateEvidence, gateId: string): Promise<boolean>;
 }
 
 export interface GoalContinuationServiceOptions {
@@ -1194,6 +1195,12 @@ async function applyEngineeringGateUpdates(
     seen.add(gateId);
     const current = byId.get(gateId);
     if (current === undefined) throw new Error(`engineering gate is unknown: ${gateId}`);
+    if (update.status === 'not_applicable' && !mayMarkEngineeringGateNotApplicable(current)) {
+      throw new Error(`required engineering gate cannot be marked not_applicable: ${gateId}`);
+    }
+    if (update.status === 'passed' && current.checkCommand !== undefined && update.evidence?.command !== current.checkCommand) {
+      throw new Error(`engineering gate requires its declared check command: ${gateId}`);
+    }
     if (update.status === 'not_applicable' && update.reason?.trim() === '') throw new Error('not_applicable engineering gate requires a reason');
     if (update.status === 'not_applicable' && update.reason === undefined) throw new Error('not_applicable engineering gate requires a reason');
     if (update.status === 'passed' && update.evidence === undefined) throw new Error('passed engineering gate requires observed evidence');
@@ -1209,7 +1216,7 @@ async function applyEngineeringGateUpdates(
           if (update.evidence.exitCode !== undefined && observed.exitCode !== update.evidence.exitCode) throw new Error('engineering gate evidence exit code does not match the observed command');
         }
         if (update.status === 'passed') {
-          if (evidenceVerifier === undefined || !(await evidenceVerifier.verify(workspaceId, update.evidence))) {
+          if (evidenceVerifier === undefined || !(await evidenceVerifier.verify(workspaceId, update.evidence, gateId))) {
             throw new Error('host-observed engineering evidence could not be verified against the host task runtime');
           }
         }

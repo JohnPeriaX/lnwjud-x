@@ -1,5 +1,5 @@
 import { engineeringGoalMetadata, type EngineeringWorkflowPlan } from '@lnwjud/application';
-import { appError, err, ok, type EngineeringGoalMetadata } from '@lnwjud/domain';
+import { appError, err, mayMarkEngineeringGateNotApplicable, ok, requiresHostObservedEngineeringEvidence, type EngineeringGoalMetadata } from '@lnwjud/domain';
 import { defineTool, missingService, type McpToolContext, type McpToolDefinition } from './tool-types.js';
 import { engineeringGetStatusSchema, engineeringPrepareTaskSchema, engineeringStartTaskSchema } from './schemas.js';
 
@@ -133,13 +133,23 @@ export function engineeringTools(context: McpToolContext): McpToolDefinition[] {
         const prepared = await context.services.engineeringPreparation.prepare(goal.value.workspaceId, goal.value.objective, goal.value.engineering.scopedPath);
         if (!prepared.ok) return prepared;
         const unresolvedGateIds = goal.value.engineering.gates
-          .filter((gate) => gate.applicability === 'required' && gate.status !== 'passed' && gate.status !== 'not_applicable')
+          .filter((gate) => gate.status === 'passed'
+            ? gate.evidence === undefined || (requiresHostObservedEngineeringEvidence(gate.id) && gate.evidence.source !== 'host_observed')
+            : gate.status === 'not_applicable'
+              ? gate.reason.trim().length === 0 || !mayMarkEngineeringGateNotApplicable(gate)
+              : gate.applicability === 'required')
           .map((gate) => gate.id);
+        const policyChanged = prepared.value.policy.policyDigest !== goal.value.engineering.policyDigest;
+        const incompleteAcceptanceIds = goal.value.acceptanceCriteria
+          .filter((criterion) => criterion.status !== 'completed').map((criterion) => criterion.id);
+        const incompleteStepIds = goal.value.plan.steps
+          .filter((step) => step.status !== 'completed').map((step) => step.id);
+        const blockingTasks = goal.value.trackedTasks.filter((task) => task.role === 'blocking_job');
         const deliveryBoundary = goal.value.status !== 'active'
           ? goal.value.status
           : goal.value.blockers.length > 0
             ? 'blocked'
-            : unresolvedGateIds.length > 0
+            : policyChanged || unresolvedGateIds.length > 0 || incompleteAcceptanceIds.length > 0 || incompleteStepIds.length > 0 || blockingTasks.length > 0
               ? 'checks_pending'
               : goal.value.engineering.deliveryScope === 'local'
                 ? 'ready_locally'
@@ -151,6 +161,9 @@ export function engineeringTools(context: McpToolContext): McpToolDefinition[] {
           currentPhase: goal.value.currentPhase,
           nextAction: goal.value.nextAction,
           blockers: goal.value.blockers,
+          acceptanceCriteria: goal.value.acceptanceCriteria,
+          incompleteAcceptanceIds,
+          incompleteStepIds,
           primaryTaskKind: goal.value.engineering.primaryTaskKind,
           riskTier: goal.value.engineering.riskTier,
           deliveryScope: goal.value.engineering.deliveryScope,
@@ -158,7 +171,7 @@ export function engineeringTools(context: McpToolContext): McpToolDefinition[] {
           unresolvedGateIds,
           deliveryBoundary,
           effectivePolicy: prepared.value.policy,
-          policyChanged: prepared.value.policy.policyDigest !== goal.value.engineering.policyDigest,
+          policyChanged,
           engineeringTask: {
             goalId: goal.value.goalId,
             policyDigest: goal.value.engineering.policyDigest,

@@ -204,6 +204,7 @@ describe('engineering_get_status', () => {
   it('returns the current gate projection and truthful local boundary without mutating the goal', async () => {
     const getGoal = vi.fn(async () => ok({
       goalId: 'goal-1', workspaceId: 'workspace-1', objective: 'Fix auth bug', status: 'active', revision: 7, userIntentRevision: 2, currentPhase: 'validate', nextAction: 'Run focused test', blockers: [],
+      acceptanceCriteria: [{ id: 'bug-fixed', title: 'Bug fixed', status: 'completed' }], plan: { steps: [{ id: 'fix', title: 'Fix', status: 'completed' }] }, trackedTasks: [],
       engineering: {
         schemaVersion: 1, primaryTaskKind: 'bugfix', riskTier: 'high', policyDigest: 'digest-1', deliveryScope: 'local', scopedPath: 'src/auth/session.ts',
         gates: [
@@ -229,5 +230,39 @@ describe('engineering_get_status', () => {
     });
     expect(getGoal).toHaveBeenCalledTimes(1);
     expect(prepare).toHaveBeenCalledWith('workspace-1', 'Fix auth bug', 'src/auth/session.ts');
+  });
+
+  it('keeps policy drift and incomplete acceptance visibly pending', async () => {
+    const getGoal = vi.fn(async () => ok({
+      goalId: 'goal-1', workspaceId: 'workspace-1', objective: 'Fix auth bug', status: 'active', revision: 7, userIntentRevision: 2,
+      currentPhase: 'validate', nextAction: 'Revalidate', blockers: [], trackedTasks: [],
+      acceptanceCriteria: [{ id: 'bug-fixed', title: 'Bug fixed', status: 'pending' }], plan: { steps: [] },
+      engineering: { schemaVersion: 1, primaryTaskKind: 'bugfix', riskTier: 'high', policyDigest: 'old-digest', deliveryScope: 'local',
+        gates: [{ id: 'diff', title: 'Diff', applicability: 'required', status: 'passed', reason: 'Done', basedOnUserIntentRevision: 2,
+          evidence: { source: 'host_observed', observedAt: '2026-09-28T00:00:00Z', workspaceId: 'workspace-1' } }] },
+    } as never));
+    const prepare = vi.fn(async () => ok({ policy: { enabled: true, policyDigest: 'new-digest' } } as never));
+    const tool = engineeringTools({ actor, contextEconomy: {} as never, services: { goals: { getGoal } as never, engineeringPreparation: { prepare } as never } })
+      .find((entry) => entry.name === 'engineering_get_status');
+    expect(await tool?.execute({ goalId: 'goal-1' }, new AbortController().signal)).toMatchObject({
+      ok: true, value: { policyChanged: true, deliveryBoundary: 'checks_pending', acceptanceCriteria: [{ id: 'bug-fixed', status: 'pending' }] },
+    });
+  });
+
+  it('does not claim local readiness from a passed gate backed only by user attestation', async () => {
+    const getGoal = vi.fn(async () => ok({
+      goalId: 'goal-1', workspaceId: 'workspace-1', objective: 'Fix auth bug', status: 'active', revision: 3, userIntentRevision: 0,
+      currentPhase: 'validate', nextAction: 'Verify diff', blockers: [], trackedTasks: [],
+      acceptanceCriteria: [{ id: 'done', title: 'Done', status: 'completed' }], plan: { steps: [{ id: 'fix', title: 'Fix', status: 'completed' }] },
+      engineering: { schemaVersion: 1, primaryTaskKind: 'bugfix', riskTier: 'medium', policyDigest: 'digest-1', deliveryScope: 'local',
+        gates: [{ id: 'diff', title: 'Diff', applicability: 'required', status: 'passed', reason: 'Checked', basedOnUserIntentRevision: 0,
+          evidence: { source: 'user_attested', observedAt: '2026-09-28T00:00:00Z', workspaceId: 'workspace-1' } }] },
+    } as never));
+    const tool = engineeringTools({ actor, contextEconomy: {} as never, services: { goals: { getGoal } as never,
+      engineeringPreparation: { prepare: vi.fn(async () => ok({ policy: { enabled: true, policyDigest: 'digest-1' } } as never)) } as never } })
+      .find((entry) => entry.name === 'engineering_get_status');
+    expect(await tool?.execute({ goalId: 'goal-1' }, new AbortController().signal)).toMatchObject({
+      ok: true, value: { unresolvedGateIds: ['diff'], deliveryBoundary: 'checks_pending' },
+    });
   });
 });

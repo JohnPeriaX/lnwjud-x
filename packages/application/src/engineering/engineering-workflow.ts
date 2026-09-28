@@ -5,7 +5,7 @@ import type {
   EngineeringRiskTier,
   EngineeringTaskKind,
 } from '@lnwjud/domain';
-import type { EngineeringHarnessSettings, EngineeringProfile } from '@lnwjud/shared';
+import { projectEngineeringSettings, type EngineeringHarnessSettings, type EngineeringProfile, type ProjectEngineeringSettings } from '@lnwjud/shared';
 import type { EngineeringProjectAssessment } from './engineering-project-assessment.js';
 
 export type EngineeringCodeIntelligence = 'codegraph' | 'lsp_search';
@@ -47,12 +47,12 @@ export function planEngineeringWorkflow(
       : 'cross_file';
   const deliveryScope = inferDeliveryScope(objective);
   const workflow = workflowFor(primaryTaskKind, riskTier);
-  const gates = gatesFor(primaryTaskKind, riskTier, deliveryScope, objective, userIntentRevision, policy);
+  const gates = gatesFor(primaryTaskKind, riskTier, deliveryScope, objective, userIntentRevision, policy, projectEngineeringSettings(assessment.projectProfile));
   const instructionText = assessment.instructions
     .filter((entry) => entry.status === 'loaded' || entry.status === 'truncated')
     .map((entry) => entry.content ?? '')
     .join('\n');
-  const codeGraphRequested = /codegraph/i.test(instructionText);
+  const codeGraphRequested = /codegraph/i.test(instructionText) && assessment.codeGraphIndexed === true;
   return {
     primaryTaskKind,
     riskTier,
@@ -62,8 +62,8 @@ export function planEngineeringWorkflow(
     gates,
     selectedCodeIntelligence: codeGraphRequested ? 'codegraph' : 'lsp_search',
     codeIntelligenceReason: codeGraphRequested
-      ? 'Applicable project instructions mention CodeGraph; availability must still be verified before use.'
-      : 'No verified CodeGraph-first instruction applies; use available symbol/LSP tools with search fallback.',
+      ? 'Applicable project instructions require CodeGraph and this workspace has a .codegraph index; verify the callable tool before use.'
+      : 'No indexed CodeGraph-first instruction applies; use available symbol/LSP tools with search fallback.',
     deliveryScope,
   };
 }
@@ -86,7 +86,7 @@ export function engineeringGoalMetadata(
 
 export function classifyEngineeringTaskKind(objective: string): EngineeringTaskKind {
   const value = objective.trim().toLowerCase();
-  if (/(\brelease\b|\bpublish\b|\btag\b|ปล่อยเวอร์ชัน|รีลีส)/i.test(value)) return 'release';
+  if (/(\brelease\b|\bpublish\b|\btag\b|ปล่อยเวอร์ชัน|รีลีส)/i.test(affirmativeDeliveryText(value))) return 'release';
   if (/(\bincident\b|\boutage\b|production down|service down|เหตุขัดข้อง|ระบบล่ม)/i.test(value)) return 'incident';
   if (/(\breview\b|code review|audit diff|ตรวจโค้ด|รีวิวโค้ด)/i.test(value)) return 'review';
   if (/(\bdocs?\b|readme|typo|copy change|documentation|เอกสาร|คำผิด)/i.test(value)) return 'docs';
@@ -125,7 +125,7 @@ export function classifyEngineeringRisk(
 }
 
 export function inferDeliveryScope(objective: string): EngineeringDeliveryScope {
-  const value = objective.trim().toLowerCase();
+  const value = affirmativeDeliveryText(objective.trim().toLowerCase());
   if (/(deploy|production|ขึ้น prod|ขึ้น production)/i.test(value)) return 'deploy';
   if (/(release|publish|tag|รีลีส|ปล่อยเวอร์ชัน)/i.test(value)) return 'release';
   if (/(merge|รวม pr)/i.test(value)) return 'merge';
@@ -133,6 +133,12 @@ export function inferDeliveryScope(objective: string): EngineeringDeliveryScope 
   if (/(push|ส่งขึ้น git)/i.test(value)) return 'push';
   if (/(commit|คอมมิต)/i.test(value)) return 'commit';
   return 'local';
+}
+
+function affirmativeDeliveryText(value: string): string {
+  // Delivery words inside a prohibition are not authorization. Treat the
+  // remainder of that clause conservatively until the next clear separator.
+  return value.replace(/(?:\b(?:do not|don't|dont|never|without|no)\b|ไม่ต้อง|ห้าม|อย่า)[^;,.]*/gi, ' ');
 }
 
 function workflowFor(taskKind: EngineeringTaskKind, riskTier: EngineeringRiskTier): readonly EngineeringWorkflowStep[] {
@@ -203,6 +209,7 @@ function gatesFor(
   objective: string,
   userIntentRevision: number,
   policy: EngineeringWorkflowPolicy,
+  project: ProjectEngineeringSettings,
 ): readonly EngineeringGateDefinition[] {
   const gates: EngineeringGateDefinition[] = [];
   const custom = policy.profile === 'custom' ? policy.custom : undefined;
@@ -210,7 +217,7 @@ function gatesFor(
   const alwaysReview = policy.profile === 'strict' || custom?.review === 'always';
   const seniorReview = policy.profile === 'senior';
   const docsImpactCheck = custom?.docsImpactCheck ?? true;
-  const add = (id: string, title: string, reason: string, applicability: EngineeringGateDefinition['applicability'] = 'required'): void => {
+  const add = (id: string, title: string, reason: string, applicability: EngineeringGateDefinition['applicability'] = 'required', checkCommand?: string): void => {
     gates.push({
       id,
       title,
@@ -218,6 +225,7 @@ function gatesFor(
       status: applicability === 'not_applicable' ? 'not_applicable' : 'pending',
       reason,
       basedOnUserIntentRevision: userIntentRevision,
+      ...(checkCommand === undefined ? {} : { checkCommand }),
     });
   };
 
@@ -225,6 +233,9 @@ function gatesFor(
   const changesBehavior = taskKind === 'feature' || taskKind === 'bugfix' || taskKind === 'refactor' || taskKind === 'incident';
   if (changesBehavior) add('coverage', 'Existing coverage inspection', 'Behavioral work must inspect existing relevant tests before adding a regression.');
   if (changesBehavior && riskTier !== 'low') add('focused_validation', 'Focused behavioral validation', 'Run the lowest meaningful test or diagnostic layer for the changed behavior.');
+  if (changesBehavior && project.architecture !== undefined) {
+    add('architecture', 'Project architecture check', 'Run the declared project architecture check and record the checked scope and rule coverage.', 'required', project.architecture.checkCommand);
+  }
   if (riskTier === 'high' || riskTier === 'critical' || (strictValidation && changesBehavior && riskTier === 'medium')) {
     add('integration', 'Integration or contract validation', strictValidation && riskTier === 'medium'
       ? 'Strict validation requires proof across the affected contract boundary for behavioral work.'
@@ -232,7 +243,11 @@ function gatesFor(
   }
   if (/(persist|storage|session|token|database|restart|ฐานข้อมูล|โทเคน|เซสชัน)/i.test(objective)) add('restart_persistence', 'Restart/persistence evidence', 'Persistence work must prove behavior across restart or reload.');
   if (/(auth|token|permission|security|credential|oauth|สิทธิ์|โทเคน)/i.test(objective)) add('security_review', 'Security boundary review', 'Security-sensitive changes require explicit boundary review.');
-  if (/(cross[- ]platform|windows|macos|linux|native|แพลตฟอร์ม)/i.test(objective)) add('cross_platform', 'Cross-platform evidence', 'Cross-platform claims require target-host or CI evidence.');
+  if (/(cross[- ]platform|windows|macos|linux|native|แพลตฟอร์ม)/i.test(objective) || (changesBehavior && project.requiredPlatforms.length > 0)) {
+    add('cross_platform', 'Cross-platform evidence', project.requiredPlatforms.length > 0
+      ? `Project profile requires target-host or CI evidence for: ${project.requiredPlatforms.join(', ')}.`
+      : 'Cross-platform claims require target-host or CI evidence.');
+  }
   if (changesBehavior && (alwaysReview || (seniorReview && riskTier !== 'low'))) {
     add('self_review', 'Implementation review', 'Review the final diff for compatibility, side effects, missing tests, and documentation impact.');
   }

@@ -1181,7 +1181,22 @@ describe('MCP tool registry', () => {
       isError: true,
       structuredContent: { error: { code: 'ENGINEERING_POLICY_CHANGED', recoverable: true } },
     });
-    expect(editFile).toHaveBeenCalledTimes(1);
+    await expect(registry.invoke('edit_file', {
+      workspaceId: 'workspace-a', path: 'src/auth.ts', oldText: 'old', newText: 'new',
+      engineeringTask: {
+        objective: 'Translate this email', policyDigest: 'digest-off', primaryTaskKind: 'unknown', riskTier: 'low', deliveryScope: 'local',
+      },
+    })).resolves.toMatchObject({
+      isError: true,
+      structuredContent: { error: { code: 'ENGINEERING_PREFLIGHT_REQUIRED', recoverable: true } },
+    });
+    await expect(registry.invoke('edit_file', {
+      workspaceId: 'workspace-a', path: 'README.md', oldText: 'old', newText: 'new',
+      engineeringTask: {
+        objective: 'Translate this email', policyDigest: 'digest-off', primaryTaskKind: 'unknown', riskTier: 'low', deliveryScope: 'local',
+      },
+    })).resolves.not.toMatchObject({ isError: true });
+    expect(editFile).toHaveBeenCalledTimes(2);
     expect(listGoals).not.toHaveBeenCalled();
   });
 
@@ -1257,6 +1272,27 @@ describe('MCP tool registry', () => {
       engineeringTask: { goalId: 'engineering-goal-1', policyDigest: 'digest-1', goalRevision: 4, userIntentRevision: 2, scopedPath: 'src/other.ts', sessionId: 'session-current' },
     })).resolves.toMatchObject({ isError: true, structuredContent: { error: { code: 'ENGINEERING_PREFLIGHT_REQUIRED' } } });
     expect(editFile).not.toHaveBeenCalled();
+  });
+
+  it('does not use a narrowly scoped Engineering task to edit another subtree', async () => {
+    const editFile = vi.fn(async () => ok({ path: 'src/app.ts', replacements: 1, bytesWritten: 1, checkpointId: 'checkpoint-1' }));
+    const prepare = vi.fn(async () => ok({ policy: { enabled: true, policyDigest: 'digest-1' } } as never));
+    const validateGoalLease = vi.fn(async () => ok({
+      goalId: 'engineering-goal-1', workspaceId: 'workspace-a', objective: 'Fix auth bug', status: 'active', revision: 4, userIntentRevision: 2, leaseGeneration: 9,
+      engineering: { schemaVersion: 1, policyDigest: 'digest-1', scopedPath: 'src/auth' },
+    } as never));
+    const registry = new ToolRegistry({ file: { editFile } as never, engineeringPreparation: { prepare } as never, goals: { validateGoalLease } as never }, actor, {
+      profileProvider: (): PermissionProfile => permissionProfiles.full,
+      authorizationModeProvider: (): 'full_bypass' => 'full_bypass',
+    });
+    const binding = { goalId: 'engineering-goal-1', policyDigest: 'digest-1', goalRevision: 4, userIntentRevision: 2, scopedPath: 'src/auth' };
+    const goalLease = { goalId: 'engineering-goal-1', leaseToken: 'lease-token-1', leaseGeneration: 9 };
+
+    await expect(registry.invoke('edit_file', { workspaceId: 'workspace-a', path: 'src/app.ts', oldText: 'old', newText: 'new', engineeringTask: binding, goalLease }))
+      .resolves.toMatchObject({ isError: true, structuredContent: { error: { code: 'ENGINEERING_PREFLIGHT_REQUIRED' } } });
+    await expect(registry.invoke('edit_file', { workspaceId: 'workspace-a', path: 'src/auth/session.ts', oldText: 'old', newText: 'new', engineeringTask: binding, goalLease }))
+      .resolves.not.toMatchObject({ isError: true });
+    expect(editFile).toHaveBeenCalledTimes(1);
   });
 
   it('guards opaque first-party shell execution while leaving external MCP calls advisory', async () => {

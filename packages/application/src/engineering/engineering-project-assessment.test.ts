@@ -11,6 +11,21 @@ afterEach(async () => {
 });
 
 describe('EngineeringProjectAssessmentService', () => {
+  it('selects CodeGraph only when an index directory exists inside the project', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-codegraph-assessment-'));
+    const outside = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-codegraph-outside-'));
+    temporaryRoots.push(root, outside);
+    await writeFile(path.join(root, 'package.json'), '{}', 'utf8');
+    await writeFile(path.join(root, 'AGENTS.md'), 'Use CodeGraph when .codegraph exists.', 'utf8');
+    const service = new EngineeringProjectAssessmentService();
+    expect((await service.assess(root)).codeGraphIndexed).toBe(false);
+    await mkdir(path.join(root, '.codegraph'));
+    expect((await service.assess(root)).codeGraphIndexed).toBe(true);
+    await rm(path.join(root, '.codegraph'), { recursive: true });
+    await symlink(outside, path.join(root, '.codegraph'), process.platform === 'win32' ? 'junction' : 'dir');
+    expect((await service.assess(root)).codeGraphIndexed).toBe(false);
+  });
+
   it('reads only applicable AGENTS scopes and the bounded project profile without writing the repository', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-engineering-assessment-'));
     temporaryRoots.push(root);

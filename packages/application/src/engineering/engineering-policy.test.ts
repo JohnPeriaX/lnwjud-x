@@ -97,6 +97,8 @@ describe('Engineering Harness effective policy', () => {
     expect(classifyEngineeringTaskScope('Fix the auth persistence bug')).toBe('coding');
     expect(classifyEngineeringTaskScope('ช่วยแก้บั๊กฐานข้อมูล')).toBe('coding');
     expect(classifyEngineeringTaskScope('translate this email')).toBe('non_code');
+    expect(classifyEngineeringTaskScope('Review the last 3 commits on dev')).toBe('coding');
+    expect(classifyEngineeringTaskScope('รีวิวโค้ด 3 commit ล่าสุด')).toBe('coding');
     expect(classifyEngineeringTaskScope('ช่วยจัดการเรื่องนี้ให้หน่อย')).toBe('unknown');
   });
 });

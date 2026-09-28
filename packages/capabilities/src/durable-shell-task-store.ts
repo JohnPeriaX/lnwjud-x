@@ -15,6 +15,7 @@ export type DurableShellTaskState = 'running' | 'completed' | 'failed' | 'timed_
 
 export interface DurableShellLaunchRequest {
   readonly taskId: string;
+  readonly commandFingerprint?: string;
   readonly executable: string;
   readonly arguments: readonly string[];
   readonly cwd: string;
@@ -29,6 +30,7 @@ export interface DurableShellLaunchRequest {
 interface DurableTaskMetadata {
   readonly version: 1;
   readonly task_id: string;
+  readonly command_fingerprint?: string;
   readonly request_digest?: string;
   state: DurableShellTaskState;
   readonly started_at: string;
@@ -174,6 +176,7 @@ export class DurableShellTaskStore {
     const metadata: DurableTaskMetadata = {
       version: 1,
       task_id: request.taskId,
+      ...(request.commandFingerprint === undefined ? {} : { command_fingerprint: request.commandFingerprint }),
       request_digest: requestDigest,
       state: 'running',
       started_at: startedAt,
@@ -310,7 +313,7 @@ export class DurableShellTaskStore {
     }
     const reconciled = await this.reconcile(metadata.value);
     await this.releaseTerminalReservation(reconciled);
-    return ok(await this.snapshotFromMetadata(reconciled));
+    return ok({ ...await this.snapshotFromMetadata(reconciled), ...(reconciled.command_fingerprint === undefined ? {} : { command_fingerprint: reconciled.command_fingerprint }) });
   }
 
   /** Trusted exact lookup for a reserved automation task. Legacy/no-digest rows fail closed. */

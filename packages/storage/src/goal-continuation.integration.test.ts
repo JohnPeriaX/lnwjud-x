@@ -1168,6 +1168,7 @@ describe('durable goal continuation persistence', () => {
           gates: [
             { id: 'diff', title: 'Diff check', applicability: 'required', status: 'pending', reason: 'Inspect the exact diff.', basedOnUserIntentRevision: 0 },
             { id: 'docs_impact', title: 'Docs impact', applicability: 'required', status: 'pending', reason: 'Record documentation impact.', basedOnUserIntentRevision: 0 },
+            { id: 'architecture', title: 'Architecture check', applicability: 'required', status: 'pending', reason: 'Run the configured check.', basedOnUserIntentRevision: 0, checkCommand: 'pnpm lint:arch' },
           ],
         },
       });
@@ -1187,6 +1188,21 @@ describe('durable goal continuation persistence', () => {
         goalId, leaseToken, expectedRevision: 1, status: 'completed', summary: 'Not ready.', evidence: [],
       });
       expect(pendingGateFinish).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+
+      const dismissedRequiredGate = await runtime.service.checkpointGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 1, expectedUserIntentRevision: 0,
+        currentPhase: 'validate', summary: 'Attempt to dismiss required diff gate.', stepUpdates: [], nextAction: 'Validate.', blockers: [], evidence: [],
+        engineeringGateUpdates: [{ gateId: 'diff', status: 'not_applicable', reason: 'Skip this check.' }],
+      });
+      expect(dismissedRequiredGate).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+
+      const wrongArchitectureCommand = await runtime.service.checkpointGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 1, expectedUserIntentRevision: 0,
+        currentPhase: 'validate', summary: 'Try an unrelated architecture check.', stepUpdates: [], nextAction: 'Run the declared command.', blockers: [], evidence: [],
+        resumeContext: { changedFiles: [], commands: [{ command: 'pnpm test', status: 'passed', exitCode: 0, result: 'passed' }], decisions: [], failedAttempts: [], pendingValidation: [], resumePrerequisites: [], stateFacts: [], artifacts: [] },
+        engineeringGateUpdates: [{ gateId: 'architecture', status: 'passed', evidence: { source: 'host_observed', observedAt: now.toISOString(), workspaceId: workspace.id, command: 'pnpm test', runId: 'host-task-1', exitCode: 0 } }],
+      });
+      expect(wrongArchitectureCommand).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
 
       const unmatchedObservation = await runtime.service.checkpointGoal(actor('engineering-dod'), {
         goalId, leaseToken, expectedRevision: 1, expectedUserIntentRevision: 0,
@@ -1233,15 +1249,18 @@ describe('durable goal continuation persistence', () => {
         currentPhase: 'review', summary: 'Validated exact diff.', stepUpdates: [], nextAction: 'Finish.', blockers: [], evidence: [],
         resumeContext: {
           changedFiles: ['src/example.ts'],
-          commands: [{ command: 'git diff --check', status: 'passed', exitCode: 0, result: 'clean' }],
+          commands: [
+            { command: 'git diff --check', status: 'passed', exitCode: 0, result: 'clean' },
+            { command: 'pnpm lint:arch', status: 'passed', exitCode: 0, result: 'passed' },
+          ],
           decisions: [], failedAttempts: [], pendingValidation: [], resumePrerequisites: [], stateFacts: [], artifacts: [],
         },
-        engineeringGateUpdates: [{
-          gateId: 'diff', status: 'passed',
-          evidence: { source: 'host_observed', observedAt: now.toISOString(), workspaceId: workspace.id, command: 'git diff --check', runId: 'host-task-1', exitCode: 0 },
-        }],
+        engineeringGateUpdates: [
+          { gateId: 'diff', status: 'passed', evidence: { source: 'host_observed', observedAt: now.toISOString(), workspaceId: workspace.id, command: 'git diff --check', runId: 'host-task-1', exitCode: 0 } },
+          { gateId: 'architecture', status: 'passed', evidence: { source: 'host_observed', observedAt: now.toISOString(), workspaceId: workspace.id, command: 'pnpm lint:arch', runId: 'host-task-1', exitCode: 0 } },
+        ],
       });
-      expect(observed).toMatchObject({ ok: true, value: { revision: 3, engineering: { gates: [{ id: 'diff', status: 'passed' }, { id: 'docs_impact', status: 'not_applicable' }] } } });
+      expect(observed).toMatchObject({ ok: true, value: { revision: 3, engineering: { gates: [{ id: 'diff', status: 'passed' }, { id: 'docs_impact', status: 'not_applicable' }, { id: 'architecture', status: 'passed', checkCommand: 'pnpm lint:arch' }] } } });
 
       const reviewFinding = await runtime.service.checkpointGoal(actor('engineering-dod'), {
         goalId, leaseToken, expectedRevision: 3, expectedUserIntentRevision: 0,

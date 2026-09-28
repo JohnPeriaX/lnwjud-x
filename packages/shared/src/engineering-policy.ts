@@ -63,7 +63,9 @@ function parseArchitecture(value: unknown): ProjectEngineeringSettings['architec
   if (value === undefined) return undefined;
   if (!isRecord(value)) throw new Error('Project profile engineering.architecture must be an object');
   assertOnlyKeys(value, ['checkCommand'], 'engineering.architecture');
-  return { checkCommand: boundedCommand(value.checkCommand, 'engineering.architecture.checkCommand') };
+  const checkCommand = boundedCommand(value.checkCommand, 'engineering.architecture.checkCommand');
+  if (checkCommand.length > 2048) throw new Error('Project profile engineering.architecture.checkCommand exceeds the evidence command limit');
+  return { checkCommand };
 }
 
 function parseRequiredPlatforms(value: unknown): readonly EngineeringRequiredPlatform[] {

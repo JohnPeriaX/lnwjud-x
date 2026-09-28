@@ -2,6 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import {
   GoalStateError,
+  mayMarkEngineeringGateNotApplicable,
+  requiresHostObservedEngineeringEvidence,
   type AcquireGoalRecordRequest,
   type AcquireGoalRecordResult,
   type BeginGoalFencedMutationRequest,
@@ -2853,7 +2855,7 @@ function assertCompletionReady(goal: GoalRecord, status: FinishGoalRecordRequest
   if (goal.engineering !== undefined) {
     const unresolvedGates = goal.engineering.gates.filter((gate) => {
       if (gate.status === 'passed') return gate.evidence === undefined;
-      if (gate.status === 'not_applicable') return gate.reason.trim().length === 0;
+      if (gate.status === 'not_applicable') return gate.reason.trim().length === 0 || !mayMarkEngineeringGateNotApplicable(gate);
       return gate.applicability === 'required';
     });
     if (unresolvedGates.length > 0) {
@@ -2862,8 +2864,7 @@ function assertCompletionReady(goal: GoalRecord, status: FinishGoalRecordRequest
         `Engineering goal cannot be completed while required gates are unresolved: ${unresolvedGates.map((gate) => `${gate.id}:${gate.status}`).join(', ')}`,
       );
     }
-    const hostEvidenceGateIds = new Set(['diff','focused_validation','integration','restart_persistence','cross_platform','exact_sha_ci','package']);
-    const unobservedGates = goal.engineering.gates.filter((gate) => gate.status === 'passed' && hostEvidenceGateIds.has(gate.id) && gate.evidence?.source !== 'host_observed');
+    const unobservedGates = goal.engineering.gates.filter((gate) => gate.status === 'passed' && requiresHostObservedEngineeringEvidence(gate.id) && gate.evidence?.source !== 'host_observed');
     if (unobservedGates.length > 0) {
       throw new GoalStateError(
         'conflict',
@@ -3060,6 +3061,9 @@ function parseEngineeringGoalMetadata(serialized: string): EngineeringGoalMetada
     if (!['required','optional','not_applicable'].includes(String(entry.applicability))) throw corrupt('Engineering gate applicability is invalid');
     if (!['pending','running','passed','failed','blocked','not_applicable','stale'].includes(String(entry.status))) throw corrupt('Engineering gate status is invalid');
     if (!Number.isInteger(entry.basedOnUserIntentRevision) || Number(entry.basedOnUserIntentRevision) < 0) throw corrupt('Engineering gate intent revision is invalid');
+    if (entry.checkCommand !== undefined && (typeof entry.checkCommand !== 'string' || entry.checkCommand.trim().length === 0 || entry.checkCommand.length > 2048)) {
+      throw corrupt('Engineering gate check command is invalid');
+    }
     let evidence: EngineeringGoalMetadata['gates'][number]['evidence'];
     if (entry.evidence !== undefined) {
       if (!isRecord(entry.evidence) || !['host_observed','user_attested'].includes(String(entry.evidence.source))
@@ -3099,6 +3103,7 @@ function parseEngineeringGoalMetadata(serialized: string): EngineeringGoalMetada
       status: entry.status as EngineeringGoalMetadata['gates'][number]['status'],
       reason: entry.reason,
       basedOnUserIntentRevision: Number(entry.basedOnUserIntentRevision),
+      ...(typeof entry.checkCommand === 'string' ? { checkCommand: entry.checkCommand } : {}),
       ...(evidence === undefined ? {} : { evidence }),
     };
   });
