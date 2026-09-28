@@ -53,9 +53,13 @@ and returns the response without opening a public inbound port on the host.
 
 ## Current published version: v5.7.0
 
-## Current source version: v5.7.0
+## Current source version: v5.7.1
 
 Latest published release: **v5.7.0**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
+
+### What's new in v5.7.1
+
+- **Engineering Harness checkpoints save gate results:** gate updates and review findings now reach the durable Goal instead of being silently dropped by the MCP handler.
 
 ### What's new in v5.7.0
 
@@ -72,13 +76,7 @@ See [Thai Engineering Harness setup and workflow](docs/USAGE_TH.md#8a-engineerin
 - **Detailed Goal snapshots:** Watcher Protocol v1 now provides completion readiness, objective, phase, acceptance checks, task count, and timestamps for each active Goal so the companion Watcher can explain remaining work and detect inactivity.
 - **Configured MCP server names:** Watcher can display the names users set in LNWJUD with their connection state. Launch commands, configuration paths, and secrets are excluded.
 
-### What's new in v5.6.5
-
-- **Agent Swarm follows live settings:** enable Codex delegation in Settings and `agent_swarm_run` on the Tools page. The running MCP tool list updates immediately for active Desktop HTTP/Tunnel sessions and local STDIO connections, without restarting lnwjud.
-- **Setup explains both switches:** the Settings preview includes `agent_swarm_run`; if a ChatGPT app still uses an older tool snapshot, refresh or rescan its tools in ChatGPT.
-- **Additional reliability fixes since v5.6.4:** Desktop Agent Stop status remains accurate after refresh, and concurrent startup cannot expose a partially created checkpoint encryption key.
-
-See [RELEASE_NOTES.md](RELEASE_NOTES.md) for complete version history and [Thai troubleshooting](docs/USAGE_TH.md#13-doctor--troubleshooting) for step-by-step Agent Swarm setup.
+See [RELEASE_NOTES.md](RELEASE_NOTES.md) for complete version history and [Thai troubleshooting](docs/USAGE_TH.md#13-doctor--troubleshooting) for Agent Swarm setup.
 
 Current v4 highlights include:
 
@@ -600,8 +598,8 @@ corepack pnpm@10.15.0 package:windows
 The Windows 10/11 x64 artifacts are written to:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.7.0.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.7.0.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.7.1.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.7.1.exe
 ```
 
 The installer is per-user by default. The portable executable needs no installation but uses the same per-user lnwjud data/settings location. A common installed executable path is:

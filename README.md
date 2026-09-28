@@ -53,9 +53,13 @@
 
 ## Current published version: v5.7.0
 
-## Current source version: v5.7.0
+## Current source version: v5.7.1
 
 Latest published release: **v5.7.0**. The download buttons above point directly to the v5.7.0 assets. The release is published only after the exact tagged main commit passes the target-native release gates.
+
+### What's new in v5.7.1
+
+- **Engineering Harness checkpoints save gate results:** gate updates and review findings now reach the durable Goal instead of being silently dropped by the MCP handler.
 
 ### What's new in v5.7.0
 
@@ -72,15 +76,7 @@ See the [Thai Engineering Harness guide](docs/USAGE_TH.md#8a-engineering-harness
 - **More detail in Watcher:** active Goal snapshots now include completion readiness, phase, objective, acceptance checks, active task count, and timestamps, so the companion app can show what is still pending and identify quiet Goals.
 - **Your configured MCP names:** Watcher can display MCP server names and connection state from LNWJUD. Commands, configuration paths, and credentials stay private.
 
-### What's new in v5.6.5
-
-- **Agent Swarm appears when enabled:** turn on Codex delegation in Settings and enable `agent_swarm_run` on the Tools page. Saving either setting updates the running MCP tool list, including an active Tunnel or local STDIO connection. You no longer need to restart lnwjud just to expose the tool.
-- **Clearer setup:** Settings now shows `agent_swarm_run` in its tool preview and explains both switches. If ChatGPT still shows an older tool list, refresh or rescan the connected app's tools in ChatGPT.
-- **Reliability fixes since v5.6.4:** the Desktop Agent Stop state remains accurate after a refresh, and concurrent startup no longer exposes a partially written checkpoint encryption key.
-
-See the [Thai troubleshooting guide](docs/USAGE_TH.md#13-doctor--troubleshooting) for simple Agent Swarm setup steps.
-
-See [RELEASE_NOTES.md](RELEASE_NOTES.md) for earlier versions and the complete release history.
+See [RELEASE_NOTES.md](RELEASE_NOTES.md) for previous releases and the complete release history.
 
 ## Install
 
