@@ -440,6 +440,13 @@ describe('ScheduledContinuationService', () => {
       expect(result.value.scheduleRequest.prompt).toContain('same native task remains runnable across normal firings');
       expect(result.value.scheduleRequest.prompt).toContain('must never create, retime, replace, or consume a successor task');
       expect(result.value.scheduleRequest.prompt).toContain('recurring_acquired');
+      expect(result.value.scheduleRequest.prompt).toContain('choose one concrete next safe action');
+      expect(result.value.scheduleRequest.prompt).toContain('Repeat this work loop while safe useful work remains');
+      expect(result.value.scheduleRequest.prompt).toContain('releaseLease:false or omitted');
+      expect(result.value.scheduleRequest.prompt).toContain('a checkpoint is not permission to return');
+      expect(result.value.scheduleRequest.prompt).toContain('Before any final response while the goal is still active');
+      expect(result.value.scheduleRequest.prompt).toContain('if any concrete safe action remains, invoke the relevant tool and continue instead of returning');
+      expect(result.value.scheduleRequest.prompt).toContain('reconstruction-grade resumeContext and releaseLease:true');
       expect(result.value.scheduleRequest.prompt).toContain('A fixable failure discovered during that work');
       expect(result.value.scheduleRequest.prompt).toContain('Never spend an hourly wake merely reporting an intermediate problem');
       expect(result.value.scheduleRequest.prompt).toContain('do not substitute user-visible progress prose for execution');

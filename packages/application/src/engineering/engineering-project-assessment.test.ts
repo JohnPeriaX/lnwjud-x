@@ -54,6 +54,52 @@ describe('EngineeringProjectAssessmentService', () => {
     expect(result.warnings.join('\n')).toMatch(/truncated|inherit or off/i);
   });
 
+  it('resolves AGENTS scopes from filesystem type and nearest existing ancestors for planned paths', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-engineering-scope-kind-'));
+    temporaryRoots.push(root);
+    await mkdir(path.join(root, 'src', 'feature.v2'), { recursive: true });
+    await mkdir(path.join(root, '..config'), { recursive: true });
+    await writeFile(path.join(root, 'package.json'), '{}', 'utf8');
+    await writeFile(path.join(root, 'AGENTS.md'), 'root rules', 'utf8');
+    await writeFile(path.join(root, 'src', 'AGENTS.md'), 'src rules', 'utf8');
+    await writeFile(path.join(root, '..config', 'AGENTS.md'), 'leading dot rules', 'utf8');
+    await writeFile(path.join(root, 'src', 'feature.v2', 'AGENTS.md'), 'dotted directory rules', 'utf8');
+    await writeFile(path.join(root, 'src', 'feature.v2', 'Dockerfile'), 'FROM scratch', 'utf8');
+    await writeFile(path.join(root, 'src', 'blocked'), 'not a directory', 'utf8');
+
+    const service = new EngineeringProjectAssessmentService();
+    const dottedDirectory = await service.assess(root, 'src/feature.v2');
+    const extensionlessFile = await service.assess(root, 'src/feature.v2/Dockerfile');
+    const leadingDotsDirectory = await service.assess(root, '..config');
+
+    expect(dottedDirectory.instructions.map((entry) => entry.path)).toEqual([
+      'AGENTS.md',
+      'src/AGENTS.md',
+      'src/feature.v2/AGENTS.md',
+    ]);
+    expect(extensionlessFile.instructions.map((entry) => entry.path)).toEqual([
+      'AGENTS.md',
+      'src/AGENTS.md',
+      'src/feature.v2/AGENTS.md',
+    ]);
+    expect(leadingDotsDirectory.instructions.map((entry) => entry.path)).toEqual([
+      'AGENTS.md',
+      '..config/AGENTS.md',
+    ]);
+
+    const plannedNestedFile = await service.assess(root, 'src/planned.v3/component.ts');
+    const plannedExtensionlessFile = await service.assess(root, 'src/PlannedDockerfile');
+    expect(plannedNestedFile.instructions.map((entry) => entry.path)).toEqual([
+      'AGENTS.md',
+      'src/AGENTS.md',
+    ]);
+    expect(plannedExtensionlessFile.instructions.map((entry) => entry.path)).toEqual([
+      'AGENTS.md',
+      'src/AGENTS.md',
+    ]);
+    await expect(service.assess(root, 'src/blocked/child.ts')).rejects.toThrow(/traverses a file/i);
+  });
+
   it('rejects a scoped path that escapes the registered project root', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-engineering-scope-'));
     temporaryRoots.push(root);

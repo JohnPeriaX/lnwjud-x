@@ -493,6 +493,117 @@ describe('durable goal continuation persistence', () => {
     second.database.close();
   });
 
+  it('keeps one rolling worker lease alive across repeated milestone checkpoints and releases it only at handoff', async () => {
+    const { filename, workspace } = await fixture();
+    let now = new Date('2026-08-26T00:00:00.000Z');
+    const runtime = await open(filename, workspace, () => now);
+    try {
+      const created = await runtime.service.runGoal(actor('rolling-session'), { ...createRequest, leaseSeconds: 600 });
+      if (!created.ok || created.value.leaseToken === undefined) throw new Error('goal create failed');
+      const prepared = await runtime.scheduledService.prepareScheduledContinuation(actor('rolling-session'), {
+        goalId: created.value.goalId,
+        leaseToken: created.value.leaseToken,
+        expectedRevision: created.value.revision,
+        currentPhase: 'rolling-work',
+        summary: 'Keep one recurring watchdog while the same worker continues.',
+        stepUpdates: [],
+        nextAction: 'Continue useful work after each milestone.',
+        blockers: [],
+        evidence: [],
+        activeTaskIds: [],
+        executionPreference: 'cloud',
+      });
+      if (!prepared.ok) throw new Error('watchdog prepare failed');
+      const receipt = await runtime.scheduledService.recordScheduledContinuationReceipt(actor('rolling-session'), {
+        continuationId: prepared.value.continuation.continuationId,
+        expectedVersion: prepared.value.continuation.version,
+        outcome: 'created',
+        nativeTaskId: 'native-work-conservation',
+        dueAt: prepared.value.continuation.dueAt,
+        runsOn: 'cloud',
+      });
+      expect(receipt).toMatchObject({ ok: true, value: { occurrence: 'interval', intervalMinutes: 60, status: 'scheduled' } });
+
+      let revision = prepared.value.goal.revision;
+      const generation = prepared.value.goal.leaseGeneration;
+      for (const [minute, expectedExpiry] of [
+        [9, '2026-08-26T00:19:00.000Z'],
+        [18, '2026-08-26T00:28:00.000Z'],
+        [27, '2026-08-26T00:37:00.000Z'],
+        [36, '2026-08-26T00:46:00.000Z'],
+      ] as const) {
+        now = new Date(`2026-08-26T00:${String(minute).padStart(2, '0')}:00.000Z`);
+        const checkpoint = await runtime.service.checkpointGoal(actor('rolling-session'), {
+          goalId: created.value.goalId,
+          leaseToken: created.value.leaseToken,
+          expectedRevision: revision,
+          currentPhase: 'rolling-work',
+          summary: `Milestone at minute ${minute}; keep working.`,
+          stepUpdates: [],
+          nextAction: 'Execute the next safe action in this same worker turn.',
+          blockers: [],
+          evidence: [{ kind: 'note', value: `minute-${minute}` }],
+          activeTaskIds: [],
+          releaseLease: false,
+        });
+        expect(checkpoint).toMatchObject({
+          ok: true,
+          value: {
+            status: 'active',
+            leaseGeneration: generation,
+            leaseExpiresAt: expectedExpiry,
+          },
+        });
+        if (!checkpoint.ok) throw new Error(`checkpoint ${minute} failed`);
+        revision = checkpoint.value.revision;
+      }
+
+      now = new Date('2026-08-26T00:36:30.000Z');
+      const handoff = await runtime.service.checkpointGoal(actor('rolling-session'), {
+        goalId: created.value.goalId,
+        leaseToken: created.value.leaseToken,
+        expectedRevision: revision,
+        currentPhase: 'handoff',
+        summary: 'Host boundary requires durable handoff.',
+        stepUpdates: [],
+        nextAction: 'Next worker resumes from this checkpoint.',
+        blockers: [],
+        evidence: [],
+        activeTaskIds: [],
+        releaseLease: true,
+        resumeContext: {
+          changedFiles: [],
+          commands: [],
+          decisions: ['Ordinary milestone checkpoints kept the same worker lease.'],
+          failedAttempts: [],
+          pendingValidation: ['Resume useful work on the next worker.'],
+          resumePrerequisites: ['Claim the same durable goal before mutation.'],
+          stateFacts: [{ kind: 'note', value: 'minute-36-handoff' }],
+          artifacts: [],
+        },
+      });
+      expect(handoff).toMatchObject({ ok: true, value: { status: 'active', leaseGeneration: generation } });
+      if (!handoff.ok) throw new Error('handoff checkpoint failed');
+      expect(handoff.value.leaseExpiresAt).toBeUndefined();
+
+      const staleMutation = await runtime.service.checkpointGoal(actor('rolling-session'), {
+        goalId: created.value.goalId,
+        leaseToken: created.value.leaseToken,
+        expectedRevision: handoff.value.revision,
+        currentPhase: 'stale-worker',
+        summary: 'Released worker must not mutate.',
+        stepUpdates: [],
+        nextAction: 'none',
+        blockers: [],
+        evidence: [],
+        activeTaskIds: [],
+      });
+      expect(staleMutation).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+    } finally {
+      runtime.database.close();
+    }
+  });
+
   it('keeps terminal goals terminal and never reopens them through runGoal', async () => {
     const { filename, workspace } = await fixture();
     const runtime = await open(filename, workspace, () => new Date('2026-08-26T00:00:00.000Z'));

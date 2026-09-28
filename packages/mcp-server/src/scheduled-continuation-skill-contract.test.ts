@@ -57,6 +57,12 @@ describe('scheduled continuation skill contract', () => {
     expect(skill).toContain('releaseLease:true');
     expect(skill).toContain('A checkpoint is not a turn boundary');
     expect(skill).toContain('Work-conserving worker behavior');
+    expect(skill).toContain('run an explicit work loop before status prose');
+    expect(skill).toContain('select one concrete next safe action');
+    expect(skill).toContain('continue the work loop immediately after the checkpoint');
+    expect(skill).toContain('Pre-final active-goal guard');
+    expect(skill).toContain('If any concrete safe action remains, execute it instead of returning');
+    expect(skill).toContain('reconstruction-grade `resumeContext`');
     expect(skill).toContain('One failed poll never justifies abandoning the task');
     expect(skill).toContain('Discovering a fixable failure is the next unit of work, not a turn boundary');
     expect(skill).toContain('Never spend an hourly wake merely reporting a problem that can still be acted on');

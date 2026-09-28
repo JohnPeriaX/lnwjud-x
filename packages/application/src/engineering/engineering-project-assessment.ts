@@ -101,9 +101,25 @@ export class EngineeringProjectAssessmentService {
     const realRoot = await realpath(rootPath);
 
     const absoluteTarget = path.resolve(rootPath, scopedPath);
-    const relativeTarget = path.relative(rootPath, absoluteTarget);
-    if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) throw new Error('Scoped path escapes the project root');
-    const targetDirectory = path.extname(absoluteTarget).length === 0 ? absoluteTarget : path.dirname(absoluteTarget);
+    if (!pathContains(rootPath, absoluteTarget)) throw new Error('Scoped path escapes the project root');
+    let targetDirectory = absoluteTarget;
+    while (true) {
+      try {
+        const targetMetadata = await stat(targetDirectory);
+        if (targetMetadata.isDirectory()) break;
+        if (targetDirectory !== absoluteTarget) throw new Error('Scoped path traverses a file before reaching the target');
+        targetDirectory = path.dirname(targetDirectory);
+        break;
+      } catch (error) {
+        if (!isMissing(error)) throw error;
+        const parentDirectory = path.dirname(targetDirectory);
+        if (parentDirectory === targetDirectory) {
+          targetDirectory = rootPath;
+          break;
+        }
+        targetDirectory = parentDirectory;
+      }
+    }
     const relativeDirectory = path.relative(rootPath, targetDirectory);
     if (relativeDirectory.length === 0) return candidates;
 
@@ -168,7 +184,7 @@ function relativeSlash(rootPath: string, targetPath: string): string {
 
 function pathContains(rootPath: string, targetPath: string): boolean {
   const relative = path.relative(rootPath, targetPath);
-  return relative.length === 0 || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  return relative.length === 0 || (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`));
 }
 
 function isMissing(error: unknown): boolean {
