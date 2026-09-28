@@ -62,6 +62,13 @@ For any repository/application version change, use the canonical root version sc
 
 After the script runs, inspect the diff and current-version references for drift. Manual per-file edits are fallback-only for genuinely uncovered references. If an uncovered reference belongs to the canonical current-version surface, update `scripts/set-version.mjs` in the same change so the next bump is automated. Preserve historical release notes, plans, and dated evidence unless the task explicitly requires changing history.
 
+Every application version prepared for release must also have a non-empty,
+exact-version entry in the in-app What's New registry, with meaningful Thai and
+English text. README and GitHub Release notes are separate outputs and do not
+populate the in-app modal. The Desktop release-notes test must verify the
+current package version and pass before tagging; never publish a version whose
+in-app modal would show the empty state.
+
 Before pushing any version-changing commit:
 
 1. Finish the functional change and its deterministic regression test before changing the version. Keep the version-sync diff mechanically isolated from unrelated behavior where practical.

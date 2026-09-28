@@ -47,6 +47,10 @@ system is never evidence for another.
    linked PRs and commits, then one `**Full Changelog**` link. It omits empty
    categories instead of publishing `- None.`. A release with no README bullets
    or no substantive change evidence fails before publication.
+10. Every application release also has a non-empty, exact-version entry in
+    the in-app What's New registry, with Thai and English text. README and
+    GitHub Release notes do not populate the in-app modal. The Desktop release
+    notes test must fail when the current package version has no in-app entry.
 
 ## Release-note format
 
@@ -57,8 +61,19 @@ bump, CI commit hash, or artifact list alone is insufficient. The tag workflow
 generates notes with `scripts/release-notes.mjs`, checks this README section,
 and validates it immediately after the tag/version check, before waiting for
 or downloading release artifacts. It publishes the generated file as the
-GitHub Release body. Nonempty headings
-appear in this order:
+GitHub Release body.
+
+The in-app What's New modal uses a separate, statically bundled registry in
+`apps/desktop/src/renderer/features/release-notes/release-notes.ts`; it does
+not read `README.md` or the GitHub Release body. For every application version,
+add the exact version and at least one real category/item to that registry, and
+add meaningful Thai and English title/description translations. The Desktop
+`release-notes.test.ts` reads the current `apps/desktop/package.json` version
+and rejects a missing or empty entry. This test is a required release gate; a
+release must not be tagged or published while the modal would show its empty
+state for the packaged version.
+
+Nonempty headings appear in this order:
 
 ```markdown
 ## Highlights
