@@ -9,6 +9,13 @@ import { CAPABILITY_TASK_OWNER_METADATA_KEY } from './task-ownership.js';
 
 const temporaryRoots: string[] = [];
 
+async function waitForDurableTaskCompletion(taskStateDirectory: string, taskId: string): Promise<void> {
+  await vi.waitFor(async () => {
+    const metadata = JSON.parse(await readFile(path.join(taskStateDirectory, taskId, 'task.json'), 'utf8')) as { state?: unknown };
+    expect(metadata.state).toBe('completed');
+  }, { interval: 25, timeout: 4_000 });
+}
+
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, {
     recursive: true,
@@ -19,7 +26,7 @@ afterEach(async () => {
 });
 
 describe('ShellCapabilityBackend', () => {
-  it('binds trusted task observations to the launched command across memory and durable storage', async () => {
+  it('binds in-memory trusted task observations to the launched command', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-shell-evidence-'));
     temporaryRoots.push(root);
     const owner = { metadata: { [CAPABILITY_TASK_OWNER_METADATA_KEY]: { clientId: 'client-1', sessionId: 'session-1', workspaceId: 'workspace-1' } } };
@@ -31,13 +38,23 @@ describe('ShellCapabilityBackend', () => {
     if (!memoryRun.ok) return;
     await expect(memory.statusForGoalLiveness('workspace-1', String(memoryRun.value.task_id)))
       .resolves.toMatchObject({ ok: true, value: { command_fingerprint: expected } });
-    const durable = new ShellCapabilityBackend({ allowedRoots: [root], taskStateDirectory: path.join(root, '.tasks') });
+  });
+
+  it('persists durable trusted task observations across backend reopen', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-shell-evidence-'));
+    temporaryRoots.push(root);
+    const owner = { metadata: { [CAPABILITY_TASK_OWNER_METADATA_KEY]: { clientId: 'client-1', sessionId: 'session-1', workspaceId: 'workspace-1' } } };
+    const expected = engineeringCommandFingerprint(formatEngineeringCommand(process.execPath, ['--version']));
+    const taskStateDirectory = path.join(root, '.tasks');
+    const durable = new ShellCapabilityBackend({ allowedRoots: [root], taskStateDirectory });
     const durableRun = await durable.execute({ operation: 'run', executable: process.execPath, arguments: ['--version'], cwd: root,
       execution: 'background', userConfirmed: true, ...owner });
     expect(durableRun).toMatchObject({ ok: true, value: { task_id: expect.any(String) } });
     if (!durableRun.ok) return;
-    const reopened = new ShellCapabilityBackend({ allowedRoots: [root], taskStateDirectory: path.join(root, '.tasks') });
-    await expect(reopened.statusForGoalLiveness('workspace-1', String(durableRun.value.task_id)))
+    const taskId = String(durableRun.value.task_id);
+    await waitForDurableTaskCompletion(taskStateDirectory, taskId);
+    const reopened = new ShellCapabilityBackend({ allowedRoots: [root], taskStateDirectory });
+    await expect(reopened.statusForGoalLiveness('workspace-1', taskId))
       .resolves.toMatchObject({ ok: true, value: { command_fingerprint: expected } });
   });
 
