@@ -57,6 +57,15 @@ and returns the response without opening a public inbound port on the host.
 
 Latest published release: **v5.6.6**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
 
+### What's new in v5.7.0
+
+- **Engineering Harness is opt-in:** choose a workflow preset and project override for coding tasks. It stays Off until you enable it.
+- **Durable plans resume safely:** substantive tasks keep plans, acceptance checks, checkpoints, and evidence in the existing Goal.
+- **Mutation and evidence gates enforce scope:** active Harness binds first-party changes to the current task. Pending, stale, or local-only evidence cannot pass hosted gates.
+- **Authorized continuation handles failures:** it works through fixable failures and keeps goal ownership and checkpoint details across handoffs.
+
+See [Thai Engineering Harness setup and workflow](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for details.
+
 ### What's new in v5.6.6
 
 - **Truthful Watcher Goal state:** an open Goal no longer makes the runtime or orchestrator appear busy without observable work. Completion readiness includes plan steps, acceptance criteria, blockers, and active tasks; final closure still requires `finish_goal`.
@@ -70,17 +79,6 @@ Latest published release: **v5.6.6**. Windows, macOS, and Linux artifacts are pu
 - **Additional reliability fixes since v5.6.4:** Desktop Agent Stop status remains accurate after refresh, and concurrent startup cannot expose a partially created checkpoint encryption key.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for complete version history and [Thai troubleshooting](docs/USAGE_TH.md#13-doctor--troubleshooting) for step-by-step Agent Swarm setup.
-
-### What's new in v5.6.4
-
-- **Existing Secure Tunnels recover after restart:** lnwjud updates its local MCP destination when the port changes. On Windows, it checks for an older client using the same lnwjud profile and Tunnel ID and closes it only when its identity can be verified. An unverified client is left alone and shown as an error; restarting Windows is the simple recovery path.
-- **ChatGPT setup uses the same Tunnel ID:** choose Tunnel and No authentication for lnwjud's Runtime API key setup. Store the Runtime API key in lnwjud; do not enter it as an OAuth client ID or secret. Refresh an existing connection after updating lnwjud. Secure Tunnel supports private/developer-mode testing, while public plugin submission requires a public HTTPS MCP endpoint.
-- **Desktop improvements:** Start/Stop buttons stay disabled while a Tunnel starts, Live Logs preserve event times, and the Git changed-files list grows into available window space.
-- **Faster release checks:** CI runs the Windows workspace suite beside the remaining release gate and starts main's target-native package builds beside the test matrix. The aggregate Windows check and exact-SHA release gate still require every result to pass.
-
-Follow the [Thai connection and recovery steps](docs/USAGE_TH.md#5-เชื่อม-lnwjud-เข้ากับ-chatgpt) if ChatGPT still reports a connection error. Remote MCP through ngrok + OAuth is a separate connection method.
-
-See [RELEASE_NOTES.md](RELEASE_NOTES.md) for earlier versions and the complete release history.
 
 Current v4 highlights include:
 

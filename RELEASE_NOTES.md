@@ -2,6 +2,14 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.7.0
+
+- **Opt in to Engineering Harness:** enable it in Settings and select a preset for coding work. It defaults Off, supports project overrides, and respects existing permissions.
+- **Resume substantive work:** Harness reuses durable Goals for plans, intent revisions, checkpoints, acceptance checks, and evidence. Requirement changes stale affected gates while preserving proven work.
+- **Guard first-party mutations:** with Harness active, guarded changes require the current engineering task. Scope, permission, recovery, and `goalLease` checks remain in force.
+- **Trust the gate status:** pending, failed, stale, or unknown evidence never passes. Local output cannot prove exact-SHA hosted CI or target-native packaging.
+- **Keep authorized continuation productive:** workers address actionable failures during the same run. Checkpoints preserve resume context, while live task ownership stays separate from run idempotency.
+
 ### What's new in v5.6.6
 
 - **Watcher Goal status is truthful:** an open Durable Goal no longer makes the runtime or orchestrator look busy without an observable in-flight operation. Completed plan steps, acceptance criteria, blockers, and tracked blocking tasks determine whether the Goal is ready for explicit `finish_goal` finalization. No Goal is silently closed just because its checklist reached 100%.

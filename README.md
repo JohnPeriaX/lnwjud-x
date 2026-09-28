@@ -57,6 +57,15 @@
 
 Latest published release: **v5.6.6**. The download buttons above point directly to the v5.6.6 assets. The release is published only after the exact tagged main commit passes the target-native release gates.
 
+### What's new in v5.7.0
+
+- **Engineering Harness is opt-in:** choose a workflow preset and project override for coding tasks. It stays Off until you enable it.
+- **Durable plans resume safely:** substantive tasks keep plans, acceptance checks, checkpoints, and evidence in the existing Goal.
+- **Mutation and evidence gates enforce scope:** active Harness binds first-party changes to the current task. Pending, stale, or local-only evidence cannot pass hosted gates.
+- **Authorized continuation handles failures:** it works through fixable failures and keeps goal ownership and checkpoint details across handoffs.
+
+See the [Thai Engineering Harness guide](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for setup and workflow details.
+
 ### What's new in v5.6.6
 
 - **Watcher shows the real Goal state:** an open Goal no longer makes the runtime look busy when there is no observable work. Completed milestones alone do not close it; acceptance criteria, blockers, and active tasks determine whether it is ready for `finish_goal`.
@@ -70,15 +79,6 @@ Latest published release: **v5.6.6**. The download buttons above point directly 
 - **Reliability fixes since v5.6.4:** the Desktop Agent Stop state remains accurate after a refresh, and concurrent startup no longer exposes a partially written checkpoint encryption key.
 
 See the [Thai troubleshooting guide](docs/USAGE_TH.md#13-doctor--troubleshooting) for simple Agent Swarm setup steps.
-
-### What's new in v5.6.4
-
-- **ChatGPT Tunnel after an app restart:** lnwjud reconnects the existing Tunnel ID to its current local MCP port. On Windows, it closes an older duplicate client only after confirming that it belongs to the same lnwjud Tunnel. If verification is inconclusive, restart Windows and open lnwjud again; there is no need to create another Tunnel ID.
-- **Connect in ChatGPT:** choose **Tunnel**, select your existing Tunnel ID, and choose **No authentication** for lnwjud's Runtime API key setup. The Runtime API key belongs in lnwjud, not in ChatGPT's OAuth fields. If the connection already exists, refresh it after updating. Secure Tunnel is for private/developer-mode connections; public plugin submission needs a public HTTPS MCP endpoint.
-- **Easier to use:** Tunnel buttons are disabled while starting, old Live Log entries keep their real timestamps, and the Git changed-files list fills the available window height.
-- **Faster release checks:** Windows workspace tests and the remaining release checks run together in CI; main also starts target-native package builds alongside test jobs. The required checks still gate publication.
-
-See the [Thai setup and recovery guide](docs/USAGE_TH.md#5-เชื่อม-lnwjud-เข้ากับ-chatgpt) for step-by-step help. The separate ngrok + OAuth option is described there as well.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for earlier versions and the complete release history.
 
