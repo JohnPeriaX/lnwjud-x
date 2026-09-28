@@ -50,7 +50,7 @@ const unavailable = (
 ): ToolRuntimeFixture => ({ input, evidence: { kind: 'truthful_unavailable', unavailableStatus } });
 
 /**
- * Safe parse-valid inputs and expected delivery evidence for the 106 core tools.
+ * Safe parse-valid inputs and expected delivery evidence for the 109 core tools.
  * These are non-production fixtures: they use controlled workspace IDs, dry-run
  * inputs where available, and never point at a real user path.
  */
@@ -60,6 +60,9 @@ export const CORE_TOOL_RUNTIME_FIXTURES = {
   workspace_info: service({ workspaceId }, 'workspaceInfo.info'),
   workspace_tree: service({}, 'workspaceQuery.tree'),
   project_snapshot: service({ workspaceId }, 'projectSnapshot.snapshot'),
+  engineering_prepare_task: service({ workspaceId, objective: 'Fix the auth persistence bug' }, 'engineeringPreparation.prepare'),
+  engineering_start_task: service({ workspaceId, goalKey: 'engineering.smoke', objective: 'Fix the auth persistence bug' }, 'goals.runGoal'),
+  engineering_get_status: service({ goalId: 'goal-1' }, 'goals.getGoal'),
   read_file: service({ workspaceId, path: 'README.md' }, 'file.readFile'),
   read_files: service({ workspaceId, files: [{ path: 'README.md' }] }, 'file.readFiles'),
   search_files: service({ workspaceId }, 'search.searchFiles'),

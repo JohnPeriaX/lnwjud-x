@@ -70,6 +70,33 @@ describe('stdio MCP runtime', { timeout: STDIO_RUNTIME_TEST_TIMEOUT_MS }, () => 
     }
   });
 
+  it('reads the default-off Engineering Harness setting from the same SQLite key as Desktop', async () => {
+    const dataPath = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-stdio-engineering-harness-'));
+    temporaryRoots.push(dataPath);
+    const runtime = createStdioMcpRuntime(dataPath, workspace);
+    try {
+      expect(runtime.engineeringHarnessSettingsProvider()).toEqual({
+        settings: { schemaVersion: 1, enabled: false, profile: 'senior', applyTo: 'coding_projects', autoProjectAssessment: true },
+        diagnostic: null,
+      });
+      const externalDatabase = new SqliteDatabase(path.join(dataPath, 'lnwjud.sqlite'));
+      new SqliteSettingsRepository(externalDatabase).set(USER_SETTING_KEYS.engineeringHarnessSettings, JSON.stringify({
+        schemaVersion: 1,
+        enabled: true,
+        profile: 'strict',
+        applyTo: 'all_workspaces',
+        autoProjectAssessment: false,
+      }));
+      externalDatabase.close();
+      expect(runtime.engineeringHarnessSettingsProvider()).toEqual({
+        settings: { schemaVersion: 1, enabled: true, profile: 'strict', applyTo: 'all_workspaces', autoProjectAssessment: false },
+        diagnostic: null,
+      });
+    } finally {
+      await runtime.close();
+    }
+  });
+
   it('wires durable goals and scheduled continuation orchestration from the same SQLite repository', async () => {
     const dataPath = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-stdio-continuation-'));
     temporaryRoots.push(dataPath);

@@ -54,6 +54,7 @@ async function open(
   const scheduledService = new ScheduledContinuationService(repository, { now });
   const service = new GoalContinuationService(workspaces, repository, {
     now,
+    engineeringEvidenceVerifier: { verify: async (_workspaceId, evidence): Promise<boolean> => evidence.runId === 'host-task-1' },
     scheduledContinuations: repository,
     ...(taskCancellation === undefined ? {} : { taskCancellation }),
     ...(requestCancellation === undefined ? {} : { requestCancellation }),
@@ -947,6 +948,212 @@ describe('durable goal continuation persistence', () => {
       if (!lateWake.ok) throw new Error('late cleanup wake failed');
       expect('leaseToken' in lateWake.value).toBe(false);
       expect((await runtime.repository.getById(created.value.goalId))?.status).toBe('cancelled');
+    } finally {
+      runtime.database.close();
+    }
+  });
+
+  it('persists Engineering Harness metadata across restart and stales only requirement-dependent gates', async () => {
+    const { filename, workspace } = await fixture();
+    let now = new Date('2026-08-26T00:00:00.000Z');
+    const first = await open(filename, workspace, () => now);
+    const engineering = {
+      schemaVersion: 1 as const,
+      primaryTaskKind: 'bugfix' as const,
+      riskTier: 'high' as const,
+      policyDigest: 'policy-digest-1',
+      deliveryScope: 'local' as const,
+      scopedPath: 'src/auth/session.ts',
+      gates: [
+        {
+          id: 'diff', title: 'Diff check', applicability: 'required' as const, status: 'passed' as const,
+          reason: 'Current diff was inspected.', basedOnUserIntentRevision: 0,
+          evidence: { source: 'host_observed' as const, observedAt: now.toISOString(), workspaceId: workspace.id, command: 'git diff --check', exitCode: 0 },
+        },
+        {
+          id: 'focused_validation', title: 'Focused validation', applicability: 'required' as const, status: 'passed' as const,
+          reason: 'Focused regression passed.', basedOnUserIntentRevision: 0,
+          evidence: { source: 'host_observed' as const, observedAt: now.toISOString(), workspaceId: workspace.id, command: 'pnpm test focused', exitCode: 0 },
+        },
+      ],
+    };
+    const created = await first.service.runGoal(actor('engineering-session-a'), {
+      ...createRequest,
+      goalKey: 'engineering-metadata-restart',
+      engineering,
+    });
+    expect(created).toMatchObject({ ok: true, value: { acquired: true, engineering } });
+    if (!created.ok) throw new Error('engineering goal create failed');
+    const goalId = created.value.goalId;
+    first.database.close();
+
+    now = new Date('2026-08-26T00:01:01.000Z');
+    const second = await open(filename, workspace, () => now);
+    try {
+      const resumed = await second.service.runGoal(actor('engineering-session-b'), {
+        workspaceId: workspace.id,
+        goalKey: 'engineering-metadata-restart',
+        objective: createRequest.objective,
+        leaseSeconds: 60,
+      });
+      expect(resumed).toMatchObject({ ok: true, value: { acquired: true, goalId, engineering } });
+      if (!resumed.ok || resumed.value.leaseToken === undefined) throw new Error('engineering goal resume failed');
+
+      const revised = await second.service.reviseGoalIntent(actor('engineering-session-b'), {
+        goalId,
+        leaseToken: resumed.value.leaseToken,
+        expectedRevision: resumed.value.revision,
+        expectedUserIntentRevision: 0,
+        steering: 'Also preserve the new web-session requirement.',
+        staleEngineeringGateIds: ['focused_validation'],
+      });
+      expect(revised).toMatchObject({
+        ok: true,
+        value: {
+          userIntentRevision: 1,
+          engineering: {
+            policyDigest: 'policy-digest-1',
+            gates: [
+              { id: 'diff', status: 'passed', basedOnUserIntentRevision: 0, evidence: expect.any(Object) },
+              { id: 'focused_validation', status: 'stale', basedOnUserIntentRevision: 1 },
+            ],
+          },
+        },
+      });
+      if (!revised.ok) throw new Error('engineering intent revision failed');
+      expect(revised.value.engineering?.gates[1]).not.toHaveProperty('evidence');
+
+      const unknownGate = await second.service.reviseGoalIntent(actor('engineering-session-b'), {
+        goalId,
+        leaseToken: resumed.value.leaseToken,
+        expectedRevision: revised.value.revision,
+        expectedUserIntentRevision: 1,
+        steering: 'This invalid gate id must not mutate state.',
+        staleEngineeringGateIds: ['missing-gate'],
+      });
+      expect(unknownGate).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+    } finally {
+      second.database.close();
+    }
+  });
+
+  it('enforces Engineering DoD and only accepts host-observed command evidence that matches the checkpoint', async () => {
+    const { filename, workspace } = await fixture();
+    const now = new Date('2026-08-26T00:00:00.000Z');
+    const runtime = await open(filename, workspace, () => now);
+    try {
+      const created = await runtime.service.runGoal(actor('engineering-dod'), {
+        workspaceId: workspace.id,
+        goalKey: 'engineering-dod',
+        objective: 'Fix local behavior safely.',
+        plan: { steps: [{ id: 'implement', title: 'Implement the change' }] },
+        leaseSeconds: 60,
+        engineering: {
+          schemaVersion: 1,
+          primaryTaskKind: 'bugfix',
+          riskTier: 'medium',
+          policyDigest: 'policy-digest-dod',
+          deliveryScope: 'local',
+          gates: [
+            { id: 'diff', title: 'Diff check', applicability: 'required', status: 'pending', reason: 'Inspect the exact diff.', basedOnUserIntentRevision: 0 },
+            { id: 'docs_impact', title: 'Docs impact', applicability: 'required', status: 'pending', reason: 'Record documentation impact.', basedOnUserIntentRevision: 0 },
+          ],
+        },
+      });
+      expect(created).toMatchObject({ ok: true, value: { acquired: true } });
+      if (!created.ok || created.value.leaseToken === undefined) throw new Error('engineering DoD goal create failed');
+      const { goalId, leaseToken } = created.value;
+
+      const planOnly = await runtime.service.checkpointGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 0, expectedUserIntentRevision: 0,
+        currentPhase: 'validate', summary: 'Implementation is complete.',
+        stepUpdates: [{ stepId: 'implement', status: 'completed', summary: 'Implemented.' }],
+        nextAction: 'Record validation evidence.', blockers: [], evidence: [],
+      });
+      expect(planOnly).toMatchObject({ ok: true, value: { revision: 1 } });
+
+      const pendingGateFinish = await runtime.service.finishGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 1, status: 'completed', summary: 'Not ready.', evidence: [],
+      });
+      expect(pendingGateFinish).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+
+      const unmatchedObservation = await runtime.service.checkpointGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 1, expectedUserIntentRevision: 0,
+        currentPhase: 'validate', summary: 'Try unmatched observation.', stepUpdates: [], nextAction: 'Validate.', blockers: [], evidence: [],
+        resumeContext: {
+          changedFiles: ['src/example.ts'], commands: [], decisions: [], failedAttempts: [], pendingValidation: [], resumePrerequisites: [], stateFacts: [], artifacts: [],
+        },
+        engineeringGateUpdates: [{
+          gateId: 'diff', status: 'passed',
+          evidence: { source: 'host_observed', observedAt: now.toISOString(), workspaceId: workspace.id, command: 'git diff --check', exitCode: 0 },
+        }],
+      });
+      expect(unmatchedObservation).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+
+      const runIdOnlyObservation = await runtime.service.checkpointGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 1, expectedUserIntentRevision: 0,
+        currentPhase: 'validate', summary: 'Reject unverified run-id-only evidence.', stepUpdates: [], nextAction: 'Validate.', blockers: [], evidence: [],
+        resumeContext: {
+          changedFiles: ['src/example.ts'], commands: [], decisions: [], failedAttempts: [], pendingValidation: [], resumePrerequisites: [], stateFacts: [{ kind: 'task', value: 'run-123' }], artifacts: [],
+        },
+        engineeringGateUpdates: [{
+          gateId: 'diff', status: 'passed',
+          evidence: { source: 'host_observed', observedAt: now.toISOString(), workspaceId: workspace.id, runId: 'run-123' },
+        }],
+      });
+      expect(runIdOnlyObservation).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+
+      const userAttested = await runtime.service.checkpointGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 1, expectedUserIntentRevision: 0,
+        currentPhase: 'validate', summary: 'Record user-attested diff evidence.', stepUpdates: [], nextAction: 'Replace with host observation.', blockers: [], evidence: [],
+        engineeringGateUpdates: [
+          { gateId: 'diff', status: 'passed', evidence: { source: 'user_attested', observedAt: now.toISOString(), workspaceId: workspace.id } },
+          { gateId: 'docs_impact', status: 'not_applicable', reason: 'No user-facing or configuration behavior changed.' },
+        ],
+      });
+      expect(userAttested).toMatchObject({ ok: true, value: { revision: 2 } });
+      const userAttestedFinish = await runtime.service.finishGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 2, status: 'completed', summary: 'Still not ready.', evidence: [],
+      });
+      expect(userAttestedFinish).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+
+      const observed = await runtime.service.checkpointGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 2, expectedUserIntentRevision: 0,
+        currentPhase: 'review', summary: 'Validated exact diff.', stepUpdates: [], nextAction: 'Finish.', blockers: [], evidence: [],
+        resumeContext: {
+          changedFiles: ['src/example.ts'],
+          commands: [{ command: 'git diff --check', status: 'passed', exitCode: 0, result: 'clean' }],
+          decisions: [], failedAttempts: [], pendingValidation: [], resumePrerequisites: [], stateFacts: [], artifacts: [],
+        },
+        engineeringGateUpdates: [{
+          gateId: 'diff', status: 'passed',
+          evidence: { source: 'host_observed', observedAt: now.toISOString(), workspaceId: workspace.id, command: 'git diff --check', runId: 'host-task-1', exitCode: 0 },
+        }],
+      });
+      expect(observed).toMatchObject({ ok: true, value: { revision: 3, engineering: { gates: [{ id: 'diff', status: 'passed' }, { id: 'docs_impact', status: 'not_applicable' }] } } });
+
+      const reviewFinding = await runtime.service.checkpointGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 3, expectedUserIntentRevision: 0,
+        currentPhase: 'review', summary: 'Independent review found a blocking issue.', stepUpdates: [], nextAction: 'Resolve review finding.', blockers: [], evidence: [],
+        engineeringReviewFindings: [{ id: 'review-1', title: 'Potential regression', severity: 'blocking', state: 'validated', reason: 'Reviewer reproduced a behavioral regression.', source: 'independent-review' }],
+      });
+      expect(reviewFinding).toMatchObject({ ok: true, value: { revision: 4, engineering: { reviewFindings: [{ id: 'review-1', state: 'validated' }] } } });
+      const blockedByReview = await runtime.service.finishGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 4, status: 'completed', summary: 'Blocked by review.', evidence: [],
+      });
+      expect(blockedByReview).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+
+      const rejectedFinding = await runtime.service.checkpointGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 4, expectedUserIntentRevision: 0,
+        currentPhase: 'review', summary: 'Review finding was verified as a false positive.', stepUpdates: [], nextAction: 'Finish.', blockers: [], evidence: [],
+        engineeringReviewFindings: [{ id: 'review-1', title: 'Potential regression', severity: 'blocking', state: 'rejected', reason: 'The reported path is unreachable under the verified contract.', source: 'independent-review' }],
+      });
+      expect(rejectedFinding).toMatchObject({ ok: true, value: { revision: 5, engineering: { reviewFindings: [{ id: 'review-1', state: 'rejected' }] } } });
+
+      const finished = await runtime.service.finishGoal(actor('engineering-dod'), {
+        goalId, leaseToken, expectedRevision: 5, status: 'completed', summary: 'Engineering DoD satisfied.', evidence: [{ kind: 'note', value: 'Focused local verification complete.' }],
+      });
+      expect(finished).toMatchObject({ ok: true, value: { status: 'completed', completionState: 'completed' } });
     } finally {
       runtime.database.close();
     }

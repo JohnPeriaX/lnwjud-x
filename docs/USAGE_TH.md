@@ -1,8 +1,8 @@
-# คู่มือใช้งาน lnwjud v5.6.6 (ภาษาไทย)
+# คู่มือใช้งาน lnwjud v5.7.0 (ภาษาไทย)
 
 lnwjud คือ cross-platform local AI-agent runtime / MCP gateway สำหรับให้ ChatGPT, Codex และ MCP client อื่นทำงานกับเครื่องของคุณ เช่น อ่าน/ค้น/แก้ไฟล์, Git, รันโปรเซส และเครื่องมือพัฒนาอื่น ๆ โดยงานจริงยังทำบนเครื่องของคุณ ความสามารถ Windows-only เช่น WSL, Registry และ Windows Sandbox จะไม่แสดงเป็นพร้อมใช้งานบน macOS/Linux
 
-คู่มือนี้อัปเดตตาม source `v5.6.6`; public release `v5.6.6` คือรุ่นที่เผยแพร่แล้วบน [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/tag/v5.6.6)
+คู่มือนี้อัปเดตตาม source `v5.7.0`; public release `v5.6.6` คือรุ่นที่เผยแพร่แล้วบน [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/tag/v5.6.6)
 
 > สำหรับผู้ใช้ package ของ lnwjud **ไม่ต้องติดตั้ง Node.js และไม่ต้องดาวน์โหลด `tunnel-client` เอง** ตัว release รวม official OpenAI `tunnel-client v0.0.15` ที่ตรงกับ OS และ architecture ของ target ไว้ให้แล้ว
 
@@ -274,6 +274,33 @@ Worker ของ recurring v4.53 เป็นแบบ **work-conserving**: `che
 
 `expedite_scheduled_continuation` ใน v4.53 ใช้ได้เฉพาะ **historical `occurrence=once` ที่ยัง pending** เท่านั้น; recurring `occurrence=interval` ห้าม expedite เพราะ cadence ถูกล็อกไว้ทุก 1 ชั่วโมงและ host contract ไม่มี immediate-run operation ที่พิสูจน์ได้. ระหว่างมี `trackedTasks` ให้ bounded wait เฉพาะ `blocking_job` จนอ่าน terminal result จริง ห้ามสรุป completion จาก progress log. เมื่อ acceptance ครบจริง, durable plan ทุก step เป็น `completed`, `blockers` ว่าง และไม่มี blocking task ค้าง จึงเรียก `finish_goal(status: completed)` ได้; `failed`/`blocked` ต้องเป็นผลลัพธ์ของงานจริง ไม่ใช่ทางหนีจาก `create_failed` หรือ `Resource not found`. ถ้า `finish_goal` คืน `status=active` กับ `completionState=pending_native_cleanup`, ต้องทำ **exact recurring native task เดิม** ให้ non-runnable ผ่าน host operation ที่ expose จริง: prefer true delete; ถ้ามีเพียง disable ให้ใช้ host-confirmed disable และ record operation/state ตามจริง. การที่ recurring task ยิงไปหนึ่งรอบ **ไม่ใช่** consumed cleanup proof และห้ามใช้ `consumed` เพื่อปิด interval task. ถ้า hourly wake รอบถัดไปพบ `terminal_cleanup_required` ให้ทำ cleanup อย่างเดียว ห้าม resume goal work. หลัง cleanup ถ้า lease ของ worker ที่เริ่ม completion หมดแล้ว ให้ `run_goal` ด้วย workspace/goalKey เดิมเพื่อ reacquire lease สำหรับ **administrative finalization เท่านั้น** และห้ามกลับไปทำ workspace work จากนั้นเรียก `finish_goal` ซ้ำทันทีและอ่าน `get_goal` จนยืนยัน terminal ก่อนรายงานสำเร็จ. ใช้เฉพาะ Native ChatGPT Scheduled Tasks; ห้าม lnwjud scheduler, Windows Task Scheduler, `schtasks.exe`, cron, shell timer, browser automation หรือ undocumented OpenAI API.
 
+## 8A. Engineering Harness — Senior coding workflow
+
+Engineering Harness เป็น workflow สำหรับงานเขียนโปรแกรมที่ **ปิดเป็นค่าเริ่มต้น (Default Off)** เพื่อไม่เปลี่ยนพฤติกรรมของผู้ใช้ทั่วไป ถ้าต้องการใช้ ให้เปิด **Settings → Engineering Harness** แล้วเลือก Preset:
+
+- **Senior** — แนะนำ: วิเคราะห์ข้ามไฟล์เมื่อจำเป็น, ตรวจผลกระทบ, review และ validation ตามความเสี่ยง
+- **Standard** — เบากว่า เหมาะกับงานทั่วไป
+- **Strict** — เข้มขึ้นสำหรับงานเสี่ยง/ระบบสำคัญ
+- **Custom** — เลือก Analysis, Review, Validation และ docs-impact check เอง
+
+โดยปกติ Scope คือ **เฉพาะโปรเจกต์/งานเขียนโค้ด** และสามารถ Override ราย Workspace เป็น On/Off พร้อม Preset ของ Workspace ได้. ถ้า Workspace หรือ project profile ปิด Harness ชัดเจน ระบบต้องเคารพ opt-out และไม่เปิดกลับเอง. Project profile สามารถเพิ่มความเข้มของ policy ได้ แต่ไม่ควรใช้เพื่อลดข้อกำหนดที่ผู้ใช้ตั้งไว้โดยไม่บอก.
+
+เมื่อ Harness เปิดอยู่สำหรับงาน coding:
+
+1. เรียก `engineering_prepare_task` เพื่ออ่านสัญญาณโปรเจกต์, `AGENTS.md`, `.lnwjud/project-profile.json` และคำนวณ effective policy แบบ read-only
+2. เรียก `engineering_start_task` เพื่อสร้าง/Resume durable Goal เดิม และรับ `engineeringTask` binding
+3. แนบ `engineeringTask` binding ปัจจุบันกับ first-party development mutation ที่ถูก guard เช่น file edit/patch, Git, shell/process/project commands, verification, Codex/Agent Swarm และ worktree operations
+4. ถ้า Goal revision, user-intent revision, session หรือ policy digest เปลี่ยน binding เก่าจะถูกปฏิเสธแบบ recoverable ให้ refresh ผ่าน `engineering_get_status`/`engineering_start_task`
+5. Required gate จะไม่ถือว่าผ่านจนมี evidence ที่ตรงชนิด; mechanical checks เช่น test/build/package ต้องใช้ host-observed evidence ที่ตรวจสอบได้ ไม่ใช่คำยืนยันลอย ๆ
+6. Requirement ใหม่จะเพิ่ม `userIntentRevision` และทำให้เฉพาะ gate ที่ได้รับผลกระทบเป็น `stale`; งานที่พิสูจน์แล้วและไม่เกี่ยวข้องยังคงอยู่
+7. `finish_goal(completed)` จะถูกบล็อกถ้ายังมี required gate Pending/Running/Failed/Blocked/Stale หรือมี blocking review finding ที่ยังไม่ resolve
+
+หน้า Settings แสดง Effective policy, เหตุผลที่ Harness inactive, Task kind, Risk, Phase, Next action และ Required checks พร้อมสถานะ **Pending / Running / Passed / Failed / Blocked / Needs re-check**. สี/สถานะ Passed ต้องมาจากหลักฐานจริง ไม่ใช่เพราะมีข้อความสรุปว่า “เสร็จแล้ว”.
+
+**ขอบเขต enforcement ใน v5.7.0:** first-party development routes ถูก guard เชิงกล แต่ `mcp_call` ไป external MCP, Office ทั่วไป, web และ native UI routes ยังเป็น advisory ของ Engineering Harness และยังคงใช้ permission/security control เดิมของ lnwjud. Engineering Harness ไม่ได้เพิ่มสิทธิ์และไม่ข้าม Active Project, Recovery, approval, Full Bypass semantics หรือ rolling `goalLease` ownership fence.
+
+การเปิด Harness หรือเปิด Preview ของ project profile **ไม่เขียนไฟล์โปรเจกต์, ไม่ commit/push/deploy และไม่สร้าง Scheduled Task เอง**. Scheduled continuation เป็นการตัดสินใจแยกต่างหากของผู้ใช้; ถ้าผู้ใช้ปิด scheduler ต้องทำงานต่อแบบ manual/durable โดยไม่เปิดกลับเอง.
+
 ## 9. Active Projects และหลายแชทพร้อมกัน
 
 v4.11.0 รองรับ Active Projects หลายรายการพร้อมกัน
@@ -404,8 +431,8 @@ corepack pnpm@10.15.0 package:windows
 ไฟล์ที่ได้จะอยู่ที่:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.6.6.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.6.6.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.7.0.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.7.0.exe
 apps/desktop/dist/installers/latest.yml
 apps/desktop/dist/installers/portable.yml
 ```

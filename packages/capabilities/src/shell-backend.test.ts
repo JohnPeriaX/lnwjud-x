@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { automationShellRequestDigest, ok, type Result } from '@lnwjud/domain';
 import { ShellCapabilityBackend, withAutomationShellDispatchContext } from './shell-backend.js';
 import { CAPABILITY_TASK_OWNER_METADATA_KEY } from './task-ownership.js';
@@ -536,7 +536,12 @@ describe('ShellCapabilityBackend', () => {
     if (!started.ok) return;
 
     const cancelling = backend.execute({ operation: 'cancel', task_id: started.value.task_id, userConfirmed: true });
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await vi.waitFor(async () => {
+      await expect(backend.execute({ operation: 'status', task_id: started.value.task_id })).resolves.toMatchObject({
+        ok: true,
+        value: { state: 'termination_unverified' },
+      });
+    });
     await expect(backend.execute({ operation: 'list' })).resolves.toMatchObject({
       ok: true,
       value: { tasks: [expect.objectContaining({ task_id: started.value.task_id, state: 'termination_unverified' })] },
@@ -580,7 +585,12 @@ describe('ShellCapabilityBackend', () => {
     if (!started.ok) return;
 
     const cancelling = backend.execute({ operation: 'cancel', task_id: started.value.task_id, userConfirmed: true });
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await vi.waitFor(async () => {
+      await expect(backend.execute({ operation: 'status', task_id: started.value.task_id })).resolves.toMatchObject({
+        ok: true,
+        value: { state: 'termination_unverified' },
+      });
+    });
     const statusAfterFailure = await backend.execute({ operation: 'status', task_id: started.value.task_id });
     expect(statusAfterFailure).toMatchObject({
       ok: true,
@@ -621,10 +631,11 @@ describe('ShellCapabilityBackend', () => {
     if (!started.ok) return;
 
     const firstCancellation = backend.execute({ operation: 'cancel', task_id: started.value.task_id, userConfirmed: true });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    await expect(backend.execute({ operation: 'status', task_id: started.value.task_id })).resolves.toMatchObject({
-      ok: true,
-      value: { state: 'termination_unverified' },
+    await vi.waitFor(async () => {
+      await expect(backend.execute({ operation: 'status', task_id: started.value.task_id })).resolves.toMatchObject({
+        ok: true,
+        value: { state: 'termination_unverified' },
+      });
     });
     await expect(backend.execute({ operation: 'cancel', task_id: started.value.task_id, userConfirmed: true })).resolves.toMatchObject({
       ok: true,

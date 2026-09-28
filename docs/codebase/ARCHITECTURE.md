@@ -69,6 +69,21 @@ The preflight:
 
 External-trust skills are not auto-injected unless explicitly named by the user.
 
+## Engineering Harness
+
+Engineering Harness is an opt-in projection over existing lnwjud authorities rather than a second orchestration engine.
+
+- `EngineeringPreparationService` performs bounded project assessment and resolves effective global/workspace/project policy. Default-off work returns before expensive project assessment on the Desktop dashboard.
+- `engineering_start_task` creates/resumes the existing durable Goal and stores optional schema-versioned `EngineeringGoalMetadata` on the same goal row. There is no separate EngineeringRun database or competing lease model.
+- Goal metadata records task kind, risk tier, delivery boundary, policy digest, gates and review findings. User steering advances `userIntentRevision`; only explicitly affected gates are marked `stale` and lose obsolete evidence.
+- `checkpoint_goal` remains the mutation seam for gate/review evidence. Host-observed command evidence must correspond to a passed command in the same reconstruction-grade checkpoint context; mechanical gates cannot be satisfied by user/model attestation alone.
+- `finish_goal(completed)` uses the existing repository completion gate and rejects unresolved required Engineering gates or blocking review findings.
+- `ToolRegistry` applies Engineering admission **after** normal routing/mutation classification and **in addition to** existing permission, Active Project, Recovery, Full Bypass, and rolling `goalLease` rules. The `engineeringTask` envelope binds goal ID, policy digest, goal revision, user-intent revision and (when present) MCP session, and is stripped before the target handler executes.
+- Mechanically guarded v5.7.0 routes are first-party development mutations: guarded file writes/patches/renames, Git, shell/WSL/process/project commands, verification, Codex/Agent Swarm, worktree/self-heal and durable task creation. External `mcp_call`, general Office/web/native-UI routes remain advisory for Engineering policy and keep their existing security controls.
+- Desktop status is read-only and uses the host workspace-goal projection so MCP-owned goals are visible without changing mutation ownership. Settings can preview project-profile content but never write it automatically.
+
+Engineering Harness does not create a Scheduled Task. Scheduling remains a separate durable-continuation decision and explicit opt-out remains authoritative.
+
 ## External MCP architecture
 
 `packages/extensions/src/mcp-session-manager.ts` owns external MCP child-session lifecycle, catalog refresh, call serialization, timeout/abort and idle cleanup.

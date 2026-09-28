@@ -3,6 +3,7 @@ export * from './ecc-provider.js';
 export * from './ecc-memory-vault.js';
 export * from './activity-tracker.js';
 export * from './goal-managed-task-state-reader.js';
+export * from './engineering-evidence-verifier.js';
 export * from './http.js';
 export * from './origin-policy.js';
 export * from './parallel-tool-executor.js';

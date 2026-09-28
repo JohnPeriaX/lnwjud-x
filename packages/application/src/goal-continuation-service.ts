@@ -13,6 +13,10 @@ import {
   type GoalDeliveryReceipt,
   type GoalDeliveryState,
   type GoalIterationPolicy,
+  type EngineeringGoalMetadata,
+  type EngineeringGateEvidence,
+  type EngineeringGateStatus,
+  type EngineeringReviewFinding,
   type GoalLeaseRecoveryEvidence,
   type GoalReconciliationReason,
   type GoalPlan,
@@ -100,6 +104,7 @@ export interface RunGoalRequest {
   readonly plan?: GoalPlanInput;
   readonly acceptanceCriteria?: readonly GoalAcceptanceInput[];
   readonly iterationPolicy?: GoalIterationPolicyInput;
+  readonly engineering?: EngineeringGoalMetadata;
   readonly ponytailMode?: GoalPonytailModeOverride;
   readonly leaseSeconds?: number;
 }
@@ -113,6 +118,13 @@ export interface GetGoalRequest {
 export interface ValidateGoalLeaseRequest {
   readonly goalId: string;
   readonly leaseToken: string;
+}
+
+export interface EngineeringGateUpdate {
+  readonly gateId: string;
+  readonly status: EngineeringGateStatus;
+  readonly reason?: string;
+  readonly evidence?: EngineeringGateEvidence;
 }
 
 export interface CheckpointGoalRequest {
@@ -129,6 +141,9 @@ export interface CheckpointGoalRequest {
   readonly activeTaskIds?: readonly string[];
   readonly trackedTasks?: readonly GoalTrackedTask[];
   readonly resumeContext?: GoalCheckpointResumeContext;
+  readonly engineeringGateUpdates?: readonly EngineeringGateUpdate[];
+  readonly engineeringReviewFindings?: readonly EngineeringReviewFinding[];
+  readonly engineering?: EngineeringGoalMetadata;
   readonly ponytailMode?: GoalPonytailModeOverride;
   readonly releaseLease?: boolean;
 }
@@ -164,6 +179,7 @@ export interface ReviseGoalIntentRequest {
   readonly expectedUserIntentRevision: number;
   readonly steering: string;
   readonly nextAction?: string;
+  readonly staleEngineeringGateIds?: readonly string[];
 }
 
 export interface CreateGoalContextCapsuleRequest {
@@ -277,6 +293,7 @@ export interface GoalSnapshot {
   readonly acceptanceCriteria: readonly GoalAcceptanceCriterion[];
   readonly userIntentRevision: number;
   readonly iterationPolicy: GoalIterationPolicy;
+  readonly engineering?: EngineeringGoalMetadata;
   readonly currentContextCapsuleId?: string;
   readonly completedSteps: readonly GoalPlanStep[];
   readonly pendingSteps: readonly GoalPlanStep[];
@@ -332,8 +349,13 @@ export interface ListGoalsResult {
   readonly goals: readonly GoalSnapshot[];
 }
 
+export interface EngineeringGateEvidenceVerifier {
+  verify(workspaceId: string, evidence: EngineeringGateEvidence): Promise<boolean>;
+}
+
 export interface GoalContinuationServiceOptions {
   readonly now?: () => Date;
+  readonly engineeringEvidenceVerifier?: EngineeringGateEvidenceVerifier;
   readonly scheduledContinuations?: Pick<ScheduledContinuationRepository, 'markGoalFinishedForScheduledContinuation' | 'getLiveScheduledContinuation'>;
   readonly workerLiveness?: ScheduledContinuationWorkerLivenessPort;
   readonly taskCancellation?: Pick<GoalTaskCancellationPort, 'cancelForGoal'>;
@@ -342,6 +364,7 @@ export interface GoalContinuationServiceOptions {
 
 export class GoalContinuationService {
   private readonly now: () => Date;
+  private readonly engineeringEvidenceVerifier: EngineeringGateEvidenceVerifier | undefined;
   private readonly scheduledContinuations: Pick<ScheduledContinuationRepository, 'markGoalFinishedForScheduledContinuation' | 'getLiveScheduledContinuation'> | undefined;
   private readonly workerLiveness: ScheduledContinuationWorkerLivenessPort | undefined;
   private readonly taskCancellation: Pick<GoalTaskCancellationPort, 'cancelForGoal'> | undefined;
@@ -353,6 +376,7 @@ export class GoalContinuationService {
     options: GoalContinuationServiceOptions = {},
   ) {
     this.now = options.now ?? ((): Date => new Date());
+    this.engineeringEvidenceVerifier = options.engineeringEvidenceVerifier;
     this.scheduledContinuations = options.scheduledContinuations;
     this.workerLiveness = options.workerLiveness;
     this.taskCancellation = options.taskCancellation;
@@ -423,6 +447,7 @@ export class GoalContinuationService {
         ...(plan === undefined ? {} : { plan }),
         ...(acceptanceCriteria === undefined ? {} : { acceptanceCriteria }),
         ...(iterationPolicy === undefined ? {} : { iterationPolicy }),
+        ...(request.engineering === undefined ? {} : { engineering: request.engineering }),
         ...(ponytailMode === undefined || ponytailMode === 'inherit' ? {} : { ponytailMode }),
         leaseTokenHash: hashLeaseToken(leaseToken),
         leaseSeconds,
@@ -503,6 +528,15 @@ export class GoalContinuationService {
       const updatedPlan = applyStepUpdates(current.plan, stepUpdates);
       const trackedTasks = normalizeTrackedTasks(request.trackedTasks, request.activeTaskIds);
       const resumeContext = normalizeCheckpointResumeContext(request.resumeContext);
+      if (request.engineering !== undefined && (request.engineeringGateUpdates !== undefined || request.engineeringReviewFindings !== undefined)) throw new Error('engineering metadata cannot be supplied with Engineering Harness updates');
+      let engineering = request.engineeringGateUpdates === undefined
+        ? request.engineering
+        : await applyEngineeringGateUpdates(current.engineering, request.engineeringGateUpdates, current.workspaceId, current.userIntentRevision, resumeContext, this.engineeringEvidenceVerifier);
+      if (request.engineeringReviewFindings !== undefined) {
+        const baseEngineering = engineering ?? current.engineering;
+        if (baseEngineering === undefined) throw new Error('engineeringReviewFindings require an Engineering Harness goal');
+        engineering = { ...baseEngineering, reviewFindings: normalizeEngineeringReviewFindings(request.engineeringReviewFindings) };
+      }
       const requestedPonytailMode = request.ponytailMode === undefined ? undefined : normalizeGoalPonytailModeOverride(request.ponytailMode);
       const ponytailMode = requestedPonytailMode === undefined
         ? current.ponytailMode ?? null
@@ -525,6 +559,7 @@ export class GoalContinuationService {
         activeTaskIds: blockingTaskIds(trackedTasks),
         trackedTasks,
         ...(resumeContext === undefined ? {} : { resumeContext }),
+        ...(engineering === undefined ? {} : { engineering }),
         ponytailMode,
         releaseLease: request.releaseLease === true,
         now: this.now().toISOString(),
@@ -590,12 +625,14 @@ export class GoalContinuationService {
       if (request.expectedUserIntentRevision !== current.userIntentRevision) return err(appError('INVALID_INPUT', 'Goal user intent revision is stale'));
       const steering = safeText(request.steering, MAX_CONTEXT_ITEM, 'steering');
       const trackedTasks = current.trackedTasks ?? legacyTrackedTasks(current.activeTaskIds);
+      const nextUserIntentRevision = current.userIntentRevision + 1;
+      const engineering = staleEngineeringGates(current.engineering, request.staleEngineeringGateIds ?? [], nextUserIntentRevision);
       const now = this.now().toISOString();
       const goal = await this.goals.checkpoint({
         checkpointId: randomUUID(), goalId, ownerClientId, ownerSessionId: stableOwnerSessionId(actor),
         leaseTokenHash: hashLeaseToken(requiredBounded(request.leaseToken, 'leaseToken', 256)), expectedRevision: request.expectedRevision,
-        expectedUserIntentRevision: request.expectedUserIntentRevision, userIntentRevision: current.userIntentRevision + 1,
-        plan: current.plan, currentPhase: current.currentPhase,
+        expectedUserIntentRevision: request.expectedUserIntentRevision, userIntentRevision: nextUserIntentRevision,
+        plan: current.plan, ...(engineering === undefined ? {} : { engineering }), currentPhase: current.currentPhase,
         summary: `User steering accepted: ${steering}`,
         stepUpdates: [], nextAction: safeText(request.nextAction ?? current.nextAction, MAX_NEXT_ACTION, 'nextAction', true),
         blockers: current.blockers, evidence: [{ kind: 'note', value: steering }], activeTaskIds: blockingTaskIds(trackedTasks), trackedTasks,
@@ -1117,6 +1154,98 @@ function cancellationInstruction(continuation: ScheduledContinuationRecord | nul
   };
 }
 
+function normalizeEngineeringReviewFindings(findings: readonly EngineeringReviewFinding[]): readonly EngineeringReviewFinding[] {
+  if (findings.length > 100) throw new Error('engineeringReviewFindings are invalid');
+  const ids = new Set<string>();
+  return findings.map((finding) => {
+    const id = requiredBounded(finding.id, 'engineering review finding id', 128);
+    if (ids.has(id)) throw new Error('engineering review finding ids must be unique');
+    ids.add(id);
+    if (!['blocking', 'non_blocking'].includes(finding.severity)) throw new Error('engineering review finding severity is invalid');
+    if (!['open', 'validated', 'rejected', 'resolved'].includes(finding.state)) throw new Error('engineering review finding state is invalid');
+    const reason = safeText(finding.reason, MAX_CONTEXT_ITEM, 'engineering review finding reason');
+    if (finding.state === 'rejected' && reason.trim().length === 0) throw new Error('rejected engineering review finding requires a reason');
+    return {
+      id,
+      title: safeText(finding.title, 512, 'engineering review finding title'),
+      severity: finding.severity,
+      state: finding.state,
+      reason,
+      ...(finding.source === undefined ? {} : { source: safeText(finding.source, 1024, 'engineering review finding source') }),
+    };
+  });
+}
+
+async function applyEngineeringGateUpdates(
+  engineering: EngineeringGoalMetadata | undefined,
+  updates: readonly EngineeringGateUpdate[],
+  workspaceId: string,
+  userIntentRevision: number,
+  resumeContext: GoalCheckpointResumeContext | undefined,
+  evidenceVerifier: EngineeringGateEvidenceVerifier | undefined,
+): Promise<EngineeringGoalMetadata> {
+  if (engineering === undefined) throw new Error('engineeringGateUpdates require an Engineering Harness goal');
+  if (updates.length > 100) throw new Error('engineeringGateUpdates are invalid');
+  const byId = new Map(engineering.gates.map((gate) => [gate.id, gate] as const));
+  const seen = new Set<string>();
+  for (const update of updates) {
+    const gateId = requiredBounded(update.gateId, 'engineering gate id', 128);
+    if (seen.has(gateId)) throw new Error('engineering gate updates must be unique');
+    seen.add(gateId);
+    const current = byId.get(gateId);
+    if (current === undefined) throw new Error(`engineering gate is unknown: ${gateId}`);
+    if (update.status === 'not_applicable' && update.reason?.trim() === '') throw new Error('not_applicable engineering gate requires a reason');
+    if (update.status === 'not_applicable' && update.reason === undefined) throw new Error('not_applicable engineering gate requires a reason');
+    if (update.status === 'passed' && update.evidence === undefined) throw new Error('passed engineering gate requires observed evidence');
+    if (update.evidence !== undefined) {
+      if (update.evidence.workspaceId !== workspaceId) throw new Error('engineering gate evidence workspace does not match the goal');
+      if (update.evidence.source === 'host_observed') {
+        if (update.status === 'passed' && (update.evidence.command === undefined || update.evidence.runId === undefined)) {
+          throw new Error('host-observed passed engineering evidence requires a command and host runId');
+        }
+        if (update.evidence.command !== undefined) {
+          const observed = resumeContext?.commands.find((entry) => entry.command === update.evidence?.command && entry.status === 'passed');
+          if (observed === undefined) throw new Error('host-observed command evidence is not present in the checkpoint resumeContext');
+          if (update.evidence.exitCode !== undefined && observed.exitCode !== update.evidence.exitCode) throw new Error('engineering gate evidence exit code does not match the observed command');
+        }
+        if (update.status === 'passed') {
+          if (evidenceVerifier === undefined || !(await evidenceVerifier.verify(workspaceId, update.evidence))) {
+            throw new Error('host-observed engineering evidence could not be verified against the host task runtime');
+          }
+        }
+      }
+    }
+    const reason = update.reason === undefined ? current.reason : safeText(update.reason, MAX_CONTEXT_ITEM, 'engineering gate reason');
+    const retainEvidence = update.status === 'passed' || update.status === 'failed' || update.status === 'blocked';
+    const { evidence: previousEvidence, ...gateWithoutEvidence } = current;
+    void previousEvidence;
+    byId.set(gateId, {
+      ...gateWithoutEvidence,
+      status: update.status,
+      reason,
+      basedOnUserIntentRevision: userIntentRevision,
+      ...(retainEvidence && update.evidence !== undefined ? { evidence: update.evidence } : {}),
+    });
+  }
+  return { ...engineering, gates: engineering.gates.map((gate) => byId.get(gate.id) ?? gate) };
+}
+
+function staleEngineeringGates(engineering: EngineeringGoalMetadata | undefined, gateIds: readonly string[], nextUserIntentRevision: number): EngineeringGoalMetadata | undefined {
+  if (engineering === undefined || gateIds.length === 0) return engineering;
+  const requested = new Set(gateIds.map((id) => requiredBounded(id, 'engineering gate id', 128)));
+  const known = new Set(engineering.gates.map((gate) => gate.id));
+  for (const id of requested) if (!known.has(id)) throw new Error('engineering gate id is unknown');
+  return {
+    ...engineering,
+    gates: engineering.gates.map((gate) => {
+      if (!requested.has(gate.id) || gate.status === 'not_applicable') return gate;
+      const { evidence: omittedEvidence, ...rest } = gate;
+      void omittedEvidence;
+      return { ...rest, status: 'stale' as const, basedOnUserIntentRevision: nextUserIntentRevision };
+    }),
+  };
+}
+
 function toRunSnapshot(goal: GoalRecord): Omit<RunGoalResult, 'acquired' | 'leaseToken' | 'retryAfterSeconds'> {
   const snapshot = toSnapshot(goal);
   return {
@@ -1129,6 +1258,7 @@ function toRunSnapshot(goal: GoalRecord): Omit<RunGoalResult, 'acquired' | 'leas
     acceptanceCriteria: snapshot.acceptanceCriteria,
     userIntentRevision: snapshot.userIntentRevision,
     iterationPolicy: snapshot.iterationPolicy,
+    ...(snapshot.engineering === undefined ? {} : { engineering: snapshot.engineering }),
     ...(snapshot.currentContextCapsuleId === undefined ? {} : { currentContextCapsuleId: snapshot.currentContextCapsuleId }),
     completedSteps: snapshot.completedSteps,
     pendingSteps: snapshot.pendingSteps,
@@ -1157,6 +1287,7 @@ function toSnapshot(goal: GoalRecord): GoalSnapshot {
     acceptanceCriteria: goal.acceptanceCriteria,
     userIntentRevision: goal.userIntentRevision,
     iterationPolicy: goal.iterationPolicy,
+    ...(goal.engineering === undefined ? {} : { engineering: goal.engineering }),
     ...(goal.currentContextCapsuleId === undefined ? {} : { currentContextCapsuleId: goal.currentContextCapsuleId }),
     completedSteps: goal.plan.steps.filter((step) => step.status === 'completed'),
     pendingSteps: goal.plan.steps.filter((step) => step.status !== 'completed'),

@@ -13,8 +13,19 @@ describe('MCP Ponytail instructions', () => {
     expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).toContain('use those tools directly in the current conversation');
     expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).toContain('Do not ask or suggest switching to ChatGPT Work, Codex');
     expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).toContain('the required capability is not available through the exposed lnwjud tools');
+    expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).not.toContain('engineering_prepare_task');
+    expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).not.toContain('engineering_start_task');
+    expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).toContain('unless the user explicitly disabled scheduling');
     expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).not.toContain('lnwjud_o');
     expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).toContain('USER_INSTRUCTIONS');
+  });
+
+  it('adds Engineering guidance only after an explicit Harness opt-in', () => {
+    const instructions = buildMcpInstructions('off', true);
+    expect(instructions).toContain(MCP_OUTCOME_DRIVEN_INSTRUCTIONS);
+    expect(instructions).toContain('call engineering_prepare_task');
+    expect(instructions).toContain('call engineering_start_task');
+    expect(instructions).toContain('Engineering Harness never creates a Scheduled Task by itself');
   });
 
   it.each(['lite', 'full', 'ultra'] as const)('adds a bounded exact-load directive for %s', (mode) => {

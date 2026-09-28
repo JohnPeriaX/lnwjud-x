@@ -23,6 +23,21 @@ export const lineRangeSchema = z.object({
 export const workspaceInfoSchema = z.object({ workspaceId: workspaceIdSchema }).strict();
 export const workspaceTreeSchema = z.object({ workspaceId: optionalWorkspaceIdSchema, path: pathSchema.optional(), maxDepth: z.number().int().min(1).max(MAX_TREE_DEPTH).optional(), maxEntries: z.number().int().min(1).max(MAX_TREE_ENTRIES).optional() }).strict();
 export const projectSnapshotSchema = z.object({ workspaceId: workspaceIdSchema }).strict();
+export const engineeringPrepareTaskSchema = z.object({
+  workspaceId: workspaceIdSchema,
+  objective: z.string().trim().min(1).max(32_768),
+  scopedPath: pathSchema.optional(),
+}).strict();
+export const engineeringStartTaskSchema = z.object({
+  workspaceId: workspaceIdSchema,
+  goalKey: z.string().trim().min(1).max(128).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/),
+  objective: z.string().trim().min(1).max(4096),
+  scopedPath: pathSchema.optional(),
+  leaseSeconds: z.number().int().min(30).max(600).optional(),
+}).strict();
+export const engineeringGetStatusSchema = z.object({
+  goalId: z.string().trim().min(1).max(128),
+}).strict();
 export const readFileSchema = z.object({ workspaceId: optionalWorkspaceIdSchema, path: pathSchema, ...lineRangeSchema.shape }).strict().refine((value) => value.startLine === undefined || value.endLine === undefined || value.startLine <= value.endLine, 'Line range is invalid');
 export const readFilePageSchema = z.object({
   workspaceId: optionalWorkspaceIdSchema,

@@ -81,7 +81,8 @@ test('desktop serves the real MCP client development workflow', async () => {
     await client.connect(new StreamableHTTPClientTransport(endpoint));
     const tools = await client.listTools();
     const expectedCoreTools = [
-      'workspace_list', 'workspace_register', 'workspace_info', 'workspace_tree', 'project_snapshot', 'read_file', 'read_files',
+      'workspace_list', 'workspace_register', 'workspace_info', 'workspace_tree', 'project_snapshot',
+      'engineering_prepare_task', 'engineering_start_task', 'engineering_get_status', 'read_file', 'read_files',
       'search_files', 'search_text', 'git_status', 'git_diff', 'git_log', 'git', 'write_file',
       'apply_patch', 'edit_file', 'move_file', 'copy_file', 'delete_file', 'list_recovery_items', 'restore_deleted_file', 'list_checkpoints', 'restore_checkpoint', 'process_start', 'process_list', 'process_status',
       'process_logs', 'process_stop', 'project_dev', 'project_test', 'project_lint',

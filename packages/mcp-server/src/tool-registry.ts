@@ -69,6 +69,7 @@ import type { SetOfMarksObservationStore } from './set-of-marks-service.js';
 import { codexTools, CODEX_TOOL_NAMES } from './tools/codex-tools.js';
 import { capabilityTools } from './tools/capability-tools.js';
 import { fileTools } from './tools/file-tools.js';
+import { engineeringTools } from './tools/engineering-tools.js';
 import { gitTools } from './tools/git-tools.js';
 import { goalTools } from './tools/goal-tools.js';
 import { mcpBridgeTools } from './tools/mcp-bridge-tools.js';
@@ -269,6 +270,7 @@ export class ToolRegistry {
     const files = fileTools(context);
     const allBaseTools: readonly McpToolDefinition[] = [
       ...workspace,
+      ...engineeringTools(context),
       ...files.slice(0, 2),
       ...searchTools(context),
       ...gitTools(context),
@@ -420,7 +422,10 @@ export class ToolRegistry {
     const fullBypass = invocationGuardMessage === null && profile.name === 'full' && this.authorizationModeProvider() === 'full_bypass';
     const authorizationMode: AuthorizationMode = fullBypass ? 'full_bypass' : 'standard';
     const activityWorkspaceId = await this.resolveActivityWorkspaceId(name, input);
-    const workspaceActivityInput = withActivityWorkspaceId(stripGoalLeaseEnvelope(input), activityWorkspaceId);
+    const workspaceActivityInput = withActivityWorkspaceId(
+      stripEngineeringTaskEnvelope(stripGoalLeaseEnvelope(input)),
+      activityWorkspaceId,
+    );
     const activityInput = this.withRememberedActivityTarget(name, workspaceActivityInput);
     const callId = await this.activity.begin(
       name,
@@ -449,7 +454,8 @@ export class ToolRegistry {
         return response;
       }
       const goalLease = readGoalLeaseProof(parsed.value);
-      const parsedInput = stripGoalLeaseEnvelope(parsed.value);
+      const engineeringTask = readEngineeringTaskBinding(parsed.value);
+      const parsedInput = stripEngineeringTaskEnvelope(stripGoalLeaseEnvelope(parsed.value));
       if (AUTOMATION_MUTATION_TOOL_NAMES.has(tool.name) && goalLease !== undefined) {
         if (!isRecord(parsedInput)
           || parsedInput.goalId !== goalLease.goalId
@@ -511,6 +517,25 @@ export class ToolRegistry {
         return response;
       }
       const mutationFenceWorkspaceId = mutationWorkspaceId ?? activeWorkspaceScope?.workspaceId ?? activityWorkspaceId;
+      const codingMutation = mutationDecision.kind !== 'read' && isCodingMutation(tool.name, activeRoutedInput);
+      const engineeringGuardedMutation = mutationDecision.kind !== 'read'
+        && ENGINEERING_GUARDED_MUTATION_TOOLS.has(tool.name);
+      if (engineeringGuardedMutation && mutationFenceWorkspaceId !== undefined) {
+        const admission = await resolveEngineeringAdmission(
+          this.services,
+          this.actor,
+          mutationFenceWorkspaceId,
+          tool.name,
+          activeRoutedInput,
+          engineeringTask,
+          goalLease,
+        );
+        if (!admission.ok) {
+          const response = mapError(admission.error);
+          await this.activity.end(callId, admission.error.code, Date.now() - started, admission.error.message);
+          return response;
+        }
+      }
       let mutationFenceProof: GoalLeaseProof | undefined;
       if (
         mutationDecision.kind !== 'read'
@@ -580,7 +605,6 @@ export class ToolRegistry {
           }
         }
       }
-      const codingMutation = mutationDecision.kind !== 'read' && isCodingMutation(tool.name, activeRoutedInput);
       const ponytailInvocation = codingMutation
         ? await this.resolvePonytailInvocation(mutationFenceWorkspaceId ?? activeWorkspaceScope?.workspaceId, goalLease?.goalId)
         : undefined;
@@ -1160,7 +1184,7 @@ const NATIVE_ACTIVE_SCOPE_TOOLS = new Set(['office', 'audio', 'screen_record', .
 const COMMAND_EXECUTION_TOOLS = new Set(['shell', 'wsl_exec', 'process_start']);
 export const SCHEDULED_CONTINUATION_FENCED_TOOLS = new Set([
   'write_file', 'apply_patch', 'edit_file', 'move_file', 'copy_file', 'delete_file',
-  'restore_deleted_file', 'restore_checkpoint', 'git', 'shell', 'wsl_exec',
+  'restore_deleted_file', 'restore_checkpoint', 'lsp_rename', 'git', 'shell', 'wsl_exec',
   'process_start', 'process_stop', 'project_dev', 'project_test', 'project_lint', 'project_typecheck', 'project_build',
   'verify_incremental', 'codex_run', 'codex_stop', 'agent_swarm_run', 'git_worktree_spawn', 'git_worktree_remove', 'self_heal_apply',
   'computer_use', 'dom_cdp', 'accessibility', 'input_event', 'ui_target_action', 'window',
@@ -1169,16 +1193,44 @@ export const SCHEDULED_CONTINUATION_FENCED_TOOLS = new Set([
   'task_create',
   ...AUTOMATION_TOOL_NAMES.filter((name) => AUTOMATION_MUTATION_TOOL_NAMES.has(name)),
 ]);
+const ENGINEERING_GUARDED_MUTATION_TOOLS = new Set([
+  'write_file', 'apply_patch', 'edit_file', 'move_file', 'copy_file', 'delete_file', 'restore_deleted_file', 'restore_checkpoint',
+  'lsp_rename', 'git', 'shell', 'wsl_exec', 'process_start', 'process_stop',
+  'project_dev', 'project_test', 'project_lint', 'project_typecheck', 'project_build', 'verify_incremental',
+  'codex_run', 'codex_stop', 'agent_swarm_run', 'git_worktree_spawn', 'git_worktree_remove', 'self_heal_apply', 'task_create',
+]);
+const ENGINEERING_LIGHTWEIGHT_MUTATION_TOOLS = new Set([
+  'write_file', 'apply_patch', 'edit_file', 'move_file', 'copy_file',
+]);
 const goalLeaseProofSchema = z.object({
   goalId: z.string().min(1).max(128),
   leaseToken: z.string().min(1).max(256),
   leaseGeneration: z.number().int().nonnegative(),
 }).strict();
+const engineeringGoalTaskBindingSchema = z.object({
+  goalId: z.string().min(1).max(128),
+  policyDigest: z.string().min(1).max(256),
+  goalRevision: z.number().int().nonnegative(),
+  userIntentRevision: z.number().int().nonnegative(),
+  scopedPath: z.string().min(1).max(4096).optional(),
+  sessionId: z.string().min(1).max(256).optional(),
+}).strict();
+const engineeringPreparedTaskBindingSchema = z.object({
+  objective: z.string().trim().min(1).max(32_768),
+  scopedPath: z.string().min(1).max(4096).optional(),
+  policyDigest: z.string().min(1).max(256),
+  primaryTaskKind: z.enum(['feature', 'bugfix', 'refactor', 'review', 'incident', 'release', 'maintenance', 'docs', 'unknown']),
+  riskTier: z.enum(['low', 'medium', 'high', 'critical']),
+  deliveryScope: z.enum(['local', 'commit', 'push', 'pull_request', 'merge', 'release', 'deploy']),
+  sessionId: z.string().min(1).max(256).optional(),
+}).strict();
+const engineeringTaskBindingSchema = z.union([engineeringGoalTaskBindingSchema, engineeringPreparedTaskBindingSchema]);
+type EngineeringTaskBinding = z.infer<typeof engineeringTaskBindingSchema>;
 const approvalEnvelopeSchema = z.boolean();
 const GOAL_MUTATION_HEARTBEAT_MS = 10_000;
 
 function withToolEnvelopes(tool: McpToolDefinition): McpToolDefinition {
-  return withApprovalEnvelope(withGoalLeaseEnvelope(tool));
+  return withApprovalEnvelope(withEngineeringTaskEnvelope(withGoalLeaseEnvelope(tool)));
 }
 
 function withApprovalEnvelope(tool: McpToolDefinition): McpToolDefinition {
@@ -1208,6 +1260,38 @@ function withApprovalEnvelope(tool: McpToolDefinition): McpToolDefinition {
       if (!parsed.ok || parsedConfirmation === undefined) return parsed;
       if (!isRecord(parsed.value)) return err(appError('INVALID_INPUT', 'Tool input must be an object'));
       return ok({ ...parsed.value, userConfirmed: parsedConfirmation.data });
+    },
+  };
+}
+
+function withEngineeringTaskEnvelope(tool: McpToolDefinition): McpToolDefinition {
+  if (!ENGINEERING_GUARDED_MUTATION_TOOLS.has(tool.name)) return tool;
+  const extendObjectSchema = (schema: z.ZodObject): z.ZodObject =>
+    schema.safeExtend({ engineeringTask: engineeringTaskBindingSchema.optional() });
+  const inputSchema = tool.inputSchema instanceof z.ZodObject
+    ? extendObjectSchema(tool.inputSchema)
+    : tool.inputSchema instanceof z.ZodUnion
+      ? z.union(tool.inputSchema.options.map((option) => {
+        if (!(option instanceof z.ZodObject)) {
+          throw new Error(`Engineering-guarded tool ${tool.name} union input branches must use object schemas`);
+        }
+        return extendObjectSchema(option);
+      }) as [z.ZodObject, z.ZodObject, ...z.ZodObject[]])
+      : undefined;
+  if (inputSchema === undefined) throw new Error(`Engineering-guarded tool ${tool.name} must use an object or object-union input schema`);
+  return {
+    ...tool,
+    inputSchema,
+    parse(input: unknown): ReturnType<McpToolDefinition['parse']> {
+      const rawBinding = isRecord(input) ? input.engineeringTask : undefined;
+      const parsedBinding = rawBinding === undefined ? undefined : engineeringTaskBindingSchema.safeParse(rawBinding);
+      if (parsedBinding !== undefined && !parsedBinding.success) {
+        return err(appError('INVALID_INPUT', 'engineeringTask is invalid'));
+      }
+      const parsed = tool.parse(stripEngineeringTaskEnvelope(input));
+      if (!parsed.ok || parsedBinding === undefined) return parsed;
+      if (!isRecord(parsed.value)) return err(appError('INVALID_INPUT', 'Engineering-guarded tool input must be an object'));
+      return ok({ ...parsed.value, engineeringTask: parsedBinding.data });
     },
   };
 }
@@ -1250,6 +1334,17 @@ function readGoalLeaseProof(input: unknown): GoalLeaseProof | undefined {
   return parsed.success ? parsed.data : undefined;
 }
 
+function readEngineeringTaskBinding(input: unknown): EngineeringTaskBinding | undefined {
+  if (!isRecord(input) || input.engineeringTask === undefined) return undefined;
+  const parsed = engineeringTaskBindingSchema.safeParse(input.engineeringTask);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function stripEngineeringTaskEnvelope(input: unknown): unknown {
+  if (!isRecord(input) || !Object.prototype.hasOwnProperty.call(input, 'engineeringTask')) return input;
+  return Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'engineeringTask'));
+}
+
 function stripGoalLeaseEnvelope(input: unknown): unknown {
   if (!isRecord(input) || !Object.prototype.hasOwnProperty.call(input, 'goalLease')) return input;
   return Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'goalLease'));
@@ -1258,6 +1353,96 @@ function stripGoalLeaseEnvelope(input: unknown): unknown {
 function stripUserConfirmationEnvelope(input: unknown): unknown {
   if (!isRecord(input) || !Object.prototype.hasOwnProperty.call(input, 'userConfirmed')) return input;
   return Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'userConfirmed'));
+}
+
+async function resolveEngineeringAdmission(
+  services: McpApplicationServices,
+  actor: FileActor,
+  workspaceId: string,
+  toolName: string,
+  toolInput: unknown,
+  engineeringTask: EngineeringTaskBinding | undefined,
+  goalLease: GoalLeaseProof | undefined,
+): Promise<Result<void>> {
+  if (services.engineeringPreparation === undefined || services.goals === undefined) return ok(undefined);
+  if (engineeringTask !== undefined && 'objective' in engineeringTask) {
+    const preparedTask = await services.engineeringPreparation.prepare(workspaceId, engineeringTask.objective, engineeringTask.scopedPath);
+    if (!preparedTask.ok) return err(preparedTask.error);
+    if (actor.sessionId !== undefined && engineeringTask.sessionId !== actor.sessionId) {
+      return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'The prepared Engineering task belongs to a different MCP session. Prepare the task again in this session before mutation.', true));
+    }
+    if (engineeringTask.policyDigest !== preparedTask.value.policy.policyDigest) {
+      return err(appError('ENGINEERING_POLICY_CHANGED', 'The prepared Engineering task policy is stale. Re-run engineering_prepare_task before mutation.', true));
+    }
+    if (engineeringTask.primaryTaskKind !== preparedTask.value.workflow.primaryTaskKind
+      || engineeringTask.riskTier !== preparedTask.value.workflow.riskTier
+      || engineeringTask.deliveryScope !== preparedTask.value.workflow.deliveryScope) {
+      return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'The prepared Engineering task classification is stale. Re-run engineering_prepare_task before mutation.', true));
+    }
+    if (!preparedTask.value.policy.enabled) return ok(undefined);
+    const lightweight = preparedTask.value.workflow.riskTier === 'low'
+      && preparedTask.value.workflow.deliveryScope === 'local'
+      && (preparedTask.value.workflow.primaryTaskKind === 'docs' || preparedTask.value.workflow.primaryTaskKind === 'maintenance');
+    const lightweightRoute = ENGINEERING_LIGHTWEIGHT_MUTATION_TOOLS.has(toolName) && !isCodingMutation(toolName, toolInput);
+    if (!lightweight || !lightweightRoute) {
+      return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'This Engineering task or mutation target requires a durable Engineering task. Call engineering_start_task and retry with its durable engineeringTask binding.', true));
+    }
+    return ok(undefined);
+  }
+  if (engineeringTask === undefined) {
+    const prepared = await services.engineeringPreparation.prepare(workspaceId, `Modify software code through ${toolName}`);
+    if (!prepared.ok) return err(prepared.error);
+    if (!prepared.value.policy.enabled) return ok(undefined);
+    return err(appError(
+      'ENGINEERING_PREFLIGHT_REQUIRED',
+      'Engineering Harness is active for this coding workspace. Call engineering_prepare_task first; lightweight work may use its prepared binding, while substantive work must call engineering_start_task.',
+      true,
+    ));
+  }
+  if (!('goalId' in engineeringTask)) {
+    return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'This prepared task cannot be used as a durable Engineering task binding. Call engineering_start_task.', true));
+  }
+  if (goalLease === undefined || goalLease.goalId !== engineeringTask.goalId) {
+    return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'A durable Engineering mutation requires the current goalLease returned by engineering_start_task.', true));
+  }
+  const validated = await services.goals.validateGoalLease(actor, { goalId: engineeringTask.goalId, leaseToken: goalLease.leaseToken });
+  if (!validated.ok) return err(validated.error);
+  const selected = validated.value;
+  if (selected.workspaceId !== workspaceId || selected.status !== 'active') {
+    return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'The supplied Engineering task does not match an active goal in this workspace.', true));
+  }
+  if (selected.leaseGeneration !== goalLease.leaseGeneration) {
+    return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'The supplied Engineering goalLease generation is stale. Reacquire the goal before mutation.', true));
+  }
+  if (selected.engineering === undefined) {
+    return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'The selected goal is not an Engineering Harness task.', true));
+  }
+  if (engineeringTask.policyDigest !== selected.engineering.policyDigest) {
+    return err(appError('ENGINEERING_POLICY_CHANGED', 'The supplied Engineering task policy digest is stale. Re-prepare and reconcile the task before mutation.', true));
+  }
+  if (engineeringTask.goalRevision !== selected.revision || engineeringTask.userIntentRevision !== selected.userIntentRevision) {
+    return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'The Engineering task binding is stale for the current goal revision. Re-run engineering_start_task before mutation.', true));
+  }
+  if (actor.sessionId !== undefined && engineeringTask.sessionId !== actor.sessionId) {
+    return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'The Engineering task binding belongs to a different MCP session. Re-run engineering_start_task in this session before mutation.', true));
+  }
+  if (engineeringTask.scopedPath !== selected.engineering.scopedPath) {
+    return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'The Engineering task binding scope is stale. Re-run engineering_start_task before mutation.', true));
+  }
+  const prepared = await services.engineeringPreparation.prepare(workspaceId, selected.objective, selected.engineering.scopedPath);
+  if (!prepared.ok) return err(prepared.error);
+  if (!prepared.value.policy.enabled) {
+    // A repository engineering.mode=off applies to new preparation only. An
+    // already-active durable Engineering task keeps its stored policy/gates
+    // until it reaches a terminal state. User-controlled opt-out disables the
+    // Harness admission layer immediately; rolling goalLease fencing remains
+    // independently authoritative later in the registry pipeline.
+    return ok(undefined);
+  }
+  if (selected.engineering.policyDigest !== prepared.value.policy.policyDigest) {
+    return err(appError('ENGINEERING_POLICY_CHANGED', 'Engineering policy changed since this task was prepared. Re-run engineering_start_task to reconcile affected gates before mutation.', true));
+  }
+  return ok(undefined);
 }
 
 function startGoalMutationFenceHeartbeat(
@@ -1353,7 +1538,7 @@ function summarizeMutationForApproval(toolName: string, input: unknown, activeWo
       lines.push(`launchCount = ${taskIds.length}`);
       if (taskIds.length > 0) lines.push(`taskIds = ${JSON.stringify(taskIds)}`);
     }
-    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.6.6 enforces read-only child sandboxes.');
+    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.7.0 enforces read-only child sandboxes.');
     return boundedApprovalSummary(lines);
   }
   const projectKind = projectCommandKind(toolName);

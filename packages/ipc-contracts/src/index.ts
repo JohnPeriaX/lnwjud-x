@@ -1,5 +1,5 @@
 export const APP_NAME = 'lnwjud';
-export const APP_VERSION = '5.6.6';
+export const APP_VERSION = '5.7.0';
 
 export const ipcChannels = {
   listWorkspaces: 'lnwjud:list-workspaces',
@@ -292,6 +292,24 @@ export interface ExtraMcpServerSettings {
   readonly env: Readonly<Record<string, string>>;
 }
 
+export type EngineeringProfile = 'standard' | 'senior' | 'strict' | 'custom';
+export type EngineeringApplyTo = 'coding_projects' | 'all_workspaces';
+export type EngineeringHarnessDiagnostic = 'invalid_json' | 'invalid_shape' | 'unsupported_schema_version';
+
+export interface EngineeringHarnessSettings {
+  readonly schemaVersion: 1;
+  readonly enabled: boolean;
+  readonly profile: EngineeringProfile;
+  readonly applyTo: EngineeringApplyTo;
+  readonly autoProjectAssessment: boolean;
+  readonly custom?: {
+    readonly analysis: 'focused' | 'cross_file';
+    readonly review: 'risk_based' | 'always';
+    readonly validation: 'risk_based' | 'strict';
+    readonly docsImpactCheck: boolean;
+  };
+}
+
 export interface UserSettings {
   readonly customPermission: CustomPermissionSettings;
   /** Full profile only. Explicitly bypasses lnwjud application authorization on Desktop HTTP/Secure Tunnel. */
@@ -312,6 +330,12 @@ export interface UserSettings {
   /** Host-owned ECC consent gate. Missing/false means ECC stays disabled. */
   readonly eccEnabled?: boolean;
   readonly ponytailMode: 'off' | 'lite' | 'full' | 'ultra';
+  /** Optional on inbound settings payloads for backward compatibility with pre-5.7 clients; Desktop responses always populate it. */
+  readonly engineeringHarness?: EngineeringHarnessSettings;
+  /** User-controlled per-workspace opt-in/opt-out and optional preset override. Absence inherits global settings. */
+  readonly engineeringHarnessWorkspaceOverrides?: Readonly<Record<string, { readonly mode: 'on' | 'off'; readonly profile?: EngineeringProfile }>>;
+  /** Read-side diagnostic for invalid/future persisted Harness settings; never grants activation. */
+  readonly engineeringHarnessDiagnostic?: EngineeringHarnessDiagnostic | null;
   readonly updateAutoCheck: boolean;
   readonly updateCheckOnStartup: boolean;
   readonly updateIntervalMinutes: number;
@@ -787,6 +811,33 @@ export interface RecoveryCenterSummary {
   readonly checkpoints: readonly RecoveryCheckpointSummary[];
 }
 
+export interface DashboardEngineeringHarnessStatus {
+  readonly workspaceId: string | null;
+  readonly enabled: boolean;
+  readonly source: 'global' | 'workspace' | 'project' | 'task_scope' | 'project_signal' | 'unavailable';
+  readonly profile: EngineeringProfile;
+  readonly policyDigest: string | null;
+  readonly reasons: readonly string[];
+  readonly diagnostic: EngineeringHarnessDiagnostic | null;
+  readonly task: null | {
+    readonly goalId: string;
+    readonly goalKey: string;
+    readonly currentPhase: string;
+    readonly nextAction: string;
+    readonly primaryTaskKind: 'feature' | 'bugfix' | 'refactor' | 'review' | 'incident' | 'release' | 'maintenance' | 'docs' | 'unknown';
+    readonly riskTier: 'low' | 'medium' | 'high' | 'critical';
+    readonly deliveryScope: 'local' | 'commit' | 'push' | 'pull_request' | 'merge' | 'release' | 'deploy';
+    readonly gates: readonly {
+      readonly id: string;
+      readonly title: string;
+      readonly applicability: 'required' | 'optional' | 'not_applicable';
+      readonly status: 'pending' | 'running' | 'passed' | 'failed' | 'blocked' | 'not_applicable' | 'stale';
+      readonly reason: string;
+      readonly evidenceSource?: 'host_observed' | 'user_attested';
+    }[];
+  };
+}
+
 export interface DashboardSnapshot {
   /** Primary workspace used when a tool call omits workspaceId. */
   readonly selectedWorkspace: WorkspaceSummary | null;
@@ -829,6 +880,7 @@ export interface DashboardSnapshot {
   readonly tunnel: TunnelStatus;
   readonly remoteMcp: RemoteMcpStatus;
   readonly settings: UserSettings;
+  readonly engineeringHarnessStatus: DashboardEngineeringHarnessStatus;
   /** Authoritative host identity used to gate platform/architecture-specific controls. */
   readonly hostPlatform: 'win32' | 'darwin' | 'linux';
   readonly hostArch: 'x64' | 'arm64';

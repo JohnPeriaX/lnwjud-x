@@ -1,3 +1,5 @@
+import { parseProjectEngineeringSettings } from './engineering-policy.js';
+
 export type PonytailMode = 'off' | 'lite' | 'full' | 'ultra';
 export type PonytailModeOverride = 'inherit' | PonytailMode;
 export type PonytailPolicySource = 'global' | 'workspace' | 'goal';
@@ -31,6 +33,7 @@ export function normalizeProjectProfile(profile: Record<string, unknown>): Recor
       throw new Error('Project profile ponytail.mode must be off, lite, full, or ultra');
     }
   }
+  if (normalized.engineering !== undefined) parseProjectEngineeringSettings(normalized.engineering);
   return normalized;
 }
 

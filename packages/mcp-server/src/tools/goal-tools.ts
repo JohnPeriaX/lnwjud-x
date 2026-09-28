@@ -72,6 +72,31 @@ const resumeContext = z.object({
   stateFacts: z.array(evidence).max(20),
   artifacts: z.array(evidence).max(20),
 }).strict();
+const engineeringGateEvidence = z.object({
+  source: z.enum(['host_observed', 'user_attested']),
+  observedAt: z.string().min(1).max(64),
+  workspaceId: z.string().min(1).max(128),
+  commit: z.string().min(1).max(256).optional(),
+  command: z.string().min(1).max(2048).optional(),
+  runId: z.string().min(1).max(256).optional(),
+  exitCode: z.number().int().optional(),
+  conclusion: z.string().min(1).max(256).optional(),
+  artifact: z.string().min(1).max(1024).optional(),
+}).strict();
+const engineeringGateUpdate = z.object({
+  gateId: z.string().min(1).max(128),
+  status: z.enum(['pending', 'running', 'passed', 'failed', 'blocked', 'not_applicable', 'stale']),
+  reason: z.string().min(1).max(1024).optional(),
+  evidence: engineeringGateEvidence.optional(),
+}).strict();
+const engineeringReviewFinding = z.object({
+  id: z.string().min(1).max(128),
+  title: z.string().min(1).max(512),
+  severity: z.enum(['blocking', 'non_blocking']),
+  state: z.enum(['open', 'validated', 'rejected', 'resolved']),
+  reason: z.string().max(1024),
+  source: z.string().min(1).max(1024).optional(),
+}).strict();
 
 const runGoalSchema = z.object({
   workspaceId: z.string().min(1).max(128),
@@ -104,6 +129,8 @@ const checkpointGoalSchema = z.object({
   activeTaskIds: z.array(z.string().min(1).max(256)).max(50).optional(),
   trackedTasks: z.array(trackedTask).max(50).optional(),
   resumeContext: resumeContext.optional(),
+  engineeringGateUpdates: z.array(engineeringGateUpdate).max(100).optional(),
+  engineeringReviewFindings: z.array(engineeringReviewFinding).max(100).optional(),
   ponytailMode: ponytailModeOverride.optional(),
   releaseLease: z.boolean().optional(),
 }).strict().refine((value) => value.activeTaskIds !== undefined || value.trackedTasks !== undefined, {
@@ -137,6 +164,7 @@ const reviseGoalIntentSchema = z.object({
   expectedUserIntentRevision: z.number().int().min(0),
   steering: z.string().min(1).max(1024),
   nextAction: z.string().max(1024).optional(),
+  staleEngineeringGateIds: z.array(z.string().min(1).max(128)).max(100).optional(),
 }).strict();
 
 const createContextCapsuleSchema = z.object({

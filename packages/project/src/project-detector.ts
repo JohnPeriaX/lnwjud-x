@@ -1,11 +1,12 @@
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { appError, err, ok, type Result } from '@lnwjud/domain';
-import type { PackageManager, ProjectFramework, ProjectProfile } from './project-profile.js';
+import type { PackageManager, ProjectCommandKind, ProjectFramework, ProjectKind, ProjectProfile } from './project-profile.js';
 
 export interface ProjectFileSystem {
   readFile(filePath: string): Promise<string>;
   exists(filePath: string): Promise<boolean>;
+  listEntries?(rootPath: string): Promise<readonly string[]>;
 }
 
 class NodeProjectFileSystem implements ProjectFileSystem {
@@ -20,6 +21,13 @@ class NodeProjectFileSystem implements ProjectFileSystem {
     } catch {
       return false;
     }
+  }
+
+  public async listEntries(rootPath: string): Promise<readonly string[]> {
+    return (await readdir(rootPath, { withFileTypes: true }))
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name)
+      .sort();
   }
 }
 
@@ -45,42 +53,120 @@ const CONFIG_FILE_NAMES = [
   'next.config.js',
   'next.config.mjs',
   'biome.json',
+  'pytest.ini',
+  'tox.ini',
+  'ruff.toml',
 ];
+
+const PRIMARY_KIND_ORDER: readonly Exclude<ProjectKind, 'unknown'>[] = ['node', 'python', 'rust', 'go', 'php', 'java', 'dotnet'];
 
 export class ProjectDetector {
   public constructor(private readonly fileSystem: ProjectFileSystem = new NodeProjectFileSystem()) {}
 
   public async detect(rootPath: string): Promise<Result<ProjectProfile>> {
-    const packageJsonPath = path.join(rootPath, 'package.json');
-    if (!(await this.fileSystem.exists(packageJsonPath))) {
-      return ok({
-        rootPath,
-        kind: 'unknown',
-        packageManager: 'unknown',
-        frameworks: [],
-        scripts: {},
-        configFiles: await this.findConfigFiles(rootPath),
-      });
-    }
-
-    let packageJson: unknown;
+    let entries: readonly string[];
     try {
-      packageJson = JSON.parse(await this.fileSystem.readFile(packageJsonPath)) as unknown;
+      entries = this.fileSystem.listEntries === undefined
+        ? await this.legacyRootEntries(rootPath)
+        : await this.fileSystem.listEntries(rootPath);
     } catch {
-      return err(appError('INVALID_INPUT', 'package.json is not valid JSON'));
+      return err(appError('INVALID_INPUT', 'Project root cannot be read'));
     }
-    if (!this.isPackageJson(packageJson)) {
-      return err(appError('INVALID_INPUT', 'package.json has an invalid shape'));
+    const entrySet = new Set(entries);
+    const detectedFiles = this.detectManifestFiles(entries);
+    const platforms = this.detectPlatforms(entries);
+    const kind = PRIMARY_KIND_ORDER.find((candidate) => platforms.includes(candidate)) ?? 'unknown';
+    const configFiles = await this.findConfigFiles(rootPath);
+
+    let packageManager: PackageManager = 'unknown';
+    let frameworks: ProjectFramework[] = [];
+    let scripts: Record<string, string> = {};
+    if (entrySet.has('package.json')) {
+      let packageJson: unknown;
+      try {
+        packageJson = JSON.parse(await this.fileSystem.readFile(path.join(rootPath, 'package.json'))) as unknown;
+      } catch {
+        return err(appError('INVALID_INPUT', 'package.json is not valid JSON'));
+      }
+      if (!this.isPackageJson(packageJson)) return err(appError('INVALID_INPUT', 'package.json has an invalid shape'));
+      packageManager = await this.detectPackageManager(rootPath);
+      frameworks = await this.detectFrameworks(rootPath, packageJson);
+      scripts = packageJson.scripts ?? {};
     }
 
     return ok({
       rootPath,
-      kind: 'node',
-      packageManager: await this.detectPackageManager(rootPath),
-      frameworks: await this.detectFrameworks(rootPath, packageJson),
-      scripts: packageJson.scripts ?? {},
-      configFiles: await this.findConfigFiles(rootPath),
+      kind,
+      packageManager,
+      frameworks,
+      scripts,
+      configFiles,
+      confidence: platforms.length > 0 ? this.detectionConfidence(detectedFiles) : configFiles.length > 0 ? 'weak' : 'none',
+      detectedFiles,
+      platforms,
+      suggestedCommands: this.suggestCommands(kind, scripts, detectedFiles),
     });
+  }
+
+  private async legacyRootEntries(rootPath: string): Promise<readonly string[]> {
+    const candidates = ['package.json', 'pyproject.toml', 'requirements.txt', 'setup.py', 'Cargo.toml', 'go.mod', 'composer.json', 'pom.xml', 'build.gradle', 'build.gradle.kts'];
+    const existing = await Promise.all(candidates.map(async (filename) => (
+      await this.fileSystem.exists(path.join(rootPath, filename)) ? filename : null
+    )));
+    return existing.flatMap((filename) => filename === null ? [] : [filename]);
+  }
+
+  private detectManifestFiles(entries: readonly string[]): string[] {
+    const exact = new Set([
+      'package.json',
+      'pyproject.toml',
+      'requirements.txt',
+      'setup.py',
+      'Cargo.toml',
+      'go.mod',
+      'composer.json',
+      'pom.xml',
+      'build.gradle',
+      'build.gradle.kts',
+    ]);
+    return entries.filter((entry) => exact.has(entry) || entry.endsWith('.sln') || entry.endsWith('.csproj')).sort();
+  }
+
+  private detectPlatforms(entries: readonly string[]): Exclude<ProjectKind, 'unknown'>[] {
+    const files = new Set(entries);
+    const detected = new Set<Exclude<ProjectKind, 'unknown'>>();
+    if (files.has('package.json')) detected.add('node');
+    if (files.has('pyproject.toml') || files.has('requirements.txt') || files.has('setup.py')) detected.add('python');
+    if (files.has('Cargo.toml')) detected.add('rust');
+    if (files.has('go.mod')) detected.add('go');
+    if (files.has('composer.json')) detected.add('php');
+    if (files.has('pom.xml') || files.has('build.gradle') || files.has('build.gradle.kts')) detected.add('java');
+    if (entries.some((entry) => entry.endsWith('.sln') || entry.endsWith('.csproj'))) detected.add('dotnet');
+    return PRIMARY_KIND_ORDER.filter((kind) => detected.has(kind));
+  }
+
+  private detectionConfidence(detectedFiles: readonly string[]): 'strong' | 'medium' {
+    if (detectedFiles.length === 1 && detectedFiles[0] === 'requirements.txt') return 'medium';
+    return 'strong';
+  }
+
+  private suggestCommands(
+    kind: ProjectKind,
+    scripts: Readonly<Record<string, string>>,
+    detectedFiles: readonly string[],
+  ): Readonly<Partial<Record<ProjectCommandKind, string>>> {
+    if (kind === 'node') {
+      return Object.fromEntries((['dev', 'test', 'lint', 'typecheck', 'build'] as const)
+        .flatMap((command) => scripts[command] === undefined ? [] : [[command, scripts[command]]])) as Partial<Record<ProjectCommandKind, string>>;
+    }
+    if (kind === 'rust') return { test: 'cargo test', typecheck: 'cargo check', build: 'cargo build' };
+    if (kind === 'go') return { test: 'go test ./...', build: 'go build ./...' };
+    if (kind === 'java') {
+      if (detectedFiles.includes('pom.xml')) return { test: 'mvn test', build: 'mvn package' };
+      return { test: 'gradle test', build: 'gradle build' };
+    }
+    if (kind === 'dotnet') return { test: 'dotnet test', build: 'dotnet build' };
+    return {};
   }
 
   private async detectPackageManager(rootPath: string): Promise<PackageManager> {
@@ -99,7 +185,7 @@ export class ProjectDetector {
     const frameworks = new Set<ProjectFramework>();
     if (dependencyNames.has('react') || dependencyNames.has('react-dom')) frameworks.add('react');
     if (dependencyNames.has('typescript') || await this.fileSystem.exists(path.join(rootPath, 'tsconfig.json'))) frameworks.add('typescript');
-    if (dependencyNames.has('vite') || (await this.fileSystem.exists(path.join(rootPath, 'vite.config.ts')))) frameworks.add('vite');
+    if (dependencyNames.has('vite') || await this.fileSystem.exists(path.join(rootPath, 'vite.config.ts'))) frameworks.add('vite');
     return [...frameworks].sort();
   }
 

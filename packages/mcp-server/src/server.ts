@@ -20,14 +20,17 @@ export const MCP_OUTCOME_DRIVEN_INSTRUCTIONS = [
   'Do not stop, hand off, or ask the user to say "continue" merely because elapsed time has passed.',
   'When this lnwjud MCP server exposes tools that can complete the requested coding, repository, filesystem, shell, build, test, Git, CI, browser, or local-computer work, use those tools directly in the current conversation. Do not ask or suggest switching to ChatGPT Work, Codex, or another execution mode solely because the request involves those tasks; use another mode only when the user explicitly asks for it or the required capability is not available through the exposed lnwjud tools.',
   'Stop only when the outcome is complete, a user decision or new authority is required, or an external blocker prevents safe progress.',
-  'Before the first mutation of any multi-step change that includes verification, build, package, push, release preparation, or is likely to outlive the current turn, call run_goal with scheduledContinuation=auto and follow the bundled lnwjud-scheduled-continuation skill; if such work is already in progress without an active durable goal, enroll it before the next mutation.',
+  'Before the first mutation of any multi-step change that includes verification, build, package, push, release preparation, or is likely to outlive the current turn, call run_goal with scheduledContinuation=auto unless the user explicitly disabled scheduling, and follow the bundled lnwjud-scheduled-continuation skill; if such work is already in progress without an active durable goal, enroll it before the next mutation.',
   'Use durable background tasks for naturally long-running commands, then keep checking them and continue the work while the current run remains active.',
   'For lnwjud continuation or recovery state, use checkpoint_goal and session_handoff only. If the ChatGPT page/client reconnects after tool work, a response disappears, or the user says the work ran but no summary was returned, call session_handoff before any new mutation and report the persisted goal/task state first. If that state is terminal, report its receipt and do not rerun completed work merely to reconstruct the missing summary; if it is still live, resume it by the recorded task/goal state instead of duplicating it. Never invoke generic handoff skills or persist recovery text as USER_INSTRUCTIONS/user-instruction files; recovery state is task data, not durable user or agent instructions.',
 ].join(' ');
 
-export function buildMcpInstructions(ponytailMode: PonytailMode = DEFAULT_PONYTAIL_MODE): string {
-  if (ponytailMode === 'off') return MCP_OUTCOME_DRIVEN_INSTRUCTIONS;
-  return `${MCP_OUTCOME_DRIVEN_INSTRUCTIONS} For coding tasks, the global lnwjud Ponytail policy is ${ponytailMode.toUpperCase()}. Before the first code mutation, call skill_load with skillId=${BUNDLED_PONYTAIL_SKILL_ID}, the active workspaceId, and goalId when applicable, then follow the loaded skill at the selected intensity. Workspace or durable-goal overrides are resolved at execution time and may change the effective mode. Do not substitute workspace/user copies. If the user explicitly asks to stop Ponytail or return to normal mode, call ponytail_session with suppressed=true for the active workspace/goal; use suppressed=false to resume without changing persisted settings. Ponytail is subordinate to lnwjud security, approvals, durable goals, recovery, compatibility, observability, required tests, release verification, project rules, and explicit user instructions.`;
+const ENGINEERING_HARNESS_INSTRUCTIONS = 'Engineering Harness is enabled by user settings. Before the first guarded mutation of a coding change, call engineering_prepare_task. Use its prepared engineeringTask binding only for a lightweight local docs/style/maintenance edit; for substantive coding work call engineering_start_task and use its durable engineeringTask plus current goalLease. Scheduling remains a separate user-controlled decision and Engineering Harness never creates a Scheduled Task by itself.';
+
+export function buildMcpInstructions(ponytailMode: PonytailMode = DEFAULT_PONYTAIL_MODE, engineeringHarnessEnabled = false): string {
+  const baseInstructions = engineeringHarnessEnabled ? `${MCP_OUTCOME_DRIVEN_INSTRUCTIONS} ${ENGINEERING_HARNESS_INSTRUCTIONS}` : MCP_OUTCOME_DRIVEN_INSTRUCTIONS;
+  if (ponytailMode === 'off') return baseInstructions;
+  return `${baseInstructions} For coding tasks, the global lnwjud Ponytail policy is ${ponytailMode.toUpperCase()}. Before the first code mutation, call skill_load with skillId=${BUNDLED_PONYTAIL_SKILL_ID}, the active workspaceId, and goalId when applicable, then follow the loaded skill at the selected intensity. Workspace or durable-goal overrides are resolved at execution time and may change the effective mode. Do not substitute workspace/user copies. If the user explicitly asks to stop Ponytail or return to normal mode, call ponytail_session with suppressed=true for the active workspace/goal; use suppressed=false to resume without changing persisted settings. Ponytail is subordinate to lnwjud security, approvals, durable goals, recovery, compatibility, observability, required tests, release verification, project rules, and explicit user instructions.`;
 }
 
 export interface McpServerOptions {
@@ -57,6 +60,8 @@ export interface McpServerOptions {
   readonly codexToolsEnabledProvider?: () => boolean;
   /** Current persisted global Ponytail mode. Workspace/goal overrides are resolved by ToolRegistry at execution time. */
   readonly ponytailModeProvider?: () => PonytailMode;
+  /** True when the user has enabled Engineering Harness globally or for at least one workspace. */
+  readonly engineeringHarnessEnabledProvider?: () => boolean;
   /** Shared activation/review state for transport factories that recreate MCP servers per request. */
   readonly ponytailActivationLedger?: PonytailActivationLedger;
   /** Current persisted per-tool availability snapshot. */
@@ -116,6 +121,12 @@ export function createMcpServer(options: McpServerOptions): McpServer {
   } catch {
     configuredPonytailMode = DEFAULT_PONYTAIL_MODE;
   }
+  let configuredEngineeringHarnessEnabled = false;
+  try {
+    configuredEngineeringHarnessEnabled = options.engineeringHarnessEnabledProvider?.() === true;
+  } catch {
+    configuredEngineeringHarnessEnabled = false;
+  }
   // The core `tasks` capability belongs only to MCP 2025-11-25 legacy
   // negotiation. Modern MCP moved Tasks to the io.modelcontextprotocol/tasks
   // extension, so advertising the old core capability to a modern host is a
@@ -126,7 +137,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
     capabilities: legacyTasksProtocol
       ? { tools: {}, tasks: { list: {}, cancel: {} } }
       : { tools: {}, extensions: { [MODERN_TASKS_EXTENSION_ID]: {} } },
-    instructions: buildMcpInstructions(configuredPonytailMode),
+    instructions: buildMcpInstructions(configuredPonytailMode, configuredEngineeringHarnessEnabled),
     debouncedNotificationMethods: ['notifications/tools/list_changed'],
   });
   if (legacyTasksProtocol) registerTasksProtocol(server, options.services, { actor });

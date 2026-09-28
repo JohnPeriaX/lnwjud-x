@@ -21,6 +21,7 @@ import {
   type GoalDeliveryReceipt,
   type GoalDeliveryState,
   type GoalIterationPolicy,
+  type EngineeringGoalMetadata,
   type CreateGoalContextCapsuleRecordRequest,
   type RecordGoalDeliveryReceiptRequest,
   type GoalPlan,
@@ -67,6 +68,7 @@ interface GoalRow {
   readonly acceptance_criteria_json: string;
   readonly user_intent_revision: number;
   readonly iteration_policy_json: string;
+  readonly engineering_metadata_json: string | null;
   readonly current_context_capsule_id: string | null;
   readonly status: string;
   readonly revision: number;
@@ -194,11 +196,11 @@ export class SqliteGoalRepository implements GoalRepository, ScheduledContinuati
         this.database.connection.prepare(`
           INSERT INTO goals (
             id, workspace_id, goal_key, owner_client_id, objective, plan_json,
-            acceptance_criteria_json, user_intent_revision, iteration_policy_json, current_context_capsule_id,
+            acceptance_criteria_json, user_intent_revision, iteration_policy_json, engineering_metadata_json, current_context_capsule_id,
             status, revision, current_phase, next_action, blockers_json, active_task_ids_json, tracked_tasks_json, ponytail_mode,
             lease_owner_client_id, lease_owner_session_id, lease_token_hash, lease_duration_seconds, lease_generation, lease_activity_seq, lease_heartbeat_at, lease_expires_at,
             created_at, updated_at, terminal_summary, terminal_evidence_json, terminal_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, NULL, 'active', 0, 'created', '', '[]', '[]', '[]', ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?, NULL, NULL, NULL)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, NULL, 'active', 0, 'created', '', '[]', '[]', '[]', ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?, NULL, NULL, NULL)
         `).run(
           request.goalId,
           request.workspaceId,
@@ -208,6 +210,7 @@ export class SqliteGoalRepository implements GoalRepository, ScheduledContinuati
           JSON.stringify(request.plan),
           JSON.stringify(request.acceptanceCriteria ?? []),
           JSON.stringify(request.iterationPolicy ?? defaultGoalIterationPolicy()),
+          request.engineering === undefined ? null : JSON.stringify(request.engineering),
           request.ponytailMode ?? null,
           request.ownerClientId,
           request.ownerSessionId,
@@ -234,6 +237,9 @@ export class SqliteGoalRepository implements GoalRepository, ScheduledContinuati
       }
       if (request.iterationPolicy !== undefined && JSON.stringify(request.iterationPolicy) !== JSON.stringify(existing.iterationPolicy)) {
         throw new GoalStateError('conflict', 'Existing goal iteration policy does not match the requested policy');
+      }
+      if (request.engineering !== undefined && JSON.stringify(request.engineering) !== JSON.stringify(existing.engineering)) {
+        throw new GoalStateError('conflict', 'Existing goal engineering metadata does not match the requested metadata');
       }
       if (existing.status !== 'active') return { goal: existing, acquired: false };
 
@@ -396,6 +402,7 @@ export class SqliteGoalRepository implements GoalRepository, ScheduledContinuati
         throw new GoalStateError('conflict', 'Goal user intent revision must stay unchanged or advance by exactly one');
       }
       const iterationPolicy = request.iterationPolicy ?? current.iterationPolicy;
+      const engineering = request.engineering ?? current.engineering;
       const currentContextCapsuleId = request.currentContextCapsuleId === undefined
         ? current.currentContextCapsuleId ?? null
         : request.currentContextCapsuleId;
@@ -413,7 +420,7 @@ export class SqliteGoalRepository implements GoalRepository, ScheduledContinuati
           : minIso(normalLeaseExpiresAt, liveContinuation.pending_due_at ?? liveContinuation.due_at);
       const changed = this.database.connection.prepare(`
         UPDATE goals
-        SET plan_json = ?, acceptance_criteria_json = ?, user_intent_revision = ?, iteration_policy_json = ?, current_context_capsule_id = ?,
+        SET plan_json = ?, acceptance_criteria_json = ?, user_intent_revision = ?, iteration_policy_json = ?, engineering_metadata_json = ?, current_context_capsule_id = ?,
             revision = ?, current_phase = ?, next_action = ?, blockers_json = ?, active_task_ids_json = ?, tracked_tasks_json = ?, ponytail_mode = ?,
             lease_owner_client_id = ?, lease_owner_session_id = ?, lease_token_hash = ?, lease_duration_seconds = ?, lease_heartbeat_at = ?, lease_expires_at = ?,
             lease_activity_seq = lease_activity_seq + 1, updated_at = ?
@@ -423,6 +430,7 @@ export class SqliteGoalRepository implements GoalRepository, ScheduledContinuati
         JSON.stringify(acceptanceCriteria),
         userIntentRevision,
         JSON.stringify(iterationPolicy),
+        engineering === undefined ? null : JSON.stringify(engineering),
         currentContextCapsuleId,
         revision,
         request.currentPhase,
@@ -2386,6 +2394,7 @@ export class SqliteGoalRepository implements GoalRepository, ScheduledContinuati
     const plan = parsePlan(row.plan_json);
     const acceptanceCriteria = parseAcceptanceCriteria(row.acceptance_criteria_json);
     const iterationPolicy = parseIterationPolicy(row.iteration_policy_json);
+    const engineering = row.engineering_metadata_json === null ? undefined : parseEngineeringGoalMetadata(row.engineering_metadata_json);
     const blockers = parseStringArray(row.blockers_json, 'goal blockers');
     const trackedTasks = parseTrackedTasks(row.tracked_tasks_json, row.active_task_ids_json, 'goal tracked tasks');
     const activeTaskIds = blockingTaskIds(trackedTasks);
@@ -2415,6 +2424,7 @@ export class SqliteGoalRepository implements GoalRepository, ScheduledContinuati
       acceptanceCriteria,
       userIntentRevision: row.user_intent_revision,
       iterationPolicy,
+      ...(engineering === undefined ? {} : { engineering }),
       ...(row.current_context_capsule_id === null ? {} : { currentContextCapsuleId: row.current_context_capsule_id }),
       status,
       revision: row.revision,
@@ -2465,7 +2475,7 @@ export class SqliteGoalRepository implements GoalRepository, ScheduledContinuati
     if (!isRecord(value)) throw corrupt('Goal row is invalid');
     const requiredStrings = ['id','workspace_id','goal_key','owner_client_id','objective','plan_json','acceptance_criteria_json','iteration_policy_json','status','current_phase','next_action','blockers_json','active_task_ids_json','created_at','updated_at'];
     if (!requiredStrings.every((key) => typeof value[key] === 'string') || typeof value.revision !== 'number' || typeof value.user_intent_revision !== 'number') throw corrupt('Goal row fields are invalid');
-    const nullableStrings = ['current_context_capsule_id','tracked_tasks_json','ponytail_mode','lease_owner_client_id','lease_owner_session_id','lease_token_hash','lease_heartbeat_at','lease_expires_at','terminal_summary','terminal_evidence_json','terminal_at'];
+    const nullableStrings = ['engineering_metadata_json','current_context_capsule_id','tracked_tasks_json','ponytail_mode','lease_owner_client_id','lease_owner_session_id','lease_token_hash','lease_heartbeat_at','lease_expires_at','terminal_summary','terminal_evidence_json','terminal_at'];
     if (!nullableStrings.every((key) => value[key] === null || typeof value[key] === 'string')) throw corrupt('Goal nullable fields are invalid');
     if (value.lease_duration_seconds !== null && typeof value.lease_duration_seconds !== 'number') throw corrupt('Goal lease duration is invalid');
     if (typeof value.lease_generation !== 'number' || !Number.isInteger(value.lease_generation) || value.lease_generation < 0) throw corrupt('Goal lease generation is invalid');
@@ -2840,6 +2850,36 @@ function assertCompletionReady(goal: GoalRecord, status: FinishGoalRecordRequest
       `Goal cannot be completed while acceptance criteria remain unfinished: ${incompleteCriteria.map((criterion) => criterion.id).join(', ')}`,
     );
   }
+  if (goal.engineering !== undefined) {
+    const unresolvedGates = goal.engineering.gates.filter((gate) => {
+      if (gate.status === 'passed') return gate.evidence === undefined;
+      if (gate.status === 'not_applicable') return gate.reason.trim().length === 0;
+      return gate.applicability === 'required';
+    });
+    if (unresolvedGates.length > 0) {
+      throw new GoalStateError(
+        'conflict',
+        `Engineering goal cannot be completed while required gates are unresolved: ${unresolvedGates.map((gate) => `${gate.id}:${gate.status}`).join(', ')}`,
+      );
+    }
+    const hostEvidenceGateIds = new Set(['diff','focused_validation','integration','restart_persistence','cross_platform','exact_sha_ci','package']);
+    const unobservedGates = goal.engineering.gates.filter((gate) => gate.status === 'passed' && hostEvidenceGateIds.has(gate.id) && gate.evidence?.source !== 'host_observed');
+    if (unobservedGates.length > 0) {
+      throw new GoalStateError(
+        'conflict',
+        `Engineering goal cannot be completed without host-observed evidence for gates: ${unobservedGates.map((gate) => gate.id).join(', ')}`,
+      );
+    }
+    const blockingFindings = (goal.engineering.reviewFindings ?? []).filter((finding) => finding.severity === 'blocking' && (finding.state === 'open' || finding.state === 'validated'));
+    if (blockingFindings.length > 0) {
+      throw new GoalStateError(
+        'conflict',
+        `Engineering goal cannot be completed while blocking review findings remain unresolved: ${blockingFindings.map((finding) => finding.id).join(', ')}`,
+      );
+    }
+    const invalidRejectedFindings = (goal.engineering.reviewFindings ?? []).filter((finding) => finding.state === 'rejected' && finding.reason.trim().length === 0);
+    if (invalidRejectedFindings.length > 0) throw new GoalStateError('conflict', 'Rejected Engineering review findings require a recorded reason');
+  }
   if (goal.blockers.length > 0) throw new GoalStateError('conflict', 'Goal cannot be completed while durable blockers remain');
   if (goal.activeTaskIds.length > 0) throw new GoalStateError('conflict', 'Goal cannot be completed while blocking tasks remain tracked');
 }
@@ -2994,6 +3034,106 @@ function parseIterationPolicy(serialized: string): GoalIterationPolicy {
     maxIterations: Number(value.maxIterations),
     currentIteration: Number(value.currentIteration),
     stopOnNoNewEvidence: value.stopOnNoNewEvidence,
+  };
+}
+
+function parseEngineeringGoalMetadata(serialized: string): EngineeringGoalMetadata {
+  const value = parseJson(serialized, 'engineering goal metadata');
+  if (!isRecord(value) || value.schemaVersion !== 1) throw corrupt('Engineering goal metadata is invalid');
+  const primaryTaskKind = value.primaryTaskKind;
+  if (!['feature','bugfix','refactor','review','incident','release','maintenance','docs','unknown'].includes(String(primaryTaskKind))) throw corrupt('Engineering task kind is invalid');
+  const riskTier = value.riskTier;
+  if (!['low','medium','high','critical'].includes(String(riskTier))) throw corrupt('Engineering risk tier is invalid');
+  const deliveryScope = value.deliveryScope;
+  if (!['local','commit','push','pull_request','merge','release','deploy'].includes(String(deliveryScope))) throw corrupt('Engineering delivery scope is invalid');
+  const scopedPath = value.scopedPath;
+  if (scopedPath !== undefined && (typeof scopedPath !== 'string' || scopedPath.trim().length === 0 || scopedPath.length > 4096 || scopedPath.includes('\0'))) throw corrupt('Engineering scoped path is invalid');
+  if (typeof value.policyDigest !== 'string' || value.policyDigest.length === 0 || value.policyDigest.length > 256) throw corrupt('Engineering policy digest is invalid');
+  if (!Array.isArray(value.gates) || value.gates.length > 100) throw corrupt('Engineering gates are invalid');
+  const gateIds = new Set<string>();
+  const gates = value.gates.map((entry) => {
+    if (!isRecord(entry) || typeof entry.id !== 'string' || entry.id.trim().length === 0 || entry.id.length > 128
+      || typeof entry.title !== 'string' || entry.title.trim().length === 0 || entry.title.length > 512
+      || typeof entry.reason !== 'string' || entry.reason.length > 1024) throw corrupt('Engineering gate is invalid');
+    if (gateIds.has(entry.id)) throw corrupt('Engineering gate ids are duplicated');
+    gateIds.add(entry.id);
+    if (!['required','optional','not_applicable'].includes(String(entry.applicability))) throw corrupt('Engineering gate applicability is invalid');
+    if (!['pending','running','passed','failed','blocked','not_applicable','stale'].includes(String(entry.status))) throw corrupt('Engineering gate status is invalid');
+    if (!Number.isInteger(entry.basedOnUserIntentRevision) || Number(entry.basedOnUserIntentRevision) < 0) throw corrupt('Engineering gate intent revision is invalid');
+    let evidence: EngineeringGoalMetadata['gates'][number]['evidence'];
+    if (entry.evidence !== undefined) {
+      if (!isRecord(entry.evidence) || !['host_observed','user_attested'].includes(String(entry.evidence.source))
+        || typeof entry.evidence.observedAt !== 'string' || entry.evidence.observedAt.trim().length === 0 || entry.evidence.observedAt.length > 64
+        || typeof entry.evidence.workspaceId !== 'string' || entry.evidence.workspaceId.trim().length === 0 || entry.evidence.workspaceId.length > 128) {
+        throw corrupt('Engineering gate evidence is invalid');
+      }
+      const evidenceValue = entry.evidence;
+      const commit = evidenceValue.commit;
+      const command = evidenceValue.command;
+      const runId = evidenceValue.runId;
+      const conclusion = evidenceValue.conclusion;
+      const artifact = evidenceValue.artifact;
+      const evidenceStringLimits: Readonly<Record<string, number>> = { commit: 256, command: 2048, runId: 256, conclusion: 256, artifact: 1024 };
+      for (const [key, candidate] of Object.entries({ commit, command, runId, conclusion, artifact })) {
+        if (candidate !== undefined && (typeof candidate !== 'string' || candidate.trim().length === 0 || candidate.length > (evidenceStringLimits[key] ?? 1024))) {
+          throw corrupt(`Engineering gate evidence ${key} is invalid`);
+        }
+      }
+      if (evidenceValue.exitCode !== undefined && !Number.isInteger(evidenceValue.exitCode)) throw corrupt('Engineering gate evidence exitCode is invalid');
+      evidence = {
+        source: evidenceValue.source as 'host_observed' | 'user_attested',
+        observedAt: evidenceValue.observedAt as string,
+        workspaceId: evidenceValue.workspaceId as string,
+        ...(typeof commit === 'string' ? { commit } : {}),
+        ...(typeof command === 'string' ? { command } : {}),
+        ...(typeof runId === 'string' ? { runId } : {}),
+        ...(evidenceValue.exitCode === undefined ? {} : { exitCode: Number(evidenceValue.exitCode) }),
+        ...(typeof conclusion === 'string' ? { conclusion } : {}),
+        ...(typeof artifact === 'string' ? { artifact } : {}),
+      };
+    }
+    return {
+      id: entry.id,
+      title: entry.title,
+      applicability: entry.applicability as 'required' | 'optional' | 'not_applicable',
+      status: entry.status as EngineeringGoalMetadata['gates'][number]['status'],
+      reason: entry.reason,
+      basedOnUserIntentRevision: Number(entry.basedOnUserIntentRevision),
+      ...(evidence === undefined ? {} : { evidence }),
+    };
+  });
+  let reviewFindings: EngineeringGoalMetadata['reviewFindings'];
+  if (value.reviewFindings !== undefined) {
+    if (!Array.isArray(value.reviewFindings) || value.reviewFindings.length > 100) throw corrupt('Engineering review findings are invalid');
+    const findingIds = new Set<string>();
+    reviewFindings = value.reviewFindings.map((entry) => {
+      if (!isRecord(entry) || typeof entry.id !== 'string' || entry.id.trim().length === 0 || entry.id.length > 128
+        || typeof entry.title !== 'string' || entry.title.trim().length === 0 || entry.title.length > 512
+        || typeof entry.reason !== 'string' || entry.reason.length > 1024) throw corrupt('Engineering review finding is invalid');
+      if (findingIds.has(entry.id)) throw corrupt('Engineering review finding ids are duplicated');
+      findingIds.add(entry.id);
+      if (!['blocking','non_blocking'].includes(String(entry.severity))) throw corrupt('Engineering review finding severity is invalid');
+      if (!['open','validated','rejected','resolved'].includes(String(entry.state))) throw corrupt('Engineering review finding state is invalid');
+      if (entry.source !== undefined && (typeof entry.source !== 'string' || entry.source.trim().length === 0 || entry.source.length > 1024)) throw corrupt('Engineering review finding source is invalid');
+      return {
+        id: entry.id,
+        title: entry.title,
+        severity: entry.severity as 'blocking' | 'non_blocking',
+        state: entry.state as 'open' | 'validated' | 'rejected' | 'resolved',
+        reason: entry.reason,
+        ...(entry.source === undefined ? {} : { source: entry.source as string }),
+      };
+    });
+  }
+  return {
+    schemaVersion: 1,
+    primaryTaskKind: primaryTaskKind as EngineeringGoalMetadata['primaryTaskKind'],
+    riskTier: riskTier as EngineeringGoalMetadata['riskTier'],
+    policyDigest: value.policyDigest,
+    deliveryScope: deliveryScope as EngineeringGoalMetadata['deliveryScope'],
+    ...(typeof scopedPath === 'string' ? { scopedPath } : {}),
+    gates,
+    ...(reviewFindings === undefined ? {} : { reviewFindings }),
   };
 }
 

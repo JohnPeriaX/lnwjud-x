@@ -57,6 +57,28 @@ export function createRuntimeSuccessServices(calls: string[]): McpApplicationSer
     workspaceQuery: serviceProxy('workspaceQuery', calls, () => ({ entries: [] })),
     projectSnapshot: serviceProxy('projectSnapshot', calls, () => ({ workspaceId: 'workspace-1', files: 1 })),
     project: serviceProxy('project', calls, () => ({ kind: 'node', packageManager: 'pnpm' })),
+    engineeringPreparation: serviceProxy('engineeringPreparation', calls, (_method, args) => {
+      const objective = typeof args[1] === 'string' ? args[1] : 'Fix the auth persistence bug';
+      return {
+        objective,
+        assessment: {
+          project: {
+            rootPath: process.cwd(), kind: 'node', packageManager: 'pnpm', frameworks: ['typescript'], scripts: {}, configFiles: [],
+            confidence: 'strong', detectedFiles: ['package.json'], platforms: ['node'], suggestedCommands: {},
+          },
+          instructions: [], projectProfile: {}, projectProfileStatus: 'missing', fingerprint: 'runtime-contract-engineering', warnings: [],
+        },
+        policy: {
+          enabled: true, source: 'global', profile: 'senior', workspaceId: 'workspace-1', taskScope: 'coding',
+          project: { mode: 'inherit' }, policyDigest: 'engineering-policy-smoke',
+          reasons: ['Runtime contract fixture enables Engineering Harness.'],
+        },
+        workflow: {
+          primaryTaskKind: 'bugfix', riskTier: 'high', deliveryScope: 'local',
+          workflow: [{ id: 'requirements', title: 'Resolve requirement and affected contracts' }], gates: [], riskReasons: ['Runtime contract fixture.'],
+        },
+      };
+    }),
     file: serviceProxy('file', calls, (method, args) => {
       if (method === 'readFile') {
         const request = runtimeRecord(args[2]);
@@ -118,11 +140,14 @@ export function createRuntimeSuccessServices(calls: string[]): McpApplicationSer
     }),
     goals: serviceProxy('goals', calls, (method) => {
       const goal = {
-        goalId: 'goal-1', goalKey: 'smoke-goal', workspaceId: 'workspace-1', objective: 'Smoke durable goal contract',
+        goalId: 'goal-1', goalKey: 'smoke-goal', workspaceId: 'workspace-1', objective: 'Fix the auth persistence bug',
         status: 'active', revision: 0, userIntentRevision: 0, currentPhase: 'smoke',
         plan: { steps: [] }, acceptanceCriteria: [], iterationPolicy: { mode: 'outcome', maxIterations: 0, currentIteration: 0, stopOnNoNewEvidence: true },
         completedSteps: [], pendingSteps: [], nextAction: 'continue smoke', blockers: [], activeTaskIds: [], trackedTasks: [], lastCheckpoint: null,
         leaseGeneration: 1, leaseActivitySeq: 0,
+        engineering: {
+          schemaVersion: 1, primaryTaskKind: 'bugfix', riskTier: 'high', policyDigest: 'engineering-policy-smoke', deliveryScope: 'local', gates: [],
+        },
       };
       if (method === 'listGoals') return { goals: [goal] };
       if (method === 'listContextCapsules' || method === 'listDeliveryReceipts') return [];

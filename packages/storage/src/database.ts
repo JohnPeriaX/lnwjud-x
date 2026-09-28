@@ -22,6 +22,7 @@ import { GOAL_PONYTAIL_MODE_MIGRATION_SQL } from './migrations/goal-ponytail-mod
 import { GOAL_V5_ORCHESTRATION_MIGRATION_SQL } from './migrations/goal-v5-orchestration-migration.js';
 import { NATIVE_AUTOMATION_MIGRATION_SQL } from './migrations/native-automation-migration.js';
 import { GOAL_RESUME_CONTEXT_MIGRATION_SQL } from './migrations/goal-resume-context-migration.js';
+import { ENGINEERING_HARNESS_MIGRATION_SQL } from './migrations/engineering-harness-migration.js';
 
 export interface SqliteDatabaseOptions {
   readonly backupDirectory?: string;
@@ -107,6 +108,7 @@ export class SqliteDatabase {
       { id: '018_goal_v5_orchestration', sql: GOAL_V5_ORCHESTRATION_MIGRATION_SQL },
       { id: '019_native_automation', sql: NATIVE_AUTOMATION_MIGRATION_SQL },
       { id: '020_goal_resume_context', sql: GOAL_RESUME_CONTEXT_MIGRATION_SQL },
+      { id: '021_engineering_harness', sql: ENGINEERING_HARNESS_MIGRATION_SQL },
     ]);
   }
 

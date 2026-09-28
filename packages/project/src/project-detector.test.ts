@@ -31,6 +31,16 @@ describe('ProjectDetector', () => {
           build: 'vite build',
         },
         configFiles: ['tsconfig.json', 'vite.config.ts'],
+        confidence: 'strong',
+        detectedFiles: ['package.json'],
+        platforms: ['node'],
+        suggestedCommands: {
+          dev: 'vite',
+          test: 'vitest run',
+          lint: 'eslint .',
+          typecheck: 'tsc --noEmit',
+          build: 'vite build',
+        },
       },
     });
   });
@@ -54,6 +64,47 @@ describe('ProjectDetector', () => {
 
     const result = await new ProjectDetector().detect(root);
 
-    expect(result).toMatchObject({ ok: true, value: { kind: 'node', scripts: {}, packageManager: 'npm' } });
+    expect(result).toMatchObject({ ok: true, value: { kind: 'node', scripts: {}, packageManager: 'npm', suggestedCommands: {} } });
+  });
+
+  it('recognizes supported non-Node manifests from the project root without scanning recursively', async () => {
+    const cases = [
+      { files: ['pyproject.toml'], kind: 'python', commands: {} },
+      { files: ['Cargo.toml'], kind: 'rust', commands: { test: 'cargo test', typecheck: 'cargo check', build: 'cargo build' } },
+      { files: ['go.mod'], kind: 'go', commands: { test: 'go test ./...', build: 'go build ./...' } },
+      { files: ['composer.json'], kind: 'php', commands: {} },
+      { files: ['pom.xml'], kind: 'java', commands: { test: 'mvn test', build: 'mvn package' } },
+      { files: ['fixture.sln'], kind: 'dotnet', commands: { test: 'dotnet test', build: 'dotnet build' } },
+    ] as const;
+
+    for (const testCase of cases) {
+      const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-project-manifest-'));
+      temporaryRoots.push(root);
+      for (const filename of testCase.files) await writeFile(path.join(root, filename), '', 'utf8');
+      const result = await new ProjectDetector().detect(root);
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          kind: testCase.kind,
+          confidence: 'strong',
+          detectedFiles: [...testCase.files],
+          platforms: [testCase.kind],
+          suggestedCommands: testCase.commands,
+        },
+      });
+    }
+  });
+
+  it('keeps weak config-only folders out of software-project activation', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-project-weak-'));
+    temporaryRoots.push(root);
+    await writeFile(path.join(root, 'tsconfig.json'), '{}', 'utf8');
+
+    const result = await new ProjectDetector().detect(root);
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { kind: 'unknown', confidence: 'weak', detectedFiles: [], platforms: [], configFiles: ['tsconfig.json'] },
+    });
   });
 });

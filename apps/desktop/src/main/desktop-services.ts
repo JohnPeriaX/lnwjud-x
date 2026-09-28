@@ -12,6 +12,7 @@ import {
   CheckpointService,
   CodexService,
   FileService,
+  EngineeringPreparationService,
   GitService,
   GoalContinuationService,
   GoalRequestCancellationService,
@@ -32,7 +33,7 @@ import {
 } from '@lnwjud/application';
 import { AuditService, decodeActivityTargetReference, type ActivityAuditEvent, type ActivityTargetDetail, type AuditEventRepository, type AuditEventSummaryProjection } from '@lnwjud/audit';
 import { CodexDiscovery, formatCodexDiscoveryError } from '@lnwjud/codex';
-import type { Result } from '@lnwjud/domain';
+import type { GoalRecord, Result } from '@lnwjud/domain';
 import {
   EXTENSIONS_SETTINGS_KEY,
   createLocalExtensionsService,
@@ -43,6 +44,7 @@ import {
 import {
   ActivityTracker,
   LNWJUD_MCP_IDENTITY_PATH,
+  RuntimeEngineeringEvidenceVerifier,
   RuntimeGoalManagedTaskStateReader,
   createFileActivitySink,
   mcpActivityLogPath,
@@ -93,10 +95,14 @@ import {
   parseAllowedRoots,
   parseBooleanSetting,
   parseDestructiveAutoApprovalPolicy,
+  parseEngineeringHarnessSettings,
+  parseEngineeringHarnessWorkspaceOverrides,
   parseStdioPermissionProfile,
   serializeAllowedRoots,
   serializeCustomPermissionSettings,
   serializeDestructiveAutoApprovalPolicy,
+  serializeEngineeringHarnessSettings,
+  serializeEngineeringHarnessWorkspaceOverrides,
   serializeMcpAllowedHostnames,
   serializePathList,
   serializeStringRecordSetting,
@@ -105,6 +111,8 @@ import {
   formatDisplayTimestampItem,
   type SecretProtector,
   type DestructiveAutoApprovalPolicy,
+  type EngineeringHarnessSettings,
+  type EngineeringHarnessWorkspaceOverride,
 } from '@lnwjud/shared';
 import { AesGcmCheckpointCipher, BACKUP_RESTORE_NOTICE_SETTING_KEY, parseBackupRestoreNotice, SqliteAgentSwarmRepository, SqliteAuditRepository, SqliteAutomationRepository, SqliteBackupService, SqliteCheckpointRepository, SqliteDatabase, SqliteSettingsRepository, SqliteWorkspaceRepository, type BackupReason, type BackupRestoreNotice as StorageBackupRestoreNotice, type BackupSummary } from '@lnwjud/storage';
 import { SqliteGoalRepository } from '@lnwjud/storage';
@@ -123,6 +131,7 @@ import {
   type DeleteWorkspaceRequest,
   type ConnectionModes,
   type DashboardSnapshot,
+  type DashboardEngineeringHarnessStatus,
   type DoctorCheck,
   type DoctorReport,
   type ToolCatalogSnapshot,
@@ -477,6 +486,10 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
   );
   const allowAiDeleteProvider = (): boolean => destructivePolicyProvider().approvals.delete_file;
   const projectService = new ProjectService(workspaceRepository);
+  const engineeringPreparationService = new EngineeringPreparationService(workspaceRepository, {
+    globalSettingsProvider: (): EngineeringHarnessSettings => parseEngineeringHarnessSettings(settingsRepository.get(USER_SETTING_KEYS.engineeringHarnessSettings)).settings,
+    workspaceOverrideProvider: (workspaceId): EngineeringHarnessWorkspaceOverride | undefined => parseEngineeringHarnessWorkspaceOverrides(settingsRepository.get(USER_SETTING_KEYS.engineeringHarnessWorkspaceOverrides))[workspaceId],
+  });
   const processService = new ProcessService(workspaceRepository, {
     projectService,
     profileProvider: activePermissionProfile,
@@ -597,11 +610,79 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
     }),
   });
   const goalService = new GoalContinuationService(workspaceRepository, goalRepository, {
+    engineeringEvidenceVerifier: new RuntimeEngineeringEvidenceVerifier({ process: processService, shell: capabilityRuntime.shell }),
     scheduledContinuations: goalRepository,
     workerLiveness: goalMutationFence,
     taskCancellation,
     requestCancellation,
   });
+  async function buildEngineeringHarnessStatus(selectedWorkspace: Workspace | null): Promise<DashboardEngineeringHarnessStatus> {
+    const settings = readSettings();
+    const harness = settings.engineeringHarness ?? {
+      schemaVersion: 1 as const,
+      enabled: false,
+      profile: 'senior' as const,
+      applyTo: 'coding_projects' as const,
+      autoProjectAssessment: true,
+    };
+    const diagnostic = settings.engineeringHarnessDiagnostic ?? null;
+    if (selectedWorkspace === null) {
+      return {
+        workspaceId: null,
+        enabled: false,
+        source: 'unavailable',
+        profile: harness.profile,
+        policyDigest: null,
+        reasons: ['No workspace is selected.'],
+        diagnostic,
+        task: null,
+      };
+    }
+
+    const workspaceGoals = await goalRepository.listWorkspaceGoalsForHost(selectedWorkspace.id, 100);
+    const activeGoal = workspaceGoals.find((goal) => goal.status === 'active' && goal.engineering !== undefined);
+    const workspaceOverride = settings.engineeringHarnessWorkspaceOverrides?.[selectedWorkspace.id];
+    if (!harness.enabled && workspaceOverride?.mode !== 'on' && activeGoal === undefined) {
+      return {
+        workspaceId: selectedWorkspace.id,
+        enabled: false,
+        source: workspaceOverride?.mode === 'off' ? 'workspace' : 'global',
+        profile: workspaceOverride?.profile ?? harness.profile,
+        policyDigest: null,
+        reasons: [workspaceOverride?.mode === 'off' ? 'Engineering Harness is disabled for this workspace.' : 'Engineering Harness is Off.'],
+        diagnostic,
+        task: null,
+      };
+    }
+
+    const prepared = await engineeringPreparationService.prepare(
+      selectedWorkspace.id,
+      activeGoal?.objective ?? 'Implement software code in this project',
+      activeGoal?.engineering?.scopedPath,
+    );
+    if (!prepared.ok) {
+      return {
+        workspaceId: selectedWorkspace.id,
+        enabled: false,
+        source: 'unavailable',
+        profile: workspaceOverride?.profile ?? harness.profile,
+        policyDigest: null,
+        reasons: [prepared.error.message],
+        diagnostic,
+        task: toEngineeringDashboardTask(activeGoal),
+      };
+    }
+    return {
+      workspaceId: selectedWorkspace.id,
+      enabled: prepared.value.policy.enabled,
+      source: prepared.value.policy.source,
+      profile: prepared.value.policy.profile,
+      policyDigest: prepared.value.policy.policyDigest,
+      reasons: prepared.value.policy.reasons,
+      diagnostic,
+      task: toEngineeringDashboardTask(activeGoal),
+    };
+  }
   const scheduledContinuationService = new ScheduledContinuationService(goalRepository, {
     workerLiveness: goalMutationFence,
     automationResumes: automationRepository,
@@ -635,6 +716,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
     workspaceQuery: workspaceQueryService,
     projectSnapshot: projectSnapshotService,
     project: projectService,
+    engineeringPreparation: engineeringPreparationService,
     file: fileService,
     checkpoint: checkpointService,
     goals: goalService,
@@ -723,6 +805,11 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
       ...(options.hostMutationApprovalProvider === undefined ? {} : { hostMutationApprovalProvider: options.hostMutationApprovalProvider }),
       codexToolsEnabledProvider: () => readSettings().codexToolsEnabled,
       ponytailModeProvider: () => readSettings().ponytailMode,
+      engineeringHarnessEnabledProvider: (): boolean => {
+        const settings = readSettings();
+        return settings.engineeringHarness?.enabled === true
+          || Object.values(settings.engineeringHarnessWorkspaceOverrides ?? {}).some((entry) => entry.mode === 'on');
+      },
       toolAvailabilitySnapshotProvider: () => toolAvailabilityService.snapshot(),
       toolAvailabilitySubscribe: (listener) => toolAvailabilityService.subscribe(listener),
     }),
@@ -1542,6 +1629,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
           checkpoints: unwrap(await checkpointService.list(selectedWorkspace.id), 'Checkpoints could not be listed'),
         };
       }
+      const engineeringHarnessStatus = await buildEngineeringHarnessStatus(selectedWorkspace);
       logHub.syncWorkLog(workLog, inFlight.map((item) => ({ callId: item.callId, toolName: item.toolName, targetSummary: item.targetSummary, targetDetail: item.targetDetail, startedAt: item.startedAt, workspaceId: item.workspaceId, sessionId: item.sessionId })));
       logHub.syncProcesses(processSummaries.map((summary) => ({
         id: summary.id,
@@ -1589,6 +1677,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
         tunnel,
         remoteMcp,
         settings: readSettings(),
+        engineeringHarnessStatus,
         hostPlatform: supportedHostPlatform(process.platform),
         hostArch: supportedHostArchitecture(process.arch),
         appVersion: APP_VERSION,
@@ -2234,6 +2323,27 @@ function toIpcBackupRestoreNotice(value: StorageBackupRestoreNotice | null): Ipc
   };
 }
 
+function toEngineeringDashboardTask(goal: GoalRecord | undefined): DashboardEngineeringHarnessStatus['task'] {
+  if (goal?.engineering === undefined) return null;
+  return {
+    goalId: goal.id,
+    goalKey: goal.goalKey,
+    currentPhase: goal.currentPhase,
+    nextAction: goal.nextAction,
+    primaryTaskKind: goal.engineering.primaryTaskKind,
+    riskTier: goal.engineering.riskTier,
+    deliveryScope: goal.engineering.deliveryScope,
+    gates: goal.engineering.gates.map((gate) => ({
+      id: gate.id,
+      title: gate.title,
+      applicability: gate.applicability,
+      status: gate.status,
+      reason: gate.reason,
+      ...(gate.evidence === undefined ? {} : { evidenceSource: gate.evidence.source }),
+    })),
+  };
+}
+
 function toWorkspaceSummary(workspace: Workspace): WorkspaceSummary {
   return {
     id: workspace.id,
@@ -2472,6 +2582,7 @@ function quoteCommandArgument(value: string): string {
 
 function readUserSettings(settingsRepository: SqliteSettingsRepository, env: NodeJS.ProcessEnv): UserSettings {
   const extensions = parseExtensionsSettings(settingsRepository.get(EXTENSIONS_SETTINGS_KEY));
+  const engineeringHarness = parseEngineeringHarnessSettings(settingsRepository.get(USER_SETTING_KEYS.engineeringHarnessSettings));
   return {
     customPermission: parseCustomPermissionSettings(settingsRepository.get(USER_SETTING_KEYS.customPermissionProfile)),
     desktopFullBypassAll: parseBooleanSetting(settingsRepository.get(USER_SETTING_KEYS.desktopFullBypassAll), false),
@@ -2489,6 +2600,9 @@ function readUserSettings(settingsRepository: SqliteSettingsRepository, env: Nod
     codexToolsEnabled: parseBooleanSetting(settingsRepository.get(USER_SETTING_KEYS.codexToolsEnabled), DEFAULT_CODEX_TOOLS_ENABLED),
     eccEnabled: parseBooleanSetting(settingsRepository.get(USER_SETTING_KEYS.eccEnabled), DEFAULT_ECC_ENABLED),
     ponytailMode: parsePonytailMode(settingsRepository.get(USER_SETTING_KEYS.ponytailMode), DEFAULT_PONYTAIL_MODE),
+    engineeringHarness: engineeringHarness.settings,
+    engineeringHarnessWorkspaceOverrides: parseEngineeringHarnessWorkspaceOverrides(settingsRepository.get(USER_SETTING_KEYS.engineeringHarnessWorkspaceOverrides)),
+    engineeringHarnessDiagnostic: engineeringHarness.diagnostic,
     updateAutoCheck: parseBooleanSetting(settingsRepository.get(USER_SETTING_KEYS.updateAutoCheck), true),
     updateCheckOnStartup: parseBooleanSetting(settingsRepository.get(USER_SETTING_KEYS.updateCheckOnStartup), true),
     updateIntervalMinutes: parseIntegerSetting(settingsRepository.get(USER_SETTING_KEYS.updateIntervalMinutes), DEFAULT_UPDATE_INTERVAL_MINUTES, 5, 24 * 60),
@@ -2520,6 +2634,12 @@ function persistUserSettings(settingsRepository: SqliteSettingsRepository, setti
   settingsRepository.set(USER_SETTING_KEYS.codexToolsEnabled, settings.codexToolsEnabled ? 'true' : 'false');
   settingsRepository.set(USER_SETTING_KEYS.eccEnabled, settings.eccEnabled === true ? 'true' : 'false');
   settingsRepository.set(USER_SETTING_KEYS.ponytailMode, settings.ponytailMode);
+  if (settings.engineeringHarness !== undefined) {
+    settingsRepository.set(USER_SETTING_KEYS.engineeringHarnessSettings, serializeEngineeringHarnessSettings(settings.engineeringHarness));
+  }
+  if (settings.engineeringHarnessWorkspaceOverrides !== undefined) {
+    settingsRepository.set(USER_SETTING_KEYS.engineeringHarnessWorkspaceOverrides, serializeEngineeringHarnessWorkspaceOverrides(settings.engineeringHarnessWorkspaceOverrides));
+  }
   settingsRepository.set(USER_SETTING_KEYS.updateAutoCheck, settings.updateAutoCheck ? 'true' : 'false');
   settingsRepository.set(USER_SETTING_KEYS.updateCheckOnStartup, settings.updateCheckOnStartup ? 'true' : 'false');
   settingsRepository.set(USER_SETTING_KEYS.updateIntervalMinutes, String(settings.updateIntervalMinutes));
@@ -2582,6 +2702,8 @@ function runtimeRestartRequired(previous: UserSettings, next: UserSettings): boo
     || previous.mcpHttpPort !== next.mcpHttpPort
     || JSON.stringify(previous.mcpAllowedHostnames) !== JSON.stringify(next.mcpAllowedHostnames)
     || previous.ponytailMode !== next.ponytailMode
+    || JSON.stringify(previous.engineeringHarness) !== JSON.stringify(next.engineeringHarness)
+    || JSON.stringify(previous.engineeringHarnessWorkspaceOverrides) !== JSON.stringify(next.engineeringHarnessWorkspaceOverrides)
     || JSON.stringify(previous.lspCommands) !== JSON.stringify(next.lspCommands)
     || JSON.stringify(previous.customPermission) !== JSON.stringify(next.customPermission);
 }

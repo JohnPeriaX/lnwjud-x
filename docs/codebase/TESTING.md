@@ -58,6 +58,21 @@ Focused typechecks passed:
 
 These are the minimum behavioral checks for the infrastructure fix. Root lint/typecheck/tests must still be run before any eventual commit/release of the combined working tree because unrelated pre-existing changes are also present.
 
+## Engineering Harness v5.7.0 validation
+
+Engineering Harness changes are validated at the authority boundaries they affect rather than by adding broad coverage-only tests:
+
+- `packages/application/src/engineering/*.test.ts` — project/policy/task-risk/workflow classification and proportional gate selection.
+- `packages/storage/src/goal-continuation.integration.test.ts` — schema migration/backward compatibility, restart/resume, intent revision, selective stale gates, evidence/review persistence, and completion DoD.
+- `packages/mcp-server/src/tools/engineering-tools.test.ts` — prepare/start/status contracts and no implicit scheduled-continuation side effect.
+- `packages/mcp-server/src/tool-registry.test.ts` — Harness-Off compatibility, explicit task binding, stale policy/revision/session rejection, Full Bypass coexistence, first-party opaque execution, and workspace isolation.
+- `packages/mcp-server/src/server-instructions.test.ts` — enabled-path guidance routes substantive coding work through Engineering preparation/start while preserving explicit scheduler opt-out.
+- `apps/desktop/tests/engineering-harness-settings.test.ts` — Default Off, coding-project activation, and read-only durable-task status projection.
+- `apps/desktop/tests/engineering-harness-ui.test.ts` — Thai/English Settings rendering and truthful non-green pending/running gate states.
+- Existing Direct STDIO, Desktop persistence, durable-goal, permission, Full Bypass and release tests remain regression coverage; Engineering Harness must not bypass those authorities.
+
+Before a 5.7.0 delivery commit, run the focused suites above, affected package typechecks/builds, `git diff --check`, then the repository release verifier. A version bump must use `corepack pnpm@10.15.0 run set-version 5.7.0` followed immediately by `corepack pnpm@10.15.0 test:version`.
+
 ## Coverage
 
 No repo-wide numeric line/branch coverage threshold was found in the audited root/desktop test configuration. Quality is primarily gated through contract-specific unit, integration, acceptance, packaged E2E and release-evidence checks.

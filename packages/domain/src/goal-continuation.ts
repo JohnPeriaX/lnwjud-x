@@ -1,3 +1,5 @@
+import type { EngineeringGoalMetadata } from './engineering.js';
+
 export type GoalStatus = 'active' | 'completed' | 'failed' | 'blocked' | 'cancelled';
 export type GoalTerminalStatus = 'completed' | 'failed' | 'blocked';
 export type GoalStepStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';
@@ -172,6 +174,7 @@ export interface GoalRecord {
   readonly acceptanceCriteria: readonly GoalAcceptanceCriterion[];
   readonly userIntentRevision: number;
   readonly iterationPolicy: GoalIterationPolicy;
+  readonly engineering?: EngineeringGoalMetadata;
   readonly currentContextCapsuleId?: string;
   readonly status: GoalStatus;
   readonly revision: number;
@@ -235,6 +238,7 @@ export interface AcquireGoalRecordRequest {
   readonly plan?: GoalPlan;
   readonly acceptanceCriteria?: readonly GoalAcceptanceCriterion[];
   readonly iterationPolicy?: GoalIterationPolicy;
+  readonly engineering?: EngineeringGoalMetadata;
   readonly ponytailMode?: GoalPonytailMode;
   readonly leaseTokenHash: string;
   readonly leaseSeconds: number;
@@ -261,6 +265,7 @@ export interface CheckpointGoalRecordRequest {
   readonly acceptanceCriteria?: readonly GoalAcceptanceCriterion[];
   readonly userIntentRevision?: number;
   readonly iterationPolicy?: GoalIterationPolicy;
+  readonly engineering?: EngineeringGoalMetadata;
   readonly currentContextCapsuleId?: string | null;
   readonly currentPhase: string;
   readonly summary: string;

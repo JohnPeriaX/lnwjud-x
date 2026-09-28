@@ -93,6 +93,55 @@ describe('DesktopRuntime persistence', () => {
     }
   }, RUNTIME_TEST_TIMEOUT_MS);
 
+  it('persists Engineering Harness, signals reconnect for connection-time instructions, and preserves legacy-client writes', async () => {
+    const rawDataRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-runtime-engineering-harness-'));
+    temporaryRoots.push(rawDataRoot);
+    const dataRoot = await realpath(rawDataRoot);
+    const runtime = createDesktopRuntime(dataRoot);
+    try {
+      expect(runtime.getUserSettings()).toMatchObject({
+        engineeringHarness: { schemaVersion: 1, enabled: false, profile: 'senior', applyTo: 'coding_projects', autoProjectAssessment: true },
+        engineeringHarnessDiagnostic: null,
+      });
+      const enabled = await runtime.services.setUserSettings({
+        settings: {
+          ...runtime.getUserSettings(),
+          engineeringHarness: { schemaVersion: 1, enabled: true, profile: 'strict', applyTo: 'all_workspaces', autoProjectAssessment: false },
+          engineeringHarnessWorkspaceOverrides: {
+            'workspace-disabled': { mode: 'off' },
+            'workspace-enabled': { mode: 'on', profile: 'senior' },
+          },
+        },
+      });
+      expect(enabled.restartRequired).toBe(true);
+      expect(enabled.settings.engineeringHarness?.enabled).toBe(true);
+      expect(enabled.settings.engineeringHarnessWorkspaceOverrides).toMatchObject({ 'workspace-disabled': { mode: 'off' }, 'workspace-enabled': { mode: 'on', profile: 'senior' } });
+
+      const {
+        engineeringHarness: _engineeringHarness,
+        engineeringHarnessWorkspaceOverrides: _engineeringHarnessWorkspaceOverrides,
+        engineeringHarnessDiagnostic: _engineeringHarnessDiagnostic,
+        ...legacySettings
+      } = runtime.getUserSettings();
+      void _engineeringHarness;
+      void _engineeringHarnessWorkspaceOverrides;
+      void _engineeringHarnessDiagnostic;
+      await runtime.services.setUserSettings({ settings: legacySettings });
+      expect(runtime.getUserSettings().engineeringHarness).toMatchObject({ enabled: true, profile: 'strict' });
+      expect(runtime.getUserSettings().engineeringHarnessWorkspaceOverrides).toMatchObject({ 'workspace-disabled': { mode: 'off' }, 'workspace-enabled': { mode: 'on', profile: 'senior' } });
+    } finally {
+      await runtime.close();
+    }
+
+    const restarted = createDesktopRuntime(dataRoot);
+    try {
+      expect(restarted.getUserSettings().engineeringHarness).toMatchObject({ enabled: true, profile: 'strict' });
+      expect(restarted.getUserSettings().engineeringHarnessWorkspaceOverrides).toMatchObject({ 'workspace-disabled': { mode: 'off' }, 'workspace-enabled': { mode: 'on', profile: 'senior' } });
+    } finally {
+      await restarted.close();
+    }
+  }, RUNTIME_TEST_TIMEOUT_MS);
+
   it('does not execute Codex discovery for the default-disabled Codex tools on dashboard refresh', async () => {
     const discover = vi.spyOn(CodexDiscovery.prototype, 'discover');
     const rawDataRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-runtime-codex-disabled-'));

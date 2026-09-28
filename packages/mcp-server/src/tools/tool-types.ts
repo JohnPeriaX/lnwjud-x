@@ -14,6 +14,7 @@ import type {
   EditFileRequest,
   FileActor,
   FileService,
+  EngineeringPreparationService,
   GitService,
   GoalRequestCancellationPort,
   GoalContinuationService,
@@ -89,11 +90,13 @@ export interface McpApplicationServices {
   readonly workspaceQuery?: Pick<WorkspaceQueryService, 'tree'>;
   readonly projectSnapshot?: ProjectSnapshotPort;
   readonly project?: Pick<ProjectService, 'detect'>;
+  readonly engineeringPreparation?: Pick<EngineeringPreparationService, 'prepare'>;
   readonly file?: Pick<FileService, 'readFile' | 'readFiles' | 'writeFile' | 'applyPatch' | 'editFile' | 'moveFile' | 'copyFile' | 'deleteFile' | 'listRecoveryItems' | 'restoreDeletedFile' | 'prepareExternalFileMutation'>;
   readonly checkpoint?: Pick<CheckpointService, 'list' | 'restore'>;
   readonly goals?: Pick<GoalContinuationService,
     | 'runGoal'
     | 'getGoal'
+    | 'validateGoalLease'
     | 'updateGoalPlan'
     | 'updateGoalAcceptance'
     | 'reviseGoalIntent'
