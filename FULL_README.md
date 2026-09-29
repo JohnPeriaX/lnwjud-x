@@ -57,6 +57,15 @@ and returns the response without opening a public inbound port on the host.
 
 Latest published release: **v5.7.1**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
 
+### What's new in v5.7.2
+
+- **Git image diff previews:** the Git page can show before/after images at the real `HEAD → Index` and `Index → Working Tree` scopes, including added/deleted images. Preview payloads are bounded to 4 MB per side, with Fit/Actual Size controls and a clear fallback when Chromium cannot decode a particular image format.
+- **Engineering Harness settings persist correctly:** the preload bridge now preserves Harness settings, workspace overrides, and diagnostics, so an enabled Harness no longer appears Off after restarting the app while the saved value is still enabled.
+- **Engineering tools are discoverable and Goal-aware:** Engineering Harness primitives are exposed through the tool catalog and bind to the active Goal/lease correctly.
+- **Safer rich-text typing:** CDP typing uses native `Input.insertText` for ProseMirror/contenteditable targets and verifies that the DOM actually changed instead of reporting a silent no-op as success.
+- **Durable Goal progress stays fresh for Watcher:** lnwjud now instructs every connected worker to checkpoint immediately at step/task/blocker/commit/push/CI/package milestones and at least every 10 minutes during sustained work without a natural milestone, while stale superseded Goals should be reconciled instead of remaining active.
+- **Secure MCP Tunnel avoids false Windows Error state:** a temporary PowerShell failure while inventorying local tunnel-client processes/listeners is retried as a transient runtime check instead of permanently flipping an otherwise healthy Tunnel to Error; duplicate/unverifiable process identity checks remain fail-closed.
+
 ### What's new in v5.7.1
 
 - **Engineering Harness checkpoints save gate results:** gate updates and review findings now reach the durable Goal instead of being silently dropped by the MCP handler.
@@ -69,12 +78,6 @@ Latest published release: **v5.7.1**. Windows, macOS, and Linux artifacts are pu
 - **Authorized continuation handles failures:** it works through fixable failures and keeps goal ownership and checkpoint details across handoffs.
 
 See [Thai Engineering Harness setup and workflow](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for details.
-
-### What's new in v5.6.6
-
-- **Truthful Watcher Goal state:** an open Goal no longer makes the runtime or orchestrator appear busy without observable work. Completion readiness includes plan steps, acceptance criteria, blockers, and active tasks; final closure still requires `finish_goal`.
-- **Detailed Goal snapshots:** Watcher Protocol v1 now provides completion readiness, objective, phase, acceptance checks, task count, and timestamps for each active Goal so the companion Watcher can explain remaining work and detect inactivity.
-- **Configured MCP server names:** Watcher can display the names users set in LNWJUD with their connection state. Launch commands, configuration paths, and secrets are excluded.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for complete version history and [Thai troubleshooting](docs/USAGE_TH.md#13-doctor--troubleshooting) for Agent Swarm setup.
 
