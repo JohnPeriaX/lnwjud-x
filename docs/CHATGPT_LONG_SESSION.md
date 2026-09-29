@@ -68,9 +68,11 @@ Public tools:
 
 - `run_goal` — immediate-return create/resume + ขอ lease โดยใช้ `goalKey` คงที่
 - `get_goal` — อ่าน snapshot โดยไม่ mutate และไม่คืน lease token
-- `checkpoint_goal` — compare-and-swap checkpoint ด้วย `expectedRevision` + `leaseToken`
-- `finish_goal` — ปิดเป็น `completed`, `failed` หรือ `blocked`
-- `list_goals` — ค้น goal แบบ bounded เมื่อแชทจำ `goalId` ไม่ได้
+- `get_goal_plan` / `update_goal_plan` — อ่านและอัปเดต authoritative plan/step progress ชุดเดียวกับที่ Watcher ใช้แสดงผล
+- `update_goal_acceptance` — บันทึก acceptance criterion พร้อม evidence จริง
+- `checkpoint_goal` — compare-and-swap checkpoint ด้วย `expectedRevision` + `leaseToken` พร้อม reconstruction-grade `resumeContext`
+- `finish_goal` — ปิดเป็น `completed`, `failed` หรือ `blocked` หลัง plan/acceptance/gates/blocking work พร้อมจริง
+- `reconcile_goals` / `list_goals` — ตรวจและ reconcile goal ที่ abandoned/superseded อย่างมีหลักฐาน และค้น goal แบบ bounded เมื่อแชทจำ `goalId` ไม่ได้
 
 `run_goal` **ไม่ได้สร้าง ChatGPT turn ใหม่เอง** และไม่มี foreground wait ภายใน tool. Scheduled Task ของ ChatGPT เป็นตัวปลุก turn ใหม่ ส่วน goal tools ทำให้ turn ใหม่นั้นตัดสินใจได้ว่าต้อง resume อะไรและป้องกัน writer ซ้ำ
 
@@ -81,11 +83,11 @@ Flow ที่ควรใช้:
 2. ถ้า `acquired: false` แปลว่ามี turn อื่นถือ lease อยู่ ให้รายงานสถานะแล้ว **ห้ามเริ่ม mutation/process ซ้ำ**
 3. ถ้า `acquired: true` ให้ใช้ `currentPhase`, `pendingSteps`, `nextAction`, `trackedTasks`, `activeTaskIds` และ `lastCheckpoint` เป็น continuation state
 4. ถ้า `trackedTasks` มี `blocking_job` เดิม ให้ตรวจ task เดิมก่อนเริ่ม command ใหม่; `supporting_service` เป็น service กลางที่ไม่ควร block liveness หรือถูกยกเลิกโดยอัตโนมัติ
-5. หลังผลลัพธ์สำคัญเรียก `checkpoint_goal` พร้อม `expectedRevision` ล่าสุด แต่ **checkpoint เป็นการบันทึกสถานะ ไม่ใช่ turn boundary**; หลัง checkpoint ปกติต้องทำ useful work ต่อใน run เดิมและยังไม่ `releaseLease`
-6. checkpoint ให้เก็บเฉพาะ bounded/redacted summary, path/hash/task ID/evidence ที่จำเป็น ห้ามเก็บ credential, source contents หรือ log ยาว. ถ้า status/log/result/poll เจอ transient error ให้ retry/re-resolve ใน run เดิมก่อน; ถ้า task เป็น terminal แล้วต้องอ่าน terminal result และจัดการผลทันที
-7. ถ้า lease หาย/หมดระหว่าง worker ที่ยังทำ useful work ให้ re-read goal แล้ว reacquire `goalKey` เดิมอย่างปลอดภัยเมื่อไม่มี owner ใหม่ที่ live จากนั้นทำต่อใน run เดิม; อย่าใช้การรอ lease หมดเป็น continuation strategy. สำหรับ recurring wake ที่เจอ stale-valid lease ให้ใช้ same-tick recovery contract ของ v4.53 ตามหัวข้อด้านล่าง
-8. เมื่อ acceptance ครบจริงจึง `finish_goal`
-9. Scheduled Task เห็น terminal state แล้วต้องหยุดตัวเอง ไม่เรียก tools ต่อ
+5. เมื่อ plan/step progress เปลี่ยนให้เรียก `update_goal_plan` เพื่อให้ authoritative plan และ Watcher projection ตรงกับงานจริง แล้วเรียก `checkpoint_goal` ทันทีหลัง milestone สำคัญ เช่น step/task/blocker/commit/push/hosted CI/package เปลี่ยนสถานะ; ถ้าทำงานต่อเนื่องโดยไม่มี milestone ตามธรรมชาติให้ refresh อย่างน้อยทุก 10 นาที. **checkpoint เป็นการบันทึกสถานะ ไม่ใช่ turn boundary**; หลัง checkpoint ปกติต้องทำ useful work ต่อใน run เดิมและยังไม่ `releaseLease`
+6. meaningful milestone/handoff checkpoint ต้องมี reconstruction-grade `resumeContext`: changed files, exact commands/results พร้อม pass/fail/running, decisions, failed attempts, pending validation, resume prerequisites, state facts และ artifacts. summary เป็นเพียง headline; ยังต้อง bounded/redacted และห้ามเก็บ credential, source contents หรือ log ยาว. ถ้า status/log/result/poll เจอ transient error ให้ retry/re-resolve ใน run เดิมก่อน; ถ้า task เป็น terminal แล้วต้องอ่าน terminal result และจัดการผลทันที
+7. ถ้า CI/test/build/code-scanning/package/release validation พบ failure ที่แก้ได้ ให้เปิด exact failure, วิเคราะห์ root cause, แก้ และ validate ต่อใน turn เดิมแทนการหยุดแค่รายงาน. ถ้า lease หาย/หมดระหว่าง worker ที่ยังทำ useful work ให้ re-read goal แล้ว reacquire `goalKey` เดิมอย่างปลอดภัยเมื่อไม่มี owner ใหม่ที่ live จากนั้นทำต่อใน run เดิม; อย่าใช้การรอ lease หมดเป็น continuation strategy. สำหรับ recurring wake ที่เจอ stale-valid lease ให้ใช้ same-tick recovery contract ของ v4.53 ตามหัวข้อด้านล่าง
+8. เมื่อ plan ทุก step, acceptance criteria, blockers และ blocking tasks พร้อมจริงจึง `finish_goal`; ถ้า Engineering Harness มีผล required gates/review findings ต้องผ่านหรือ resolve จาก evidence จริงด้วย. ก่อนรายงานเสร็จให้ cleanup recurring watchdog ตามสัญญาและอ่าน `get_goal` จนยืนยัน terminal
+9. Scheduled Task เห็น terminal state แล้วต้องหยุดตัวเอง ไม่เรียก tools ต่อ และต้องไม่ปล่อย Goal ที่ completed/superseded/abandoned ค้าง `Active` ใน Watcher; ใช้ `reconcile_goals` เฉพาะเมื่อ authoritative evidence รองรับ
 
 Goal state เป็น SQLite durable state และใช้ monotonic revision/CAS + append-only checkpoint history. Raw lease token ไม่ถูกเก็บใน authoritative state; repository เก็บ hash สำหรับตรวจสิทธิ์เท่านั้น และ activity logs ต้องไม่แสดง lease token
 

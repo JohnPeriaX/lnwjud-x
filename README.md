@@ -195,13 +195,13 @@ C:\path\to\my-project
 Continue this task until it is genuinely complete. Do not stop only because the current chat turn ends.
 
 - Use the lnwjud-scheduled-continuation skill.
-- Create or resume the same durable goal using one stable goalKey. Never create duplicate goals for the same job.
+- Create or resume the same durable goal using one stable goalKey. Treat that Durable Goal as the authoritative task state and never create duplicate goals for the same job. When plan or step progress changes, use update_goal_plan so the Watcher-visible plan stays current.
 - Create exactly one recurring Native ChatGPT Scheduled Task, run it in cloud mode every 1 hour, and reuse that same scheduled continuation for this goal.
-- Checkpoint the goal after every meaningful milestone. Persist the current phase, step status, next action, blockers, evidence, and any background tasks that are still running.
+- Checkpoint immediately after every meaningful milestone, and refresh active progress at least every 10 minutes when sustained work has no natural milestone. Persist current phase, step status, next action, blockers, evidence, tracked background tasks, and reconstruction-grade resumeContext: changed files, exact commands/results, decisions, failed attempts, pending validation, resume prerequisites, state facts, and artifacts. A checkpoint records progress; it is not a reason to stop useful work.
 - When the scheduled task wakes the workflow, claim the continuation for the same goal and resume from the latest checkpoint instead of starting over.
-- If CI, build, test, deployment, or another process is still running, keep tracking the same task until its terminal result is known, then record that result in the checkpoint.
-- Do not finish the goal while any planned step, blocker, or blocking task remains unresolved.
-- When the work is truly complete, cancel the scheduled continuation, make the exact Native ChatGPT Scheduled Task non-runnable, then call finish_goal with the final status and evidence.
+- If CI, build, test, deployment, or another process is still running, keep tracking the same task until its terminal result is known. If a failure is fixable, inspect the exact failure, diagnose it, repair it, and run the relevant validation in the same turn instead of stopping at a status report.
+- Do not finish the goal while any planned step, acceptance criterion, required Engineering gate/review finding, blocker, or blocking task remains unresolved. Reconcile stale duplicate/superseded/abandoned goals instead of leaving finished work Active in Watcher.
+- When the work is truly complete, cancel the scheduled continuation, make the exact Native ChatGPT Scheduled Task non-runnable, then call finish_goal with final evidence and read get_goal to confirm a terminal state before reporting completion.
 ```
 
 ### Prompt แนะนำ — ภาษาไทย
@@ -215,13 +215,13 @@ C:\path\to\my-project
 ทำงานนี้ต่อเนื่องจนเสร็จจริง ห้ามหยุดกลางทางเพียงเพราะแชทจบรอบ
 
 - ใช้สกิล lnwjud-scheduled-continuation
-- สร้างหรือ resume durable goal เดิมด้วย goalKey ที่คงที่ ห้ามสร้าง goal ซ้ำสำหรับงานเดียวกัน
+- สร้างหรือ resume durable goal เดิมด้วย goalKey ที่คงที่ และให้ Durable Goal เป็น state หลักของงาน ห้ามสร้าง goal ซ้ำสำหรับงานเดียวกัน เมื่อ plan หรือสถานะ step เปลี่ยน ให้ใช้ update_goal_plan เพื่อให้ plan/progress ที่ Watcher แสดงเป็นปัจจุบัน
 - สร้าง Native ChatGPT Scheduled Task แบบ recurring เพียง 1 ตัว ให้รันบน cloud ทุก 1 ชั่วโมง และใช้ scheduled continuation ตัวเดิมกับ goal นี้ไปตลอด
-- หลังจบ milestone สำคัญทุกครั้ง ให้ checkpoint goal โดยบันทึก current phase, step status, next action, blockers, evidence และ background task ที่ยังรันอยู่
+- หลัง milestone สำคัญทุกครั้งให้ checkpoint ทันที และถ้าทำงานต่อเนื่องโดยไม่มี milestone ตามธรรมชาติให้ refresh อย่างน้อยทุก 10 นาที โดยบันทึก current phase, step status, next action, blockers, evidence, tracked background task และ resumeContext ที่สร้างงานต่อได้จริง เช่นไฟล์ที่เปลี่ยน, คำสั่งและผลลัพธ์, การตัดสินใจ, failed attempts, pending validation, prerequisites, state facts และ artifacts การ checkpoint คือการบันทึก progress ไม่ใช่เหตุผลให้หยุดทำงาน
 - เมื่อ scheduled task ปลุกขึ้นมา ให้ claim continuation ของ goal เดิม แล้วทำงานต่อจาก checkpoint ล่าสุด ห้ามเริ่มงานใหม่ตั้งแต่ต้น
-- หากมี CI, build, test, deploy หรือ process ที่ยังรันอยู่ ให้ติดตาม task เดิมจนได้ terminal result แล้วบันทึกผลลง checkpoint
-- ห้าม finish goal หากยังมี step ที่ไม่เสร็จ, blocker ที่ยังไม่เคลียร์ หรือ blocking task ที่ยังทำงานอยู่
-- เมื่อทุกอย่างเสร็จจริง ให้ cancel scheduled continuation, ทำให้ Native ChatGPT Scheduled Task ตัวเดิมไม่สามารถรันต่อได้ แล้วค่อย finish_goal พร้อม final status และ evidence
+- หากมี CI, build, test, deploy หรือ process ที่ยังรันอยู่ ให้ติดตาม task เดิมจนได้ terminal result ถ้าความล้มเหลวนั้นแก้ได้ ให้เปิดผลล้มเหลวจริง วิเคราะห์ root cause แก้ และรัน validation ที่เกี่ยวข้องต่อใน turn เดิม ห้ามหยุดแค่รายงานสถานะ
+- ห้าม finish goal หากยังมี step, acceptance criterion, Engineering gate/review finding ที่จำเป็น, blocker หรือ blocking task ที่ยังไม่เสร็จ และให้ reconcile goal ซ้ำ/ถูกแทนที่/ถูก abandon ที่งานจบแล้วแทนการปล่อยค้าง Active ใน Watcher
+- เมื่อทุกอย่างเสร็จจริง ให้ cancel scheduled continuation, ทำให้ Native ChatGPT Scheduled Task ตัวเดิมไม่สามารถรันต่อได้ แล้วค่อย finish_goal พร้อม final evidence จากนั้นเรียก get_goal ยืนยันว่าเป็น terminal ก่อนรายงานว่าเสร็จ
 ```
 
 ### Goal lifecycle / วงจรของ Goal
@@ -248,11 +248,13 @@ C:\path\to\my-project
 
 ### v5 Goal state / สถานะ Goal ใน v5
 
-- **Plan:** `get_goal_plan` projects the authoritative plan; `update_goal_plan` changes that same durable plan instead of creating a second planner.
-- **Acceptance:** `update_goal_acceptance` records explicit completion evidence. `finish_goal(status=completed)` is rejected while any criterion is still pending or blocked.
+- **Plan + Watcher projection:** `get_goal_plan` projects the authoritative plan; `update_goal_plan` changes that same durable plan and keeps the plan/progress shown by Watcher aligned with real step state instead of creating a second planner.
+- **Freshness + reconstruction:** call `checkpoint_goal` immediately after meaningful step/task/blocker/commit/push/CI/package milestones, and at least every 10 minutes during sustained work without a natural milestone. Meaningful checkpoints carry reconstruction-grade `resumeContext`; a short summary alone is not enough for reliable resume.
+- **Acceptance:** `update_goal_acceptance` records explicit completion evidence. `finish_goal(status=completed)` is rejected while any criterion is still pending or blocked; Engineering Harness goals must also satisfy their required gates and blocking review findings.
 - **Newest intent wins:** `revise_goal_intent` increments `userIntentRevision`; stale checkpoints or delivery receipts from older accepted user intent are fenced/retired rather than replayed.
 - **Context Capsule:** `create_context_capsule` stores a bounded immutable objective/decision/result summary for compact/resume or handoff. It stores task state, not private chain-of-thought, and does not drive ChatGPT through browser/DOM automation.
 - **Pressure + iteration:** `context_pressure` reports a local estimate when exact provider usage is unavailable, while `advance_goal_iteration` is explicitly bounded by `maxIterations` and can stop when no new evidence appears.
+- **Completion hygiene:** after watchdog cleanup and `finish_goal`, read `get_goal` and confirm a terminal status before reporting completion. Reconcile stale duplicate, superseded, or abandoned Goal cards when authoritative evidence shows they no longer represent live work; completed work must not remain Active in Watcher.
 
 ภาษาไทยแบบสั้น: v5 แยก **plan / acceptance / user intent / context capsule / bounded iteration** ออกจากกันชัดเจน โดย Durable Goal ยังเป็น source of truth เพียงชุดเดียว ถ้าผู้ใช้เปลี่ยนคำสั่งใหม่ งานเก่าต้องแพ้ revision ใหม่ และ Context Capsule ใช้เก็บสรุปสถานะเพื่อกลับมาทำต่อ ไม่ใช่เก็บ chain-of-thought หรือใช้ browser ไปสร้างแชทใหม่เอง
 

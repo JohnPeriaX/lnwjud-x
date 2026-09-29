@@ -451,10 +451,19 @@ For clients that do not expose `$skill-name` syntax, ask the agent to call
 `skills_list`, choose the source-qualified `lnwjud-scheduled-continuation`
 result, call `skills_read`, and follow that skill. The first run creates or
 resumes the durable goal and prepares exactly one hourly recurring Native
-ChatGPT cloud watchdog. Ordinary checkpoints keep useful work moving on the
-current lease; they do not create or retime Scheduled Tasks. A request to stop
-future scheduling cancels only that watchdog; the current worker must still
-inspect blocking task results and finish the durable goal truthfully.
+ChatGPT cloud watchdog. The Durable Goal remains the authoritative work state;
+when plan or step progress changes, `update_goal_plan` updates that same durable
+plan so Watcher presents the current plan/progress rather than a stale shadow.
+Call `checkpoint_goal` immediately after meaningful step/task/blocker/commit/
+push/hosted-CI/package milestones, and refresh at least every 10 minutes during
+sustained work with no natural milestone. Meaningful checkpoints and handoffs
+must carry reconstruction-grade `resumeContext` (changed files, exact commands
+and results, decisions, failed attempts, pending validation, prerequisites,
+state facts, and artifacts); a short summary alone is not sufficient.
+Ordinary checkpoints keep useful work moving on the current lease; they do not
+create or retime Scheduled Tasks and are not a reason to stop the worker. A
+request to stop future scheduling cancels only that watchdog; the current worker
+must still inspect blocking task results and finish the durable goal truthfully.
 
 Every recurring wake must call `claim_scheduled_continuation` before any
 workspace mutation. `recurring_acquired` returns the current goal lease and
@@ -468,7 +477,8 @@ stale-heartbeat grace has passed. Ordinary wakes never create a successor,
 consume the recurring task, or retime its hourly cadence.
 
 v5.0.0 adds a richer durable state model around that watchdog. `get_goal_plan`
-projects the authoritative plan, `update_goal_acceptance` records explicit
+projects the authoritative plan, `update_goal_plan` updates that same plan and
+its Watcher-visible progress, `update_goal_acceptance` records explicit
 completion evidence, and `revise_goal_intent` increments `userIntentRevision`
 so older generated work cannot outrank newer accepted user steering. Bounded
 immutable Context Capsules can summarize objective, decisions, validation,
@@ -483,11 +493,19 @@ A Native Scheduled Task host failure such as unavailable, unsupported, or
 work outcome. Keep the goal active when useful work remains, record host state
 truthfully, and never substitute Windows Task Scheduler, the lnwjud local
 scheduler, cron, shell timers, another provider, or browser/DOM automation.
+A concrete fixable CI, test, build, packaging, release-validation, or tool
+failure is the next unit of work: inspect the exact failure, diagnose and repair
+the root cause, and run the relevant validation in the same host turn while safe
+useful actions remain instead of ending with a status-only report.
 `finish_goal(status: completed)` remains guarded: all plan steps and acceptance
-criteria must be complete, durable blockers must be empty, and no blocking task
-may remain tracked. Before terminal completion, make the exact native watchdog
-non-runnable using the strongest host operation actually exposed, record
-truthful cleanup evidence, then verify `get_goal` is terminal.
+criteria must be complete, durable blockers must be empty, no blocking task may
+remain tracked, and Engineering Harness goals must have every required gate and
+blocking review finding resolved from real evidence. Before terminal completion,
+make the exact native watchdog non-runnable using the strongest host operation
+actually exposed and record truthful cleanup evidence. Reconcile stale duplicate,
+superseded, or abandoned Goal cards when authoritative evidence shows the work is
+no longer live. After `finish_goal`, verify `get_goal` is terminal before
+reporting completion; completed work must not remain Active in Watcher.
 
 Full Bypass does not bypass durable-goal ownership. A stale, missing, expired,
 or generation-mismatched `goalLease` is rejected before file, Git, process,
