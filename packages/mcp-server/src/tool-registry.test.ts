@@ -1103,7 +1103,7 @@ describe('MCP tool registry', () => {
     expect(listGoals).not.toHaveBeenCalled();
   });
 
-  it('requires Engineering preflight for enabled coding mutations even under Full Bypass', async () => {
+  it('permits unconstrained coding mutations under Full Bypass when no Engineering task is bound', async () => {
     const editFile = vi.fn(async () => ok({ path: 'src/app.ts', replacements: 1, bytesWritten: 1, checkpointId: 'checkpoint-1' }));
     const prepare = vi.fn(async () => ok({ policy: { enabled: true, policyDigest: 'digest-1' } } as never));
     const listGoals = vi.fn(async () => ok({ goals: [] }));
@@ -1114,6 +1114,25 @@ describe('MCP tool registry', () => {
     }, actor, {
       profileProvider: (): PermissionProfile => permissionProfiles.full,
       authorizationModeProvider: (): 'full_bypass' => 'full_bypass',
+    });
+
+    await expect(registry.invoke('edit_file', {
+      workspaceId: 'workspace-a', path: 'src/app.ts', oldText: 'old', newText: 'new',
+    })).resolves.not.toMatchObject({ isError: true });
+    expect(editFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires Engineering preflight for enabled coding mutations when Full Bypass is off', async () => {
+    const editFile = vi.fn(async () => ok({ path: 'src/app.ts', replacements: 1, bytesWritten: 1, checkpointId: 'checkpoint-1' }));
+    const prepare = vi.fn(async () => ok({ policy: { enabled: true, policyDigest: 'digest-1' } } as never));
+    const listGoals = vi.fn(async () => ok({ goals: [] }));
+    const registry = new ToolRegistry({
+      file: { editFile } as never,
+      engineeringPreparation: { prepare } as never,
+      goals: { listGoals } as never,
+    }, actor, {
+      profileProvider: (): PermissionProfile => permissionProfiles.full,
+      authorizationModeProvider: (): 'standard' => 'standard',
     });
 
     await expect(registry.invoke('edit_file', {
@@ -1309,19 +1328,38 @@ describe('MCP tool registry', () => {
       goals: { validateGoalLease } as never,
     }, actor, {
       profileProvider: (): PermissionProfile => permissionProfiles.full,
-      authorizationModeProvider: (): 'full_bypass' => 'full_bypass',
+      authorizationModeProvider: (): 'standard' => 'standard',
+      hostMutationApprovalProvider: async (): Promise<boolean> => true,
+    });
+
+    await expect(registry.invoke('shell', {
+      workspaceId: 'workspace-a', operation: 'run', executable: 'node', arguments: ['script.js'],
+    })).resolves.toMatchObject({ isError: true, structuredContent: { error: { code: 'ENGINEERING_PREFLIGHT_REQUIRED' } } });
+    await expect(registry.invoke('shell', {
+      workspaceId: 'workspace-a', operation: 'run', executable: 'node', arguments: ['script.js'],
+      engineeringTask: { goalId: 'engineering-goal-1', policyDigest: 'digest-1', goalRevision: 2, userIntentRevision: 0 },
+      goalLease: { goalId: 'engineering-goal-1', leaseToken: 'lease-token-1', leaseGeneration: 4 },
+    })).resolves.not.toMatchObject({ isError: true });
+    await expect(registry.invoke('mcp_call', { server: 'child', tool: 'write_file', arguments: { path: 'x' }, userConfirmed: true })).resolves.not.toMatchObject({ isError: true });
+    expect(calls).toEqual(['shell', 'mcp_call']);
+  });
+
+  it('permits read-only inspection commands like node --version without Engineering preflight', async () => {
+    const calls: string[] = [];
+    const prepare = vi.fn(async () => ok({ policy: { enabled: true, policyDigest: 'digest-1' } } as never));
+    const registry = new ToolRegistry({
+      capabilities: { async execute(tool): Promise<ReturnType<typeof ok>> { calls.push(tool); return ok({ ok: true }); } },
+      engineeringPreparation: { prepare } as never,
+    }, actor, {
+      profileProvider: (): PermissionProfile => permissionProfiles.full,
+      authorizationModeProvider: (): 'standard' => 'standard',
     });
 
     await expect(registry.invoke('shell', {
       workspaceId: 'workspace-a', operation: 'run', executable: 'node', arguments: ['--version'],
-    })).resolves.toMatchObject({ isError: true, structuredContent: { error: { code: 'ENGINEERING_PREFLIGHT_REQUIRED' } } });
-    await expect(registry.invoke('shell', {
-      workspaceId: 'workspace-a', operation: 'run', executable: 'node', arguments: ['--version'],
-      engineeringTask: { goalId: 'engineering-goal-1', policyDigest: 'digest-1', goalRevision: 2, userIntentRevision: 0 },
-      goalLease: { goalId: 'engineering-goal-1', leaseToken: 'lease-token-1', leaseGeneration: 4 },
     })).resolves.not.toMatchObject({ isError: true });
-    await expect(registry.invoke('mcp_call', { server: 'child', tool: 'write_file', arguments: { path: 'x' } })).resolves.not.toMatchObject({ isError: true });
-    expect(calls).toEqual(['shell', 'mcp_call']);
+    expect(calls).toEqual(['shell']);
+    expect(prepare).not.toHaveBeenCalled();
   });
 
   it('requires explicit Engineering task identity when multiple active tasks exist and isolates workspaces', async () => {
@@ -1338,7 +1376,7 @@ describe('MCP tool registry', () => {
       goals: { validateGoalLease } as never,
     }, actor, {
       profileProvider: (): PermissionProfile => permissionProfiles.full,
-      authorizationModeProvider: (): 'full_bypass' => 'full_bypass',
+      authorizationModeProvider: (): 'standard' => 'standard',
     });
     const base = { workspaceId: 'workspace-a', path: 'src/app.ts', oldText: 'old', newText: 'new' };
 
@@ -1353,6 +1391,10 @@ describe('MCP tool registry', () => {
     })).resolves.not.toMatchObject({ isError: true });
     await expect(registry.invoke('edit_file', {
       ...base,
+      goalLease: { goalId: 'engineering-goal-a2', leaseToken: 'lease-token-a2', leaseGeneration: 2 },
+    })).resolves.not.toMatchObject({ isError: true });
+    await expect(registry.invoke('edit_file', {
+      ...base,
       workspaceId: 'workspace-b',
       engineeringTask: { goalId: 'engineering-goal-a1', policyDigest: 'digest-1', goalRevision: 2, userIntentRevision: 0 },
       goalLease: { goalId: 'engineering-goal-a1', leaseToken: 'lease-token-a1', leaseGeneration: 2 },
@@ -1360,7 +1402,7 @@ describe('MCP tool registry', () => {
       isError: true,
       structuredContent: { error: { code: 'ENGINEERING_PREFLIGHT_REQUIRED' } },
     });
-    expect(editFile).toHaveBeenCalledTimes(1);
+    expect(editFile).toHaveBeenCalledTimes(2);
   });
 
   it('propagates Full Bypass through the real local capability dispatcher and shell backend', async () => {

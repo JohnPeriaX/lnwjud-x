@@ -4,7 +4,7 @@ const ALWAYS_READ_ONLY_GIT_SUBCOMMANDS = new Set([
   'for-each-ref', 'fsck', 'grep', 'help', 'log', 'ls-files', 'ls-remote',
   'ls-tree', 'merge-base', 'name-rev', 'rev-list', 'rev-parse', 'show',
   'show-branch', 'show-ref', 'status', 'verify-commit', 'verify-pack',
-  'verify-tag', 'whatchanged',
+  'verify-tag', 'version', 'whatchanged',
 ]);
 
 const AGENT_ALLOWED_GIT_SUBCOMMANDS = new Set([

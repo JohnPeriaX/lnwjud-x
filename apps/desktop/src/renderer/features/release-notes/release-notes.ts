@@ -21,6 +21,72 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.7.2',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          {
+            id: 'engineering-harness-developer-autonomy',
+            titleKey: 'whatsNew.572.developerAutonomy.title',
+            descriptionKey: 'whatsNew.572.developerAutonomy.description',
+            badge: 'improved',
+            tags: ['Engineering Harness', 'Full Bypass', 'Developer Autonomy', 'read-only commands'],
+          },
+          {
+            id: 'engineering-tools-catalog-exposure',
+            titleKey: 'whatsNew.572.engineeringCatalog.title',
+            descriptionKey: 'whatsNew.572.engineeringCatalog.description',
+            badge: 'fixed',
+            tags: ['Engineering Harness', 'tool_search', 'tool_describe', 'goalLease'],
+          },
+        ],
+      },
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          {
+            id: 'engineering-harness-settings-persistence',
+            titleKey: 'whatsNew.572.engineeringSettingsPersistence.title',
+            descriptionKey: 'whatsNew.572.engineeringSettingsPersistence.description',
+            badge: 'fixed',
+            tags: ['Engineering Harness', 'Settings', 'restart', 'preload'],
+          },
+          {
+            id: 'prosemirror-contenteditable-typing',
+            titleKey: 'whatsNew.572.proseMirrorTyping.title',
+            descriptionKey: 'whatsNew.572.proseMirrorTyping.description',
+            badge: 'fixed',
+            tags: ['dom_cdp', 'ProseMirror', 'contenteditable', 'Input.insertText'],
+          },
+          {
+            id: 'git-image-preview',
+            titleKey: 'whatsNew.572.gitImagePreview.title',
+            descriptionKey: 'whatsNew.572.gitImagePreview.description',
+            badge: 'new',
+            tags: ['Git', 'image preview', 'binary diff', 'HEAD', 'Index', 'Working Tree'],
+          },
+          {
+            id: 'durable-goal-progress-freshness',
+            titleKey: 'whatsNew.572.goalFreshness.title',
+            descriptionKey: 'whatsNew.572.goalFreshness.description',
+            badge: 'improved',
+            tags: ['Durable Goal', 'checkpoint', 'Watcher', 'progress', 'CI'],
+          },
+          {
+            id: 'tunnel-transient-inventory-retry',
+            titleKey: 'whatsNew.572.tunnelInventoryRetry.title',
+            descriptionKey: 'whatsNew.572.tunnelInventoryRetry.description',
+            badge: 'fixed',
+            tags: ['Secure MCP Tunnel', 'Windows', 'PowerShell', 'retry', 'process inventory'],
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.7.1',
     categories: [
       {

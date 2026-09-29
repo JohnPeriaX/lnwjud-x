@@ -377,6 +377,9 @@ function userSettings(value: unknown): UserSettings {
     codexToolsEnabled: booleanField(value, 'codexToolsEnabled'),
     eccEnabled: value.eccEnabled === undefined ? false : booleanField(value, 'eccEnabled'),
     ponytailMode: ponytailModeResponse(value.ponytailMode),
+    ...(value.engineeringHarness === undefined ? {} : { engineeringHarness: engineeringHarnessSettingsResponse(value.engineeringHarness) }),
+    ...(value.engineeringHarnessWorkspaceOverrides === undefined ? {} : { engineeringHarnessWorkspaceOverrides: engineeringHarnessWorkspaceOverridesResponse(value.engineeringHarnessWorkspaceOverrides) }),
+    ...(value.engineeringHarnessDiagnostic === undefined ? {} : { engineeringHarnessDiagnostic: engineeringHarnessDiagnosticResponse(value.engineeringHarnessDiagnostic) }),
     updateAutoCheck: booleanField(value, 'updateAutoCheck'),
     updateCheckOnStartup: booleanField(value, 'updateCheckOnStartup'),
     updateIntervalMinutes: integerField(value, 'updateIntervalMinutes'),
@@ -408,8 +411,67 @@ function userSettings(value: unknown): UserSettings {
   };
 }
 
+function gitImagePreviewResponse(value: unknown): NonNullable<GetGitDiffResponse['oldImage']> {
+  if (!isRecord(value) || typeof value.mimeType !== 'string' || !value.mimeType.startsWith('image/')
+    || typeof value.dataBase64 !== 'string' || !Number.isInteger(value.byteLength) || (value.byteLength as number) < 0) {
+    throw new Error('Invalid IPC response');
+  }
+  return { mimeType: value.mimeType, dataBase64: value.dataBase64, byteLength: value.byteLength as number };
+}
+
 function permissionDecisionResponse(value: unknown): 'ALLOW' | 'ASK' | 'DENY' {
   if (value === 'ALLOW' || value === 'ASK' || value === 'DENY') return value;
+  throw new Error('Invalid IPC response');
+}
+
+function engineeringHarnessSettingsResponse(value: unknown): NonNullable<UserSettings['engineeringHarness']> {
+  if (!isRecord(value)
+    || Object.keys(value).some((key) => !['schemaVersion', 'enabled', 'profile', 'applyTo', 'autoProjectAssessment', 'custom'].includes(key))
+    || value.schemaVersion !== 1
+    || typeof value.enabled !== 'boolean'
+    || (value.profile !== 'standard' && value.profile !== 'senior' && value.profile !== 'strict' && value.profile !== 'custom')
+    || (value.applyTo !== 'coding_projects' && value.applyTo !== 'all_workspaces')
+    || typeof value.autoProjectAssessment !== 'boolean') throw new Error('Invalid IPC response');
+  const custom = value.custom;
+  if (custom !== undefined && (!isRecord(custom)
+    || Object.keys(custom).some((key) => !['analysis', 'review', 'validation', 'docsImpactCheck'].includes(key))
+    || (custom.analysis !== 'focused' && custom.analysis !== 'cross_file')
+    || (custom.review !== 'risk_based' && custom.review !== 'always')
+    || (custom.validation !== 'risk_based' && custom.validation !== 'strict')
+    || typeof custom.docsImpactCheck !== 'boolean')) throw new Error('Invalid IPC response');
+  return {
+    schemaVersion: 1,
+    enabled: value.enabled,
+    profile: value.profile,
+    applyTo: value.applyTo,
+    autoProjectAssessment: value.autoProjectAssessment,
+    ...(custom === undefined ? {} : { custom: {
+      analysis: custom.analysis as 'focused' | 'cross_file',
+      review: custom.review as 'risk_based' | 'always',
+      validation: custom.validation as 'risk_based' | 'strict',
+      docsImpactCheck: custom.docsImpactCheck as boolean,
+    } }),
+  };
+}
+
+function engineeringHarnessWorkspaceOverridesResponse(value: unknown): NonNullable<UserSettings['engineeringHarnessWorkspaceOverrides']> {
+  if (!isRecord(value) || Object.keys(value).length > 256) throw new Error('Invalid IPC response');
+  const result: Record<string, { readonly mode: 'on' | 'off'; readonly profile?: 'standard' | 'senior' | 'strict' | 'custom' }> = {};
+  for (const [workspaceId, entry] of Object.entries(value)) {
+    if (workspaceId.trim().length === 0 || workspaceId.length > 128 || !isRecord(entry)
+      || (entry.mode !== 'on' && entry.mode !== 'off')
+      || Object.keys(entry).some((key) => key !== 'mode' && key !== 'profile')
+      || (entry.profile !== undefined && entry.profile !== 'standard' && entry.profile !== 'senior' && entry.profile !== 'strict' && entry.profile !== 'custom')) {
+      throw new Error('Invalid IPC response');
+    }
+    result[workspaceId] = { mode: entry.mode, ...(entry.profile === undefined ? {} : { profile: entry.profile }) };
+  }
+  return result;
+}
+
+function engineeringHarnessDiagnosticResponse(value: unknown): Exclude<UserSettings['engineeringHarnessDiagnostic'], undefined> {
+  if (value === null) return null;
+  if (value === 'invalid_json' || value === 'invalid_shape' || value === 'unsupported_schema_version') return value;
   throw new Error('Invalid IPC response');
 }
 
@@ -1579,6 +1641,9 @@ const api: LnwjudApi = {
         truncated: booleanField(value, 'truncated'),
         ...(typeof value.oldContent === 'string' ? { oldContent: value.oldContent } : {}),
         ...(typeof value.newContent === 'string' ? { newContent: value.newContent } : {}),
+        ...(value.oldImage === undefined ? {} : { oldImage: gitImagePreviewResponse(value.oldImage) }),
+        ...(value.newImage === undefined ? {} : { newImage: gitImagePreviewResponse(value.newImage) }),
+        ...(value.imagePreviewError === 'too_large' || value.imagePreviewError === 'unsupported' ? { imagePreviewError: value.imagePreviewError } : {}),
         ...(typeof value.additions === 'number' ? { additions: value.additions } : {}),
         ...(typeof value.deletions === 'number' ? { deletions: value.deletions } : {}),
       };

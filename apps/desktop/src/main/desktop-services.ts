@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createServer } from 'node:net';
 import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
@@ -45,6 +46,7 @@ import {
   ActivityTracker,
   LNWJUD_MCP_IDENTITY_PATH,
   RuntimeEngineeringEvidenceVerifier,
+  createEngineeringSourceStateProvider,
   RuntimeGoalManagedTaskStateReader,
   createFileActivitySink,
   mcpActivityLogPath,
@@ -138,6 +140,7 @@ import {
   type GetToolCatalogRequest,
   type GetGitDiffRequest,
   type GetGitDiffResponse,
+  type GitImagePreview,
   type RecheckToolCatalogRequest,
   type SetToolAvailabilityRequest,
   type ResetToolAvailabilityRequest,
@@ -217,6 +220,7 @@ const actor: FileActor = { clientId: 'desktop-renderer', clientName: `${APP_NAME
 const mcpActor: FileActor = { clientId: 'desktop-mcp-http', clientName: `${APP_NAME} desktop MCP` };
 const BUNDLED_TUNNEL_CLIENT_VERSION = runtimeDependencies.tunnelClient.version;
 const MAX_GIT_DIFF_FALLBACK_BYTES = 2 * 1024 * 1024;
+const MAX_GIT_IMAGE_PREVIEW_BYTES = 4 * 1024 * 1024;
 const permissionSettingKey = 'permission_profile';
 const selectedWorkspaceSettingKey = 'selected_workspace_id';
 const activeWorkspaceIdsSettingKey = 'active_workspace_ids';
@@ -609,8 +613,9 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
       shell: capabilityRuntime.shell,
     }),
   });
+  const engineeringSourceState = createEngineeringSourceStateProvider(async (workspaceId, args) => gitService.run(actor, { workspaceId, args }));
   const goalService = new GoalContinuationService(workspaceRepository, goalRepository, {
-    engineeringEvidenceVerifier: new RuntimeEngineeringEvidenceVerifier({ process: processService, shell: capabilityRuntime.shell }),
+    engineeringEvidenceVerifier: new RuntimeEngineeringEvidenceVerifier({ process: processService, shell: capabilityRuntime.shell, sourceState: engineeringSourceState }),
     scheduledContinuations: goalRepository,
     workerLiveness: goalMutationFence,
     taskCancellation,
@@ -2005,9 +2010,11 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
       });
       if (statResult.ok && statResult.value.exitCode === 0) applyNumstat(numstat, statResult.value.stdout);
       const stats = numstat.get(relativePath);
+      const imagePreview = await readGitImagePreview(workspace.realRootPath, relativePath, request.staged === true, patch, resolved.realPath);
 
       let newContent: string | undefined;
-      if (!patch && resolved.exists && resolved.realPath !== undefined) {
+      if (imagePreview.oldImage === undefined && imagePreview.newImage === undefined && imagePreview.error === undefined
+        && !patch && resolved.exists && resolved.realPath !== undefined) {
         const bounded = await readBoundedGitTextFile(resolved.realPath);
         if (bounded !== null) {
           newContent = bounded;
@@ -2021,6 +2028,9 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
         patch,
         truncated,
         ...(newContent !== undefined ? { newContent } : {}),
+        ...(imagePreview.oldImage === undefined ? {} : { oldImage: imagePreview.oldImage }),
+        ...(imagePreview.newImage === undefined ? {} : { newImage: imagePreview.newImage }),
+        ...(imagePreview.error === undefined ? {} : { imagePreviewError: imagePreview.error }),
         ...(stats === undefined ? {} : { additions: stats.additions, deletions: stats.deletions }),
       };
     },
@@ -2369,6 +2379,130 @@ async function assertWorkspaceRelinkable(workspace: Workspace): Promise<void> {
   } catch {
     throw new Error('Workspace was restored from another host; add or relink a local directory before activating it');
   }
+}
+
+const gitImageMimeByExtension: Readonly<Record<string, string>> = {
+  '.png': 'image/png', '.apng': 'image/apng', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.jpe': 'image/jpeg', '.jfif': 'image/jpeg',
+  '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp', '.dib': 'image/bmp', '.ico': 'image/x-icon', '.cur': 'image/x-icon',
+  '.svg': 'image/svg+xml', '.svgz': 'image/svg+xml', '.avif': 'image/avif', '.heic': 'image/heic', '.heif': 'image/heif',
+  '.tif': 'image/tiff', '.tiff': 'image/tiff', '.psd': 'image/vnd.adobe.photoshop', '.jp2': 'image/jp2', '.j2k': 'image/jp2', '.jxl': 'image/jxl',
+  '.dds': 'image/vnd-ms.dds', '.tga': 'image/x-tga', '.exr': 'image/x-exr', '.hdr': 'image/vnd.radiance', '.qoi': 'image/qoi',
+  '.pbm': 'image/x-portable-bitmap', '.pgm': 'image/x-portable-graymap', '.ppm': 'image/x-portable-pixmap', '.pnm': 'image/x-portable-anymap',
+  '.dng': 'image/x-adobe-dng', '.raw': 'image/x-raw', '.cr2': 'image/x-canon-cr2', '.cr3': 'image/x-canon-cr3', '.nef': 'image/x-nikon-nef',
+  '.nrw': 'image/x-nikon-nrw', '.arw': 'image/x-sony-arw', '.orf': 'image/x-olympus-orf', '.rw2': 'image/x-panasonic-rw2', '.raf': 'image/x-fuji-raf',
+  '.pef': 'image/x-pentax-pef', '.x3f': 'image/x-sigma-x3f',
+};
+
+type GitImageBytes = Buffer | null | 'too_large';
+
+async function readGitImagePreview(
+  repositoryPath: string,
+  relativePath: string,
+  staged: boolean,
+  patch: string,
+  workingTreePath: string | undefined,
+): Promise<{ oldImage?: GitImagePreview; newImage?: GitImagePreview; error?: 'too_large' | 'unsupported' }> {
+  const pathMime = gitImageMimeByExtension[path.extname(relativePath).toLowerCase()];
+  const workingTreeMime = !staged && patch.length === 0 && pathMime === undefined
+    ? await sniffWorkingTreeImageMime(workingTreePath)
+    : undefined;
+  const patchSuggestsImage = patch.includes('Binary files ') || patch.toLowerCase().includes('<svg');
+  if (pathMime === undefined && workingTreeMime === undefined && !patchSuggestsImage) return {};
+
+  const oldBytes = await readGitImageBytes(repositoryPath, staged ? `HEAD:${relativePath}` : `:${relativePath}`);
+  const newBytes = staged
+    ? await readGitImageBytes(repositoryPath, `:${relativePath}`)
+    : await readWorkingTreeImageBytes(workingTreePath);
+  const oldMime = Buffer.isBuffer(oldBytes) ? detectImageMime(oldBytes, pathMime) : undefined;
+  const newMime = Buffer.isBuffer(newBytes) ? detectImageMime(newBytes, pathMime ?? workingTreeMime) : undefined;
+  const isImage = oldMime !== undefined || newMime !== undefined || pathMime !== undefined || workingTreeMime !== undefined;
+  if (!isImage) return {};
+  if (oldBytes === 'too_large' || newBytes === 'too_large') return { error: 'too_large' };
+  const oldImage = Buffer.isBuffer(oldBytes) && oldMime !== undefined ? gitImagePreview(oldBytes, oldMime) : undefined;
+  const newImage = Buffer.isBuffer(newBytes) && newMime !== undefined ? gitImagePreview(newBytes, newMime) : undefined;
+  return {
+    ...(oldImage === undefined ? {} : { oldImage }),
+    ...(newImage === undefined ? {} : { newImage }),
+    ...(oldImage === undefined && newImage === undefined ? { error: 'unsupported' as const } : {}),
+  };
+}
+
+function gitImagePreview(bytes: Buffer, mimeType: string): GitImagePreview {
+  return { mimeType, dataBase64: bytes.toString('base64'), byteLength: bytes.byteLength };
+}
+
+function detectImageMime(bytes: Buffer, pathMime: string | undefined): string | undefined {
+  if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.length >= 6 && (bytes.subarray(0, 6).toString('ascii') === 'GIF87a' || bytes.subarray(0, 6).toString('ascii') === 'GIF89a')) return 'image/gif';
+  if (bytes.length >= 12 && bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  if (bytes.length >= 2 && bytes.subarray(0, 2).toString('ascii') === 'BM') return 'image/bmp';
+  if (bytes.length >= 4 && bytes[0] === 0 && bytes[1] === 0 && (bytes[2] === 1 || bytes[2] === 2) && bytes[3] === 0) return 'image/x-icon';
+  if (bytes.length >= 12 && bytes.subarray(4, 8).toString('ascii') === 'ftyp') {
+    const brand = bytes.subarray(8, 12).toString('ascii');
+    if (brand === 'avif' || brand === 'avis') return 'image/avif';
+    if (brand === 'heic' || brand === 'heix' || brand === 'hevc' || brand === 'hevx' || brand === 'mif1' || brand === 'msf1') return 'image/heif';
+  }
+  const prefix = bytes.subarray(0, Math.min(bytes.length, 512)).toString('utf8').replace(/^\uFEFF/, '').trimStart().toLowerCase();
+  if (prefix.startsWith('<svg') || (prefix.startsWith('<?xml') && prefix.includes('<svg'))) return 'image/svg+xml';
+  return pathMime;
+}
+
+async function sniffWorkingTreeImageMime(filePath: string | undefined): Promise<string | undefined> {
+  if (filePath === undefined) return undefined;
+  let handle: Awaited<ReturnType<typeof open>> | undefined;
+  try {
+    handle = await open(filePath, 'r');
+    const sample = Buffer.alloc(512);
+    const { bytesRead } = await handle.read(sample, 0, sample.byteLength, 0);
+    return detectImageMime(sample.subarray(0, bytesRead), undefined);
+  } catch {
+    return undefined;
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+}
+
+async function readWorkingTreeImageBytes(filePath: string | undefined): Promise<GitImageBytes> {
+  if (filePath === undefined) return null;
+  try {
+    const metadata = statSync(filePath);
+    if (!metadata.isFile()) return null;
+    if (metadata.size > MAX_GIT_IMAGE_PREVIEW_BYTES) return 'too_large';
+    return await readFile(filePath);
+  } catch {
+    return null;
+  }
+}
+
+async function readGitImageBytes(repositoryPath: string, objectSpec: string): Promise<GitImageBytes> {
+  return new Promise((resolve) => {
+    const child = spawn('git', ['show', '--no-textconv', objectSpec], {
+      cwd: repositoryPath,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+      shell: false,
+      windowsHide: true,
+    });
+    const chunks: Buffer[] = [];
+    let byteLength = 0;
+    let tooLarge = false;
+    child.stdout.on('data', (chunk: Buffer) => {
+      if (tooLarge) return;
+      byteLength += chunk.byteLength;
+      if (byteLength > MAX_GIT_IMAGE_PREVIEW_BYTES) {
+        tooLarge = true;
+        child.kill();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    child.on('error', () => resolve(null));
+    child.on('close', (exitCode) => {
+      if (tooLarge) resolve('too_large');
+      else if (exitCode !== 0) resolve(null);
+      else resolve(Buffer.concat(chunks));
+    });
+  });
 }
 
 async function readBoundedGitTextFile(filePath: string): Promise<string | null> {

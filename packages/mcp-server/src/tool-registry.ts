@@ -24,6 +24,7 @@ import {
   DEFAULT_DESTRUCTIVE_AUTO_APPROVAL_POLICY,
   DEFAULT_PONYTAIL_MODE,
   DEFAULT_TOOL_AVAILABILITY_SNAPSHOT,
+  isProvablyReadOnlyGitInvocation,
   parsePonytailMode,
   parsePonytailModeOverride,
   prohibitedAgentCommandReason,
@@ -518,8 +519,10 @@ export class ToolRegistry {
       }
       const mutationFenceWorkspaceId = mutationWorkspaceId ?? activeWorkspaceScope?.workspaceId ?? activityWorkspaceId;
       const codingMutation = mutationDecision.kind !== 'read' && isCodingMutation(tool.name, activeRoutedInput);
+      const isInformational = isInformationalCommandInvocation(tool.name, activeRoutedInput);
       const engineeringGuardedMutation = mutationDecision.kind !== 'read'
-        && ENGINEERING_GUARDED_MUTATION_TOOLS.has(tool.name);
+        && ENGINEERING_GUARDED_MUTATION_TOOLS.has(tool.name)
+        && !isInformational;
       if (engineeringGuardedMutation && mutationFenceWorkspaceId !== undefined) {
         const admission = await resolveEngineeringAdmission(
           this.services,
@@ -529,6 +532,7 @@ export class ToolRegistry {
           activeRoutedInput,
           engineeringTask,
           goalLease,
+          fullBypass,
         );
         if (!admission.ok) {
           const response = mapError(admission.error);
@@ -1363,8 +1367,10 @@ async function resolveEngineeringAdmission(
   toolInput: unknown,
   engineeringTask: EngineeringTaskBinding | undefined,
   goalLease: GoalLeaseProof | undefined,
+  fullBypass = false,
 ): Promise<Result<void>> {
   if (services.engineeringPreparation === undefined || services.goals === undefined) return ok(undefined);
+  if (fullBypass && engineeringTask === undefined) return ok(undefined);
   if (engineeringTask !== undefined && 'objective' in engineeringTask) {
     const preparedTask = await services.engineeringPreparation.prepare(workspaceId, engineeringTask.objective, engineeringTask.scopedPath);
     if (!preparedTask.ok) return err(preparedTask.error);
@@ -1401,6 +1407,19 @@ async function resolveEngineeringAdmission(
       return err(appError('ENGINEERING_PREFLIGHT_REQUIRED', 'This Engineering task or mutation target requires a durable Engineering task. Call engineering_start_task and retry with its durable engineeringTask binding.', true));
     }
     return ok(undefined);
+  }
+  if (engineeringTask === undefined && goalLease !== undefined) {
+    const validated = await services.goals.validateGoalLease(actor, { goalId: goalLease.goalId, leaseToken: goalLease.leaseToken });
+    if (validated.ok && validated.value.engineering !== undefined) {
+      engineeringTask = {
+        goalId: validated.value.goalId,
+        policyDigest: validated.value.engineering.policyDigest,
+        goalRevision: validated.value.revision,
+        userIntentRevision: validated.value.userIntentRevision,
+        ...(validated.value.engineering.scopedPath === undefined ? {} : { scopedPath: validated.value.engineering.scopedPath }),
+        ...(actor.sessionId === undefined ? {} : { sessionId: actor.sessionId }),
+      };
+    }
   }
   if (engineeringTask === undefined) {
     const prepared = await services.engineeringPreparation.prepare(workspaceId, `Modify software code through ${toolName}`);
@@ -1581,7 +1600,7 @@ function summarizeMutationForApproval(toolName: string, input: unknown, activeWo
       lines.push(`launchCount = ${taskIds.length}`);
       if (taskIds.length > 0) lines.push(`taskIds = ${JSON.stringify(taskIds)}`);
     }
-    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.7.1 enforces read-only child sandboxes.');
+    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.7.2 enforces read-only child sandboxes.');
     return boundedApprovalSummary(lines);
   }
   const projectKind = projectCommandKind(toolName);
@@ -1677,6 +1696,33 @@ function prohibitedInvocationReason(toolName: string, input: unknown): string | 
     if (executable !== undefined && args !== undefined) return prohibitedAgentCommandReason(executable, args);
   }
   return undefined;
+}
+
+function isInformationalCommandInvocation(toolName: string, input: unknown): boolean {
+  if (!isRecord(input)) return false;
+  if (toolName === 'git') {
+    const args = readStringArray(input.args) ?? [];
+    return isProvablyReadOnlyGitInvocation(args);
+  }
+  if (toolName === 'shell' || toolName === 'wsl_exec' || toolName === 'process_start') {
+    const executable = typeof input.executable === 'string' ? input.executable.trim() : '';
+    const args = readStringArray(input.arguments) ?? readStringArray(input.args) ?? [];
+    const basename = executable.replaceAll('\\', '/').split('/').at(-1)?.toLowerCase().replace(/\.(?:exe|cmd|bat|com)$/i, '') ?? '';
+    if (basename === 'echo' || basename === 'where' || basename === 'which' || basename === 'pwd') return true;
+    if (basename === 'cmd' && args.length >= 2 && args[0]?.toLowerCase() === '/c' && args[1]?.toLowerCase() === 'echo') return true;
+    if (args.length === 1 && ['--version', '-v', '-V', '--help', '-h', 'version', 'help'].includes(args[0]!.toLowerCase())) return true;
+    if (basename === 'git') return isProvablyReadOnlyGitInvocation(args);
+    if (basename === 'corepack' && args.length >= 2 && ['--version', '-v', '-V', '--help', '-h', 'version'].includes(args[args.length - 1]!.toLowerCase())) return true;
+    if (basename === 'gh') {
+      const lower = args.map((arg) => arg.toLowerCase());
+      if (lower.length >= 2 && ['run', 'issue', 'pr', 'release', 'workflow'].includes(lower[0]!) && ['list', 'view', 'status', 'watch'].includes(lower[1]!)) return true;
+    }
+    if (basename === 'codegraph') {
+      const lower = args.map((arg) => arg.toLowerCase());
+      if (lower.length >= 1 && ['explore', 'search', 'symbols', 'status', 'help', '--help', '-h'].includes(lower[0]!)) return true;
+    }
+  }
+  return false;
 }
 
 const LOCAL_MUTATION_TOOLS = new Set(['write_file', 'apply_patch', 'edit_file', 'move_file', 'copy_file', 'delete_file', 'restore_deleted_file', 'restore_recovery_item', 'restore_checkpoint', 'git', 'shell', 'wsl_exec', 'process_start', 'process_stop', 'codex_run', 'codex_stop', 'agent_swarm_run', 'office', 'office_ppt', 'docx_merge', 'git_worktree_spawn', 'git_worktree_remove', 'self_heal_apply', ...OFFICE_SEMANTIC_TOOL_NAMES]);

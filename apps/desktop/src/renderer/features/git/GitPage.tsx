@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react';
-import type { DashboardSnapshot, GitStatusEntrySummary, UiLocale, WorkspaceSummary } from '@lnwjud/ipc-contracts';
+import type { DashboardSnapshot, GitImagePreview, GitStatusEntrySummary, UiLocale, WorkspaceSummary } from '@lnwjud/ipc-contracts';
 import { createTranslator } from '../../i18n/index.js';
 import { SplitDiffViewer } from './SplitDiffViewer.js';
 
@@ -31,6 +31,9 @@ export function GitPage({
     patch: string;
     oldContent?: string;
     newContent?: string;
+    oldImage?: GitImagePreview;
+    newImage?: GitImagePreview;
+    imagePreviewError?: 'too_large' | 'unsupported';
     additions?: number;
     deletions?: number;
     loading: boolean;
@@ -55,6 +58,9 @@ export function GitPage({
         patch: res.patch,
         ...(res.oldContent !== undefined ? { oldContent: res.oldContent } : {}),
         ...(res.newContent !== undefined ? { newContent: res.newContent } : {}),
+        ...(res.oldImage !== undefined ? { oldImage: res.oldImage } : {}),
+        ...(res.newImage !== undefined ? { newImage: res.newImage } : {}),
+        ...(res.imagePreviewError !== undefined ? { imagePreviewError: res.imagePreviewError } : {}),
         ...(res.additions !== undefined ? { additions: res.additions } : {}),
         ...(res.deletions !== undefined ? { deletions: res.deletions } : {}),
         loading: false,
@@ -160,11 +166,15 @@ export function GitPage({
                   </div>
                 ) : null}
                 <SplitDiffViewer
+                  key={`${selectedFile.path}:${selectedStaged ? 'staged' : 'unstaged'}`}
                   locale={locale}
                   filePath={selectedFile.path}
                   patch={diffData?.patch ?? ''}
                   oldContent={diffData?.oldContent}
                   newContent={diffData?.newContent}
+                  oldImage={diffData?.oldImage}
+                  newImage={diffData?.newImage}
+                  imagePreviewError={diffData?.imagePreviewError}
                   additions={diffData?.additions}
                   deletions={diffData?.deletions}
                   oldLabel={selectedStaged ? 'HEAD' : 'Index'}

@@ -154,6 +154,9 @@ interface SelfHealFix {
 const PRIMITIVE_SEARCH_ENTRIES: readonly SearchCatalogEntry[] = [
   primitiveEntry('workspace_list', 'List registered workspaces.', 'READ', ['workspace', 'read']),
   primitiveEntry('workspace_tree', 'Read a bounded registered workspace tree.', 'READ', ['workspace', 'tree', 'read']),
+  primitiveEntry('engineering_prepare_task', 'Read-only Engineering Harness preparation. Assess the registered workspace, applicable project instructions, effective Engineering policy, and policy digest without creating a goal, starting a process, scheduling work, or writing repository files.', 'READ', ['engineering', 'harness', 'task', 'workflow', 'preflight', 'prepare']),
+  primitiveEntry('engineering_start_task', 'Start or resume a substantive Engineering Harness task by reusing the existing durable Goal authority. This operation does not create or authorize a scheduled continuation.', 'WRITE', ['engineering', 'harness', 'task', 'goal', 'workflow', 'start', 'resume']),
+  primitiveEntry('engineering_get_status', 'Read the current Engineering Harness task projection, effective policy, required gates, blockers, and truthful delivery boundary without changing goal state.', 'READ', ['engineering', 'harness', 'task', 'status', 'gates', 'workflow']),
   primitiveEntry('read_file', 'Read one guarded workspace file.', 'READ', ['workspace', 'file', 'read']),
   primitiveEntry('read_files', 'Read multiple guarded workspace files.', 'READ', ['workspace', 'file', 'read']),
   primitiveEntry('search_files', 'Search guarded workspace file paths.', 'READ', ['workspace', 'search', 'read']),
@@ -179,6 +182,39 @@ const SEARCH_CATALOG: readonly SearchCatalogEntry[] = dedupeSearchEntries([
 const SEARCH_ENTRY_INDEX: ReadonlyMap<string, SearchEntryIndex> = new Map(
   SEARCH_CATALOG.map((entry) => [entry.name, indexSearchEntry(entry)]),
 );
+
+const ENGINEERING_PRIMITIVE_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
+  engineering_prepare_task: {
+    type: 'object',
+    properties: {
+      workspaceId: { type: 'string', description: 'Workspace identifier' },
+      objective: { type: 'string', description: 'User objective or coding change description' },
+      scopedPath: { type: 'string', description: 'Optional relative path to scope assessment' },
+    },
+    required: ['workspaceId', 'objective'],
+    additionalProperties: false,
+  },
+  engineering_start_task: {
+    type: 'object',
+    properties: {
+      workspaceId: { type: 'string', description: 'Workspace identifier' },
+      goalKey: { type: 'string', description: 'Durable goal key' },
+      objective: { type: 'string', description: 'User objective or coding change description' },
+      scopedPath: { type: 'string', description: 'Optional relative path to scope task' },
+      leaseSeconds: { type: 'integer', minimum: 30, maximum: 600, description: 'Lease duration in seconds' },
+    },
+    required: ['workspaceId', 'goalKey', 'objective'],
+    additionalProperties: false,
+  },
+  engineering_get_status: {
+    type: 'object',
+    properties: {
+      goalId: { type: 'string', description: 'Durable goal identifier' },
+    },
+    required: ['goalId'],
+    additionalProperties: false,
+  },
+};
 
 export class UpgradeRuntimeService {
   private readonly contextEngine: ContextEngine;
@@ -661,10 +697,12 @@ export class UpgradeRuntimeService {
     if (entry === undefined) return { found: false, name: name ?? null };
     const upgradeEntry = UPGRADE_TOOL_CATALOG.find((candidate) => candidate.name === entry.name);
     if (upgradeEntry === undefined) {
+      const explicitSchema = ENGINEERING_PRIMITIVE_SCHEMAS[entry.name];
       return {
         found: true,
         ...entry,
-        schema: { type: 'object', additionalProperties: true },
+        schema: explicitSchema ?? { type: 'object', additionalProperties: true },
+        ...(explicitSchema === undefined ? {} : { inputSchema: explicitSchema }),
         contractSource: 'primitive-registry',
         authorizationUnchanged: true,
       };

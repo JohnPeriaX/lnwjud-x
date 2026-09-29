@@ -71,6 +71,49 @@ describe('preload Tool Catalog validation', () => {
     expect(electron.invoke).toHaveBeenLastCalledWith(ipcChannels.setUserSettings, { settings: enabled });
   });
 
+  it('preserves Engineering Harness settings through the preload bridge', async () => {
+    const enabled = {
+      ...userSettingsFixture,
+      engineeringHarness: {
+        schemaVersion: 1 as const,
+        enabled: true,
+        profile: 'senior' as const,
+        applyTo: 'coding_projects' as const,
+        autoProjectAssessment: true,
+      },
+      engineeringHarnessWorkspaceOverrides: {
+        'workspace-enabled': { mode: 'on' as const, profile: 'strict' as const },
+      },
+      engineeringHarnessDiagnostic: null,
+    };
+    electron.invoke.mockResolvedValueOnce({ settings: enabled, restartRequired: true });
+
+    await expect(electron.exposed!.setUserSettings({ settings: enabled })).resolves.toMatchObject({
+      settings: {
+        engineeringHarness: { enabled: true, profile: 'senior' },
+        engineeringHarnessWorkspaceOverrides: { 'workspace-enabled': { mode: 'on', profile: 'strict' } },
+        engineeringHarnessDiagnostic: null,
+      },
+      restartRequired: true,
+    });
+  });
+
+  it('preserves bounded Git image previews through the preload bridge', async () => {
+    electron.invoke.mockResolvedValueOnce({
+      path: 'assets/logo.png',
+      patch: '',
+      truncated: false,
+      oldImage: { mimeType: 'image/png', dataBase64: 'b2xk', byteLength: 3 },
+      newImage: { mimeType: 'image/png', dataBase64: 'bmV3', byteLength: 3 },
+    });
+
+    await expect(electron.exposed!.getGitDiff({ workspaceId: 'workspace-1', path: 'assets/logo.png', staged: true })).resolves.toMatchObject({
+      oldImage: { mimeType: 'image/png', dataBase64: 'b2xk', byteLength: 3 },
+      newImage: { mimeType: 'image/png', dataBase64: 'bmV3', byteLength: 3 },
+    });
+    expect(electron.invoke).toHaveBeenLastCalledWith(ipcChannels.getGitDiff, { workspaceId: 'workspace-1', path: 'assets/logo.png', staged: true });
+  });
+
   it('keeps ECC disabled when an older settings response omits eccEnabled', async () => {
     const legacySettings = { ...userSettingsFixture } as Record<string, unknown>;
     delete legacySettings.eccEnabled;

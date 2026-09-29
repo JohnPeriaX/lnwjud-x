@@ -1,8 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 import { appError, err, ok } from '@lnwjud/domain';
-import { RuntimeEngineeringEvidenceVerifier } from './engineering-evidence-verifier.js';
+import { RuntimeEngineeringEvidenceVerifier, createEngineeringSourceStateProvider, type EngineeringSourceState } from './engineering-evidence-verifier.js';
 
 describe('RuntimeEngineeringEvidenceVerifier', () => {
+  it('reads the current tracked source SHA and cleanliness through bounded read-only Git commands', async () => {
+    const commit = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const runGit = vi.fn(async (_workspaceId: string, args: readonly string[]) => args[0] === 'rev-parse'
+      ? ok({ exitCode: 0, stdout: `${commit}\n` })
+      : ok({ exitCode: 0, stdout: ' M tracked.ts\n' }));
+    const sourceState = createEngineeringSourceStateProvider(runGit);
+
+    await expect(sourceState('workspace-1')).resolves.toEqual({ commit, clean: false });
+    expect(runGit).toHaveBeenCalledWith('workspace-1', ['rev-parse', 'HEAD']);
+    expect(runGit).toHaveBeenCalledWith('workspace-1', ['status', '--porcelain=v1', '--untracked-files=no']);
+  });
+
   it('accepts only an actual successful host task in the same workspace', async () => {
     const process = { statusForGoalLiveness: vi.fn(async () => err(appError('PROCESS_NOT_FOUND', 'missing'))) };
     const shell = { statusForGoalLiveness: vi.fn(async (_workspaceId: string, taskId: string) => taskId === 'task-ok'
@@ -49,13 +61,98 @@ describe('RuntimeEngineeringEvidenceVerifier', () => {
     await expect(verifier.verify('workspace-1', { ...evidence, runId: 'unidentified' }, 'focused_validation')).resolves.toBe(false);
   });
 
-  it('does not treat a successful local command as hosted CI, target-platform, or package proof', async () => {
+  it('does not treat an arbitrary successful local command as hosted CI, target-platform, or package proof', async () => {
     const shell = { statusForGoalLiveness: vi.fn(async () => ok({ state: 'completed', exit_code: 0, executable: 'pnpm', arguments: ['test'] })) };
     const verifier = new RuntimeEngineeringEvidenceVerifier({ shell });
     const evidence = { source: 'host_observed' as const, observedAt: '2026-09-28T00:00:00Z', workspaceId: 'workspace-1', command: 'pnpm test', runId: 'task-ok', exitCode: 0 };
     for (const gateId of ['exact_sha_ci', 'cross_platform', 'package']) {
       await expect(verifier.verify('workspace-1', evidence, gateId)).resolves.toBe(false);
     }
-    expect(shell.statusForGoalLiveness).not.toHaveBeenCalled();
+  });
+
+  it('accepts exact-SHA CI and package proof only from the canonical self-verifying commands', async () => {
+    const commit = 'cbb9ac40cc6d1acfd0f66a0a2d62c25a8f3a1264';
+    const shell = { statusForGoalLiveness: vi.fn(async (_workspaceId: string, taskId: string) => taskId === 'ci-proof'
+      ? ok({
+          state: 'completed', exit_code: 0, executable: 'gh',
+          arguments: ['run', 'view', '36568935961', '--json', 'headSha,status,conclusion'],
+          stdout: JSON.stringify({ headSha: commit, status: 'completed', conclusion: 'success' }),
+        })
+      : ok({
+          state: 'completed', exit_code: 0, executable: 'node',
+          arguments: ['apps/desktop/scripts/verify-release-evidence.mjs'],
+          stdout: `Release evidence verified for lnwjud 5.7.2 win32/x64 commit ${commit}\n`,
+        })) };
+    const verifier = new RuntimeEngineeringEvidenceVerifier({
+      shell,
+      sourceState: async (): Promise<EngineeringSourceState> => ({ commit, clean: true }),
+    });
+
+    await expect(verifier.verify('workspace-1', {
+      source: 'host_observed', observedAt: '2026-09-29T00:00:00Z', workspaceId: 'workspace-1',
+      command: 'gh run view 36568935961 --json "headSha,status,conclusion"', runId: 'ci-proof', exitCode: 0, commit, conclusion: 'success',
+    }, 'exact_sha_ci')).resolves.toBe(true);
+    await expect(verifier.verify('workspace-1', {
+      source: 'host_observed', observedAt: '2026-09-29T00:00:00Z', workspaceId: 'workspace-1',
+      command: 'node apps/desktop/scripts/verify-release-evidence.mjs', runId: 'package-proof', exitCode: 0, commit,
+      artifact: 'apps/desktop/dist/installers/lnwjud-Setup-5.7.2.exe',
+    }, 'package')).resolves.toBe(true);
+    await expect(verifier.verify('workspace-1', {
+      source: 'host_observed', observedAt: '2026-09-29T00:00:00Z', workspaceId: 'workspace-1',
+      command: 'gh run view 36568935961 --json "headSha,status,conclusion"', runId: 'ci-proof', exitCode: 0,
+      commit: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', conclusion: 'success',
+    }, 'exact_sha_ci')).resolves.toBe(false);
+    await expect(verifier.verify('workspace-1', {
+      source: 'host_observed', observedAt: '2026-09-29T00:00:00Z', workspaceId: 'workspace-1',
+      command: 'node apps/desktop/scripts/verify-release-evidence.mjs', runId: 'package-proof', exitCode: 0, commit,
+    }, 'package')).resolves.toBe(false);
+  });
+
+  it('rejects historical exact-SHA CI or package proof when the current tracked source is dirty or at another commit', async () => {
+    const historicalCommit = 'cbb9ac40cc6d1acfd0f66a0a2d62c25a8f3a1264';
+    const currentCommit = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const shell = { statusForGoalLiveness: vi.fn(async (_workspaceId: string, taskId: string) => taskId === 'ci-proof'
+      ? ok({
+          state: 'completed', exit_code: 0, executable: 'gh',
+          arguments: ['run', 'view', '36568935961', '--json', 'headSha,status,conclusion'],
+          stdout: JSON.stringify({ headSha: historicalCommit, status: 'completed', conclusion: 'success' }),
+        })
+      : ok({
+          state: 'completed', exit_code: 0, executable: 'node',
+          arguments: ['apps/desktop/scripts/verify-release-evidence.mjs'],
+          stdout: `Release evidence verified for lnwjud 5.7.2 win32/x64 commit ${historicalCommit}\n`,
+        })) };
+    const historicalEvidence = {
+      source: 'host_observed' as const,
+      observedAt: '2026-09-29T00:00:00Z',
+      workspaceId: 'workspace-1',
+      exitCode: 0,
+      commit: historicalCommit,
+    };
+    const mismatched = new RuntimeEngineeringEvidenceVerifier({
+      shell,
+      sourceState: async (): Promise<EngineeringSourceState> => ({ commit: currentCommit, clean: true }),
+    });
+    const dirty = new RuntimeEngineeringEvidenceVerifier({
+      shell,
+      sourceState: async (): Promise<EngineeringSourceState> => ({ commit: historicalCommit, clean: false }),
+    });
+    const ciEvidence = {
+      ...historicalEvidence,
+      command: 'gh run view 36568935961 --json "headSha,status,conclusion"',
+      runId: 'ci-proof',
+      conclusion: 'success',
+    };
+    const packageEvidence = {
+      ...historicalEvidence,
+      command: 'node apps/desktop/scripts/verify-release-evidence.mjs',
+      runId: 'package-proof',
+      artifact: 'apps/desktop/dist/installers/lnwjud-Setup-5.7.2.exe',
+    };
+
+    await expect(mismatched.verify('workspace-1', ciEvidence, 'exact_sha_ci')).resolves.toBe(false);
+    await expect(mismatched.verify('workspace-1', packageEvidence, 'package')).resolves.toBe(false);
+    await expect(dirty.verify('workspace-1', ciEvidence, 'exact_sha_ci')).resolves.toBe(false);
+    await expect(dirty.verify('workspace-1', packageEvidence, 'package')).resolves.toBe(false);
   });
 });

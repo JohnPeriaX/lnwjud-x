@@ -18,6 +18,9 @@ describe('MCP Ponytail instructions', () => {
     expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).toContain('unless the user explicitly disabled scheduling');
     expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).not.toContain('lnwjud_o');
     expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).toContain('USER_INSTRUCTIONS');
+    expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).toContain('Goal freshness is user-visible state');
+    expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).toContain('at least every 10 minutes');
+    expect(MCP_OUTCOME_DRIVEN_INSTRUCTIONS).toContain('reconcile or finalize superseded/completed Goals promptly');
   });
 
   it('adds Engineering guidance only after an explicit Harness opt-in', () => {

@@ -24,6 +24,10 @@ Every rolling-mode workspace mutation must use the current `goalLease` token/gen
 
 A milestone checkpoint is durable reconstruction state, not a status blurb. For meaningful milestones and every handoff boundary, populate `resumeContext` with enough concrete state for a new worker to continue without guessing or repeating settled work: changed files, exact commands/results, decisions, failed attempts, pending validation, resume prerequisites, state facts, and artifacts. Keep blockers, tracked tasks, step status and next action truthful and current. `summary` is only a headline; never rely on summary text alone when detailed recovery facts exist. `session_handoff` must prefer durable goal + checkpoint resume context before Git diff or legacy trackers.
 
+Goal freshness is also a user-visible Watcher contract. While a durable Goal is active, call `checkpoint_goal` immediately after any plan step changes state, a blocking task becomes terminal, a blocker is added/resolved, or a commit, push, hosted-CI conclusion, package, deploy, release artifact, or other meaningful milestone becomes known. During sustained active work with no natural milestone, refresh `currentPhase`, `nextAction`, blockers, `trackedTasks`, and truthful step state at least every 10 minutes. Do not batch several already-finished steps into one late end-of-task checkpoint. Before any user-visible progress/final status, first make the durable Goal reflect all work already completed.
+
+Do not leave duplicate, abandoned, superseded, or completed work as stale active Goal cards. When authoritative liveness/evidence shows that one Goal has been incorporated into another, reconcile it promptly; when a Goal is genuinely complete, satisfy its acceptance criteria and finish it before reporting completion.
+
 ## Authoritative CI Watcher Policy
 
 When a GitHub Actions workflow must be monitored until completion, use one authoritative long-running background/durable watcher for the exact workflow run instead of repeated ad-hoc polling.

@@ -3,6 +3,7 @@ import {
   DEFAULT_GOAL_LEASE_SECONDS,
   MAX_GOAL_LEASE_SECONDS,
   MIN_GOAL_LEASE_SECONDS,
+  engineeringGoalMetadata,
 } from '@lnwjud/application';
 import { ok } from '@lnwjud/domain';
 import { rankSkillMatches, selectAutoSkillMatches } from '../skill-routing.js';
@@ -332,12 +333,53 @@ export function goalTools(context: McpToolContext): McpToolDefinition[] {
           ...(input.ponytailMode === undefined ? {} : { ponytailMode: input.ponytailMode }),
         });
         if (!result.ok) return result;
+        let currentResult = result.value;
+        let engineeringTask = currentResult.engineering !== undefined
+          ? {
+              goalId: currentResult.goalId,
+              policyDigest: currentResult.engineering.policyDigest,
+              goalRevision: currentResult.revision,
+              userIntentRevision: currentResult.userIntentRevision,
+              ...(currentResult.engineering.scopedPath === undefined ? {} : { scopedPath: currentResult.engineering.scopedPath }),
+              ...(context.actor.sessionId === undefined ? {} : { sessionId: context.actor.sessionId }),
+            }
+          : undefined;
+        if (engineeringTask === undefined && currentResult.acquired && context.services.engineeringPreparation !== undefined && input.objective !== undefined && goals.checkpointGoal !== undefined) {
+          const prep = await context.services.engineeringPreparation.prepare(input.workspaceId, input.objective);
+          if (prep.ok && prep.value.policy.enabled) {
+            const meta = engineeringGoalMetadata(prep.value.policy.policyDigest, prep.value.workflow);
+            const checkpointed = await goals.checkpointGoal(context.actor, {
+              goalId: currentResult.goalId,
+              leaseToken: currentResult.leaseToken!,
+              expectedRevision: currentResult.revision,
+              expectedUserIntentRevision: currentResult.userIntentRevision,
+              currentPhase: currentResult.currentPhase,
+              summary: 'Initialized Engineering Harness task binding.',
+              stepUpdates: [],
+              nextAction: currentResult.nextAction,
+              blockers: currentResult.blockers,
+              evidence: [],
+              trackedTasks: currentResult.trackedTasks,
+              engineering: meta,
+            });
+            if (checkpointed.ok) {
+              currentResult = { ...currentResult, ...checkpointed.value };
+              engineeringTask = {
+                goalId: currentResult.goalId,
+                policyDigest: meta.policyDigest,
+                goalRevision: currentResult.revision,
+                userIntentRevision: currentResult.userIntentRevision,
+                ...(context.actor.sessionId === undefined ? {} : { sessionId: context.actor.sessionId }),
+              };
+            }
+          }
+        }
         const skillPreflight = await loadGoalSkillPreflight(context, input.objective);
-        const active = result.value.status === 'active';
+        const active = currentResult.status === 'active';
         const scheduledContinuation = input.scheduledContinuation ?? 'auto';
         const auto = scheduledContinuation === 'auto';
         const latestContinuation = active && auto && context.services.scheduledContinuations !== undefined
-          ? await context.services.scheduledContinuations.getScheduledContinuation(context.actor, { goalId: result.value.goalId, latest: true })
+          ? await context.services.scheduledContinuations.getScheduledContinuation(context.actor, { goalId: currentResult.goalId, latest: true })
           : undefined;
         const successor = latestContinuation?.ok ? latestContinuation.value : undefined;
         const successorConfirmed = successor?.status === 'scheduled'
@@ -355,12 +397,13 @@ export function goalTools(context: McpToolContext): McpToolDefinition[] {
                   ? 'none'
                   : 'not_confirmed';
         return ok({
-          ...result.value,
+          ...currentResult,
           projectInstructionsPreflight,
+          ...(engineeringTask === undefined ? {} : { engineeringTask }),
           ...(skillPreflight === undefined ? {} : { skillPreflight }),
-          ...(!result.value.acquired && result.value.retryAfterSeconds !== undefined && result.value.retryAfterSeconds <= 60
+          ...(!currentResult.acquired && currentResult.retryAfterSeconds !== undefined && currentResult.retryAfterSeconds <= 60
             ? {
-                leaseGuidance: `Previous worker appears inactive. The bounded stale-recovery grace expires in ${result.value.retryAfterSeconds}s. Wait ${result.value.retryAfterSeconds}s and call run_goal again to take over the lease; do not yield or treat as occupied.`,
+                leaseGuidance: `Previous worker appears inactive. The bounded stale-recovery grace expires in ${currentResult.retryAfterSeconds}s. Wait ${currentResult.retryAfterSeconds}s and call run_goal again to take over the lease; do not yield or treat as occupied.`,
               }
             : {}),
           continuationDirective: {

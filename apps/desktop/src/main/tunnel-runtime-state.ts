@@ -70,6 +70,10 @@ export function classifyTunnelRuntimeFailure(message: string | null | undefined)
   if (/\b(401|403)\b|unauthori[sz]ed|forbidden|api[ _-]?key.*(?:invalid|expired|revoked|missing)|(?:invalid|expired|revoked|missing).*api[ _-]?key|authentication required|auth required/.test(value)) {
     return 'auth';
   }
+  if (value.includes('could not safely check the local tunnel processes')
+    && /details:\s*command failed:\s*(?:powershell|pwsh)(?:\.exe)?\b/.test(value)) {
+    return 'transient';
+  }
   if (/tunnel(?:_| )?id.*(?:invalid|mismatch|inaccessible|not found)|(?:invalid|mismatch|inaccessible).*tunnel|client.*not found|profile.*(?:invalid|incompatible|missing)|unsupported.*runtime|permission denied|another tunnel-client pid|could not verify tunnel-client pid|managed tunnel pid is missing|could not safely check the local tunnel processes/.test(value)) {
     return 'operator';
   }
