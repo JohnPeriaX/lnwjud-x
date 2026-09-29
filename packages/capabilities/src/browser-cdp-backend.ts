@@ -135,7 +135,7 @@ export class BrowserCdpBackend implements CapabilityBackend {
       }
       case 'query': return this.withTab(request, action, async (tab) => this.evaluateProtocol(tab.id, 'Runtime.evaluate', { expression: queryScript(readString(parameters, 'selector') ?? ''), returnByValue: true, awaitPromise: true }, signal), signal);
       case 'click': return this.withTab(request, action, async (tab) => this.evaluateProtocol(tab.id, 'Runtime.evaluate', { expression: clickScript(readString(parameters, 'selector') ?? ''), returnByValue: true, awaitPromise: true }, signal), signal);
-      case 'type': return this.withTab(request, action, async (tab) => this.evaluateProtocol(tab.id, 'Runtime.evaluate', { expression: typeScript(readString(parameters, 'selector') ?? '', readString(parameters, 'text') ?? ''), returnByValue: true, awaitPromise: true }, signal), signal);
+      case 'type': return this.withTab(request, action, async (tab) => this.typeProtocol(tab.id, parameters, signal), signal);
       case 'wait': return this.waitFor(request, parameters, signal);
       case 'screenshot': return this.withTab(request, action, async (tab) => {
         const result = await this.protocol.request(tab.id, 'Page.captureScreenshot', { format: 'png' }, signal);
@@ -198,6 +198,108 @@ export class BrowserCdpBackend implements CapabilityBackend {
     } catch {
       return err(appError('INTERNAL_ERROR', 'Browser CDP request failed', true));
     }
+  }
+
+  private async typeProtocol(tabId: string, parameters: Record<string, unknown>, signal?: AbortSignal): Promise<Result<unknown>> {
+    const selector = readString(parameters, 'selector');
+    const text = readString(parameters, 'text') ?? '';
+    const clear = parameters.clear === true;
+
+    const inspectScript = `(() => {
+      const el = ${selector !== undefined && selector.length > 0 ? `document.querySelector(${JSON.stringify(selector)})` : 'document.activeElement'};
+      if (!el || (el === document.body && ${selector === undefined || selector.length === 0})) return { ok: false, error: 'Element not found' };
+      if (typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ block: 'center', inline: 'center' });
+      }
+      if (typeof el.focus === 'function') {
+        el.focus();
+      }
+      const isInputOrTextarea = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+      const isContentEditable = !!(
+        el.isContentEditable
+        || el.getAttribute('contenteditable') === 'true'
+        || el.getAttribute('contenteditable') === ''
+        || el.classList.contains('ProseMirror')
+        || el.getAttribute('role') === 'textbox'
+      );
+      if (isContentEditable || !isInputOrTextarea) {
+        const sel = window.getSelection();
+        if (sel) {
+          const range = document.createRange();
+          if (${clear}) {
+            range.selectNodeContents(el);
+          } else {
+            range.selectNodeContents(el);
+            range.collapse(false);
+          }
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+        return { ok: true, isContentEditable: true, tag: el.tagName };
+      }
+      const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value')?.set;
+      if (setter) {
+        setter.call(el, ${JSON.stringify(text)});
+      } else {
+        el.value = ${JSON.stringify(text)};
+      }
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return { ok: true, isContentEditable: false, value: el.value, tag: el.tagName };
+    })()`;
+
+    const inspectResult = await this.evaluateProtocol(tabId, 'Runtime.evaluate', {
+      expression: inspectScript,
+      returnByValue: true,
+      awaitPromise: true,
+    }, signal);
+
+    if (!inspectResult.ok) return inspectResult;
+    const inspectValue = inspectResult.value;
+    if (isRecord(inspectValue) && inspectValue.ok === false) {
+      return ok({ ok: false, error: inspectValue.error ?? 'Element not found', ...(selector === undefined ? {} : { selector }) });
+    }
+
+    if (isRecord(inspectValue) && inspectValue.isContentEditable === true) {
+      try {
+        await this.protocol.request(tabId, 'Input.insertText', { text }, signal);
+      } catch {
+        return err(appError('INTERNAL_ERROR', 'Browser CDP Input.insertText failed', true));
+      }
+
+      const verifyScript = `(() => {
+        const el = ${selector !== undefined && selector.length > 0 ? `document.querySelector(${JSON.stringify(selector)})` : 'document.activeElement'};
+        if (!el) return { ok: true, text: ${JSON.stringify(text)} };
+        return { ok: true, text: el.innerText || el.textContent || ${JSON.stringify(text)} };
+      })()`;
+      const verifyResult = await this.evaluateProtocol(tabId, 'Runtime.evaluate', {
+        expression: verifyScript,
+        returnByValue: true,
+        awaitPromise: true,
+      }, signal);
+
+      const verifiedText = verifyResult.ok && isRecord(verifyResult.value) && typeof verifyResult.value.text === 'string'
+        ? verifyResult.value.text
+        : text;
+
+      return ok({
+        ok: true,
+        typed: true,
+        isContentEditable: true,
+        tag: inspectValue.tag,
+        text: verifiedText,
+        value: verifiedText,
+      });
+    }
+
+    const value = isRecord(inspectValue) && 'value' in inspectValue ? inspectValue.value : text;
+    return ok({
+      ok: true,
+      typed: true,
+      isContentEditable: false,
+      value,
+      text: typeof value === 'string' ? value : text,
+    });
   }
 }
 
@@ -362,10 +464,6 @@ function queryScript(selector: string): string {
 
 function clickScript(selector: string): string {
   return `(() => { const el=document.querySelector(${JSON.stringify(selector)}); if(!el) return {ok:false}; el.scrollIntoView({block:'center',inline:'center'}); el.click(); return {ok:true}; })()`;
-}
-
-function typeScript(selector: string, text: string): string {
-  return `(() => { const el=document.querySelector(${JSON.stringify(selector)}); if(!el) return {ok:false}; el.focus(); const setter=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el),'value')?.set; if(setter) setter.call(el,${JSON.stringify(text)}); else el.value=${JSON.stringify(text)}; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); return {ok:true,value:el.value}; })()`;
 }
 
 function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {

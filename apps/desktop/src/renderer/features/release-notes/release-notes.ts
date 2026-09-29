@@ -34,6 +34,26 @@ const RELEASE_NOTES: readonly ReleaseNote[] = [
             badge: 'improved',
             tags: ['Engineering Harness', 'Full Bypass', 'Developer Autonomy', 'read-only commands'],
           },
+          {
+            id: 'engineering-tools-catalog-exposure',
+            titleKey: 'whatsNew.572.engineeringCatalog.title',
+            descriptionKey: 'whatsNew.572.engineeringCatalog.description',
+            badge: 'fixed',
+            tags: ['Engineering Harness', 'tool_search', 'tool_describe', 'goalLease'],
+          },
+        ],
+      },
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          {
+            id: 'prosemirror-contenteditable-typing',
+            titleKey: 'whatsNew.572.proseMirrorTyping.title',
+            descriptionKey: 'whatsNew.572.proseMirrorTyping.description',
+            badge: 'fixed',
+            tags: ['dom_cdp', 'ProseMirror', 'contenteditable', 'Input.insertText'],
+          },
         ],
       },
     ],

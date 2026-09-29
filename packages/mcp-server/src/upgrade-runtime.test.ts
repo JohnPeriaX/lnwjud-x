@@ -86,6 +86,56 @@ describe('upgrade runtime', () => {
     if (search.ok) expect(search.value).toHaveProperty('matches');
   });
 
+  it('discovers and describes engineering preflight tools with accurate input schema', async () => {
+    const runtime = new UpgradeRuntimeService({}, actor);
+    const search = await runtime.execute('tool_search', { query: 'engineering preflight prepare', limit: 10 });
+    expect(search).toMatchObject({ ok: true });
+    if (search.ok) {
+      const names = search.value.matches.map((m: { name: string }) => m.name);
+      expect(names).toContain('engineering_prepare_task');
+      expect(names).toContain('engineering_start_task');
+      expect(names).toContain('engineering_get_status');
+    }
+
+    const described = await runtime.execute('tool_describe', { tool: 'engineering_prepare_task' });
+    expect(described).toMatchObject({
+      ok: true,
+      value: {
+        found: true,
+        name: 'engineering_prepare_task',
+        contractSource: 'primitive-registry',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workspaceId: { type: 'string' },
+            objective: { type: 'string' },
+            scopedPath: { type: 'string' },
+          },
+          required: ['workspaceId', 'objective'],
+        },
+      },
+    });
+
+    const startDescribed = await runtime.execute('tool_describe', { tool: 'engineering_start_task' });
+    expect(startDescribed).toMatchObject({
+      ok: true,
+      value: {
+        found: true,
+        name: 'engineering_start_task',
+        contractSource: 'primitive-registry',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workspaceId: { type: 'string' },
+            goalKey: { type: 'string' },
+            objective: { type: 'string' },
+          },
+          required: ['workspaceId', 'goalKey', 'objective'],
+        },
+      },
+    });
+  });
+
   it('ranks primitive and upgrade tools with deterministic reasons without granting authorization', async () => {
     const runtime = new UpgradeRuntimeService({}, actor);
     const search = await runtime.execute('tool_dynamic_filter', { query: 'run a Linux WSL developer command', limit: 20, reranker: 'local' });

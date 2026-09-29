@@ -452,4 +452,110 @@ describe('BrowserCdpBackend', () => {
     )).resolves.toMatchObject({ ok: true });
     expect(dispatched).toBe(true);
   });
+
+  it('types into a standard input element using property setter and synthetic events', async () => {
+    const requests: { readonly method: string; readonly params: Record<string, unknown> }[] = [];
+    const protocol = protocolStub({
+      tabs: [tab('tab-1', 'Test', 'http://127.0.0.1/')],
+      onRequest: (_tabId, method, params) => requests.push({ method, params }),
+      responseForRequest: (_tabId, method) => {
+        if (method === 'Runtime.evaluate') {
+          return { result: { result: { value: { ok: true, isContentEditable: false, value: 'typed-text', tag: 'INPUT' } } } };
+        }
+        return { result: {} };
+      },
+    });
+
+    const result = await new BrowserCdpBackend({ protocol }).execute({
+      action: 'type',
+      tab_id: 'tab-1',
+      parameters: { selector: 'input#title', text: 'typed-text' },
+      userConfirmed: true,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        ok: true,
+        typed: true,
+        isContentEditable: false,
+        value: 'typed-text',
+        text: 'typed-text',
+      },
+    });
+    expect(requests.some((req) => req.method === 'Runtime.evaluate')).toBe(true);
+    expect(requests.some((req) => req.method === 'Input.insertText')).toBe(false);
+  });
+
+  it('types into a ProseMirror or contenteditable element by dispatching CDP Input.insertText', async () => {
+    const requests: { readonly method: string; readonly params: Record<string, unknown> }[] = [];
+    let evalCount = 0;
+    const protocol = protocolStub({
+      tabs: [tab('tab-1', 'Test', 'http://127.0.0.1/')],
+      onRequest: (_tabId, method, params) => requests.push({ method, params }),
+      responseForRequest: (_tabId, method) => {
+        if (method === 'Runtime.evaluate') {
+          evalCount += 1;
+          if (evalCount === 1) {
+            return { result: { result: { value: { ok: true, isContentEditable: true, tag: 'DIV' } } } };
+          }
+          return { result: { result: { value: { ok: true, text: 'Hello ProseMirror' } } } };
+        }
+        if (method === 'Input.insertText') {
+          return { result: {} };
+        }
+        return { result: {} };
+      },
+    });
+
+    const result = await new BrowserCdpBackend({ protocol }).execute({
+      action: 'type',
+      tab_id: 'tab-1',
+      parameters: { selector: 'div.ProseMirror', text: 'Hello ProseMirror' },
+      userConfirmed: true,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        ok: true,
+        typed: true,
+        isContentEditable: true,
+        tag: 'DIV',
+        text: 'Hello ProseMirror',
+        value: 'Hello ProseMirror',
+      },
+    });
+    const insertTextCall = requests.find((req) => req.method === 'Input.insertText');
+    expect(insertTextCall).toBeDefined();
+    expect(insertTextCall?.params).toEqual({ text: 'Hello ProseMirror' });
+  });
+
+  it('returns structured not-found error when typing into a missing element', async () => {
+    const protocol = protocolStub({
+      tabs: [tab('tab-1', 'Test', 'http://127.0.0.1/')],
+      responseForRequest: (_tabId, method) => {
+        if (method === 'Runtime.evaluate') {
+          return { result: { result: { value: { ok: false, error: 'Element not found' } } } };
+        }
+        return { result: {} };
+      },
+    });
+
+    const result = await new BrowserCdpBackend({ protocol }).execute({
+      action: 'type',
+      tab_id: 'tab-1',
+      parameters: { selector: '#does-not-exist', text: 'test' },
+      userConfirmed: true,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        ok: false,
+        error: 'Element not found',
+        selector: '#does-not-exist',
+      },
+    });
+  });
 });

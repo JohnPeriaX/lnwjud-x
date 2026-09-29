@@ -1391,6 +1391,10 @@ describe('MCP tool registry', () => {
     })).resolves.not.toMatchObject({ isError: true });
     await expect(registry.invoke('edit_file', {
       ...base,
+      goalLease: { goalId: 'engineering-goal-a2', leaseToken: 'lease-token-a2', leaseGeneration: 2 },
+    })).resolves.not.toMatchObject({ isError: true });
+    await expect(registry.invoke('edit_file', {
+      ...base,
       workspaceId: 'workspace-b',
       engineeringTask: { goalId: 'engineering-goal-a1', policyDigest: 'digest-1', goalRevision: 2, userIntentRevision: 0 },
       goalLease: { goalId: 'engineering-goal-a1', leaseToken: 'lease-token-a1', leaseGeneration: 2 },
@@ -1398,7 +1402,7 @@ describe('MCP tool registry', () => {
       isError: true,
       structuredContent: { error: { code: 'ENGINEERING_PREFLIGHT_REQUIRED' } },
     });
-    expect(editFile).toHaveBeenCalledTimes(1);
+    expect(editFile).toHaveBeenCalledTimes(2);
   });
 
   it('propagates Full Bypass through the real local capability dispatcher and shell backend', async () => {

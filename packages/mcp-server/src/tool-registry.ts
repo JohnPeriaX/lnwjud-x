@@ -1408,6 +1408,19 @@ async function resolveEngineeringAdmission(
     }
     return ok(undefined);
   }
+  if (engineeringTask === undefined && goalLease !== undefined) {
+    const validated = await services.goals.validateGoalLease(actor, { goalId: goalLease.goalId, leaseToken: goalLease.leaseToken });
+    if (validated.ok && validated.value.engineering !== undefined) {
+      engineeringTask = {
+        goalId: validated.value.goalId,
+        policyDigest: validated.value.engineering.policyDigest,
+        goalRevision: validated.value.revision,
+        userIntentRevision: validated.value.userIntentRevision,
+        ...(validated.value.engineering.scopedPath === undefined ? {} : { scopedPath: validated.value.engineering.scopedPath }),
+        ...(actor.sessionId === undefined ? {} : { sessionId: actor.sessionId }),
+      };
+    }
+  }
   if (engineeringTask === undefined) {
     const prepared = await services.engineeringPreparation.prepare(workspaceId, `Modify software code through ${toolName}`);
     if (!prepared.ok) return err(prepared.error);
