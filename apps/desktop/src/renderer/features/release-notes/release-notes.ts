@@ -68,6 +68,13 @@ const RELEASE_NOTES: readonly ReleaseNote[] = [
             badge: 'new',
             tags: ['Git', 'image preview', 'binary diff', 'HEAD', 'Index', 'Working Tree'],
           },
+          {
+            id: 'durable-goal-progress-freshness',
+            titleKey: 'whatsNew.572.goalFreshness.title',
+            descriptionKey: 'whatsNew.572.goalFreshness.description',
+            badge: 'improved',
+            tags: ['Durable Goal', 'checkpoint', 'Watcher', 'progress', 'CI'],
+          },
         ],
       },
     ],
