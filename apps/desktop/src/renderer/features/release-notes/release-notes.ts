@@ -21,6 +21,24 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.7.2',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          {
+            id: 'engineering-harness-developer-autonomy',
+            titleKey: 'whatsNew.572.developerAutonomy.title',
+            descriptionKey: 'whatsNew.572.developerAutonomy.description',
+            badge: 'improved',
+            tags: ['Engineering Harness', 'Full Bypass', 'Developer Autonomy', 'read-only commands'],
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.7.1',
     categories: [
       {

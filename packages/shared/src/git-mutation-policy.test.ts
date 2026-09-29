@@ -64,6 +64,8 @@ describe('prohibitedAgentGitInvocationReason', () => {
 
   it('classifies demonstrably read-only forms separately from allowed writes', () => {
     expect(isProvablyReadOnlyGitInvocation(['status', '--short'])).toBe(true);
+    expect(isProvablyReadOnlyGitInvocation(['version'])).toBe(true);
+    expect(isProvablyReadOnlyGitInvocation(['--version'])).toBe(true);
     expect(isProvablyReadOnlyGitInvocation(['remote', '-v'])).toBe(true);
     expect(isProvablyReadOnlyGitInvocation(['branch'])).toBe(true);
     expect(isProvablyReadOnlyGitInvocation(['branch', '--show-current'])).toBe(true);

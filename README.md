@@ -53,7 +53,7 @@
 
 ## Current published version: v5.7.1
 
-## Current source version: v5.7.1
+## Current source version: v5.7.2
 
 Latest published release: **v5.7.1**. The download buttons above point directly to the v5.7.1 assets. The release was published after the exact tagged main commit passed the target-native release gates.
 
