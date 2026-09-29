@@ -194,17 +194,28 @@ function reconcileEngineeringMetadata(
   scopedPath?: string,
 ): EngineeringGoalMetadata {
   const next = engineeringGoalMetadata(policyDigest, workflow, scopedPath);
-  const previousGateIds = new Set(current.gates.map((gate) => gate.id));
+  const previousGates = new Map(current.gates.map((gate) => [gate.id, gate] as const));
   return {
     ...next,
-    gates: next.gates.map((gate) => gate.applicability === 'not_applicable'
-      ? { ...gate, basedOnUserIntentRevision: userIntentRevision }
-      : {
-          ...gate,
-          status: previousGateIds.has(gate.id) ? 'stale' : 'pending',
-          reason: previousGateIds.has(gate.id) ? `Engineering policy changed; revalidate. ${gate.reason}` : gate.reason,
-          basedOnUserIntentRevision: userIntentRevision,
-        }),
+    gates: next.gates.map((gate) => {
+      if (gate.applicability === 'not_applicable') return { ...gate, basedOnUserIntentRevision: userIntentRevision };
+      const previous = previousGates.get(gate.id);
+      if (previous === undefined) return { ...gate, status: 'pending', basedOnUserIntentRevision: userIntentRevision };
+      if (sameEngineeringGateContract(previous, gate)) return { ...previous, basedOnUserIntentRevision: userIntentRevision };
+      return {
+        ...gate,
+        status: 'stale',
+        reason: `Engineering policy changed; revalidate. ${gate.reason}`,
+        basedOnUserIntentRevision: userIntentRevision,
+      };
+    }),
     ...(current.reviewFindings === undefined ? {} : { reviewFindings: current.reviewFindings }),
   };
+}
+
+function sameEngineeringGateContract(current: EngineeringGoalMetadata['gates'][number], next: EngineeringGoalMetadata['gates'][number]): boolean {
+  return current.title === next.title
+    && current.applicability === next.applicability
+    && current.reason === next.reason
+    && current.checkCommand === next.checkCommand;
 }

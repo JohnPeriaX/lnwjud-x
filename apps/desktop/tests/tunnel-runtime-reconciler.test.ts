@@ -61,13 +61,27 @@ describe('TunnelRuntimeReconciler', () => {
 
   it('does not report a healthy runtime when duplicate-process verification fails', async () => {
     const runtimeAdapter = adapter(runtime());
-    runtimeAdapter.ensureSingleProcess = vi.fn(async () => { throw new Error('Could not verify tunnel-client PID 200'); });
+    runtimeAdapter.ensureSingleProcess = vi.fn(async () => { throw new Error('lnwjud could not safely check the local Tunnel processes. Restart Windows, reopen lnwjud, then check the Tunnel status. Details: Could not verify tunnel-client PID 200'); });
     const reconciler = new TunnelRuntimeReconciler({ adapter: runtimeAdapter, desiredState: (): TunnelRuntimeDesiredState => desired });
 
     const result = await reconciler.reconcile();
 
     expect(result.action).toBe('operator-required');
     expect(result.snapshot.message).toContain('PID 200');
+    expect(runtimeAdapter.connect).not.toHaveBeenCalled();
+  });
+
+  it('retries a transient Windows process-inventory failure instead of turning a healthy Tunnel into a permanent Error', async () => {
+    const runtimeAdapter = adapter(runtime());
+    runtimeAdapter.ensureSingleProcess = vi.fn(async () => {
+      throw new Error('lnwjud could not safely check the local Tunnel processes. Restart Windows, reopen lnwjud, then check the Tunnel status. Details: Command failed: powershell.exe -NoProfile -NonInteractive -Command Get-CimInstance Win32_Process');
+    });
+    const reconciler = new TunnelRuntimeReconciler({ adapter: runtimeAdapter, desiredState: (): TunnelRuntimeDesiredState => desired });
+
+    const result = await reconciler.reconcile();
+
+    expect(result.action).toBe('retry-required');
+    expect(result.snapshot).toMatchObject({ state: 'reconnecting', lastFailureClass: 'transient', lastErrorCode: 'TRANSIENT_RUNTIME_FAILURE' });
     expect(runtimeAdapter.connect).not.toHaveBeenCalled();
   });
 

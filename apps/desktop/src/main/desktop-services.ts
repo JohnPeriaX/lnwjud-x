@@ -46,6 +46,7 @@ import {
   ActivityTracker,
   LNWJUD_MCP_IDENTITY_PATH,
   RuntimeEngineeringEvidenceVerifier,
+  createEngineeringSourceStateProvider,
   RuntimeGoalManagedTaskStateReader,
   createFileActivitySink,
   mcpActivityLogPath,
@@ -612,8 +613,9 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
       shell: capabilityRuntime.shell,
     }),
   });
+  const engineeringSourceState = createEngineeringSourceStateProvider(async (workspaceId, args) => gitService.run(actor, { workspaceId, args }));
   const goalService = new GoalContinuationService(workspaceRepository, goalRepository, {
-    engineeringEvidenceVerifier: new RuntimeEngineeringEvidenceVerifier({ process: processService, shell: capabilityRuntime.shell }),
+    engineeringEvidenceVerifier: new RuntimeEngineeringEvidenceVerifier({ process: processService, shell: capabilityRuntime.shell, sourceState: engineeringSourceState }),
     scheduledContinuations: goalRepository,
     workerLiveness: goalMutationFence,
     taskCancellation,

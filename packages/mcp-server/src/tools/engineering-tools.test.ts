@@ -198,6 +198,61 @@ describe('engineering_start_task', () => {
       engineering: expect.objectContaining({ policyDigest: 'digest-1' }),
     }));
   });
+
+  it('preserves completed gate evidence when only the policy digest changes but the gate contract is unchanged', async () => {
+    const evidence = {
+      source: 'host_observed' as const,
+      observedAt: '2026-09-29T00:00:00Z',
+      workspaceId: 'workspace-1',
+      command: 'pnpm test',
+      runId: 'task-1',
+      exitCode: 0,
+    };
+    const existingEngineering = {
+      schemaVersion: 1 as const,
+      primaryTaskKind: 'bugfix' as const,
+      riskTier: 'high' as const,
+      policyDigest: 'old-digest',
+      deliveryScope: 'local' as const,
+      gates: [{
+        id: 'focused_validation',
+        title: 'Focused validation',
+        applicability: 'required' as const,
+        status: 'passed' as const,
+        reason: 'Behavior changed',
+        basedOnUserIntentRevision: 2,
+        evidence,
+      }],
+    };
+    const getGoal = vi.fn(async () => ok({ goalId: 'goal-1', engineering: existingEngineering } as never));
+    const runGoal = vi.fn(async () => ok({
+      goalId: 'goal-1', status: 'active', acquired: true, leaseToken: 'lease-1', leaseGeneration: 3,
+      revision: 5, userIntentRevision: 2, currentPhase: 'validate', nextAction: 'Finish', blockers: [], trackedTasks: [],
+      engineering: existingEngineering,
+    } as never));
+    const checkpointGoal = vi.fn(async (_actor, request: { engineering?: unknown }) => ok({
+      goalId: 'goal-1', status: 'active', revision: 6, userIntentRevision: 2, currentPhase: 'validate', nextAction: 'Finish', blockers: [], trackedTasks: [],
+      engineering: request.engineering,
+    } as never));
+    const tool = engineeringTools({
+      actor,
+      contextEconomy: {} as never,
+      services: { goals: { runGoal, getGoal, checkpointGoal } as never, engineeringPreparation: { prepare: vi.fn(async () => prepared()) } as never },
+    }).find((entry) => entry.name === 'engineering_start_task');
+
+    await expect(tool?.execute({ workspaceId: 'workspace-1', goalKey: 'engineering.auth-fix', objective: 'Fix auth bug' }, new AbortController().signal)).resolves.toMatchObject({ ok: true });
+    expect(checkpointGoal).toHaveBeenCalledWith(actor, expect.objectContaining({
+      engineering: expect.objectContaining({
+        policyDigest: 'digest-1',
+        gates: [expect.objectContaining({
+          id: 'focused_validation',
+          status: 'passed',
+          reason: 'Behavior changed',
+          evidence,
+        })],
+      }),
+    }));
+  });
 });
 
 describe('engineering_get_status', () => {

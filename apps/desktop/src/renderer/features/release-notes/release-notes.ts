@@ -75,6 +75,13 @@ const RELEASE_NOTES: readonly ReleaseNote[] = [
             badge: 'improved',
             tags: ['Durable Goal', 'checkpoint', 'Watcher', 'progress', 'CI'],
           },
+          {
+            id: 'tunnel-transient-inventory-retry',
+            titleKey: 'whatsNew.572.tunnelInventoryRetry.title',
+            descriptionKey: 'whatsNew.572.tunnelInventoryRetry.description',
+            badge: 'fixed',
+            tags: ['Secure MCP Tunnel', 'Windows', 'PowerShell', 'retry', 'process inventory'],
+          },
         ],
       },
     ],

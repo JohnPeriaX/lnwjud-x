@@ -41,7 +41,7 @@ import {
   createLocalExtensionsService,
   type ExtensionsService,
 } from '@lnwjud/extensions';
-import { ActivityTracker, RuntimeEngineeringEvidenceVerifier, RuntimeGoalManagedTaskStateReader, SharedActivitySnapshotLease, composeActivitySinks, createFileActivitySink, currentSharedActivityOwner, mcpActivityLogPath, type ActivitySink, type ActivitySinkEvent, type McpApplicationServices, type WorkspaceScope } from '@lnwjud/mcp-server';
+import { ActivityTracker, RuntimeEngineeringEvidenceVerifier, createEngineeringSourceStateProvider, RuntimeGoalManagedTaskStateReader, SharedActivitySnapshotLease, composeActivitySinks, createFileActivitySink, currentSharedActivityOwner, mcpActivityLogPath, type ActivitySink, type ActivitySinkEvent, type McpApplicationServices, type WorkspaceScope } from '@lnwjud/mcp-server';
 import { permissionProfiles, type PermissionProfile, type PermissionProfileName } from '@lnwjud/permissions';
 import {
   AesGcmCheckpointCipher,
@@ -203,8 +203,10 @@ export function createStdioMcpRuntime(
       shell: capabilityRuntime.shell,
     }),
   });
+  const actor: FileActor = { clientId: 'cli-mcp-stdio', clientName: 'lnwjud cli MCP' };
+  const engineeringSourceState = createEngineeringSourceStateProvider(async (workspaceId, args) => gitService.run(actor, { workspaceId, args }));
   const goalService = new GoalContinuationService(workspaceRepository, goalRepository, {
-    engineeringEvidenceVerifier: new RuntimeEngineeringEvidenceVerifier({ process: processService, shell: capabilityRuntime.shell }),
+    engineeringEvidenceVerifier: new RuntimeEngineeringEvidenceVerifier({ process: processService, shell: capabilityRuntime.shell, sourceState: engineeringSourceState }),
     scheduledContinuations: goalRepository,
     workerLiveness: goalMutationFence,
     taskCancellation,
@@ -214,7 +216,6 @@ export function createStdioMcpRuntime(
     workerLiveness: goalMutationFence,
     automationResumes: automationRepository,
   });
-  const actor: FileActor = { clientId: 'cli-mcp-stdio', clientName: 'lnwjud cli MCP' };
   const sharedActivityLease = createSharedActivityLease(process.env.TUNNEL_CLIENT_PROFILE_DIR);
   const activityReady = sharedActivityLease.then(async (lease) => lease?.initialize());
   const sharedActivitySink: ActivitySink = {
