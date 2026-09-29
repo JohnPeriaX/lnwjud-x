@@ -57,7 +57,7 @@
 
 Latest published release: **v5.7.1**. The download buttons above point directly to the v5.7.1 assets. The release was published after the exact tagged main commit passed the target-native release gates.
 
-### What's new in v5.7.2 (current source)
+### What's new in v5.7.2
 
 - **Git image diff previews:** the Git page can show before/after images at the real `HEAD → Index` and `Index → Working Tree` scopes, including added/deleted images. Preview payloads are bounded to 4 MB per side, with Fit/Actual Size controls and a clear fallback when Chromium cannot decode a particular image format.
 - **Engineering Harness settings persist correctly:** the preload bridge now preserves Harness settings, workspace overrides, and diagnostics, so an enabled Harness no longer appears Off after restarting the app while the saved value is still enabled.
@@ -80,12 +80,6 @@ Latest published release: **v5.7.1**. The download buttons above point directly 
 - **Authorized continuation handles failures:** it works through fixable failures and keeps goal ownership and checkpoint details across handoffs.
 
 See the [Thai Engineering Harness guide](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for setup and workflow details.
-
-### What's new in v5.6.6
-
-- **Watcher shows the real Goal state:** an open Goal no longer makes the runtime look busy when there is no observable work. Completed milestones alone do not close it; acceptance criteria, blockers, and active tasks determine whether it is ready for `finish_goal`.
-- **More detail in Watcher:** active Goal snapshots now include completion readiness, phase, objective, acceptance checks, active task count, and timestamps, so the companion app can show what is still pending and identify quiet Goals.
-- **Your configured MCP names:** Watcher can display MCP server names and connection state from LNWJUD. Commands, configuration paths, and credentials stay private.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for previous releases and the complete release history.
 

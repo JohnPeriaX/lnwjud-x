@@ -2,6 +2,15 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.7.2
+
+- **Git image diff previews:** the Git page can show before/after images at the real `HEAD → Index` and `Index → Working Tree` scopes, including added/deleted images. Preview payloads are bounded to 4 MB per side, with Fit/Actual Size controls and a clear fallback when Chromium cannot decode a particular image format.
+- **Engineering Harness settings persist correctly:** the preload bridge now preserves Harness settings, workspace overrides, and diagnostics, so an enabled Harness no longer appears Off after restarting the app while the saved value is still enabled.
+- **Engineering tools are discoverable and Goal-aware:** Engineering Harness primitives are exposed through the tool catalog and bind to the active Goal/lease correctly.
+- **Safer rich-text typing:** CDP typing uses native `Input.insertText` for ProseMirror/contenteditable targets and verifies that the DOM actually changed instead of reporting a silent no-op as success.
+- **Durable Goal progress stays fresh for Watcher:** lnwjud now instructs every connected worker to checkpoint immediately at step/task/blocker/commit/push/CI/package milestones and at least every 10 minutes during sustained work without a natural milestone, while stale superseded Goals should be reconciled instead of remaining active.
+- **Secure MCP Tunnel avoids false Windows Error state:** a temporary PowerShell failure while inventorying local tunnel-client processes/listeners is retried as a transient runtime check instead of permanently flipping an otherwise healthy Tunnel to Error; duplicate/unverifiable process identity checks remain fail-closed.
+
 ### What's new in v5.7.1
 
 - **Engineering Harness checkpoint fix:** `checkpoint_goal` now forwards gate updates and review findings to the Goal service. Accepted updates persist in the durable Goal instead of silently leaving the gate state unchanged.
