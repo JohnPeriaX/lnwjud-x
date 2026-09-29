@@ -361,7 +361,8 @@ describe('TunnelRuntimeAdapter', () => {
       },
     });
     const environment = { CONTROL_PLANE_API_KEY: 'secret-must-stay-in-env' };
-    const adapter = new TunnelRuntimeAdapter({ clientPath: 'client.exe', profileDirectory: 'C:\\profile', environment, execute });
+    const processGuard = vi.fn(async () => undefined);
+    const adapter = new TunnelRuntimeAdapter({ clientPath: 'client.exe', profileDirectory: 'C:\\profile', environment, execute, processGuard });
 
     await expect(adapter.connect({ tunnelId, mcpServerUrl })).resolves.toMatchObject({
       running: true,

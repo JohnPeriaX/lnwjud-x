@@ -66,6 +66,21 @@ describe('local tunnel runtime process guard', () => {
     expect(deps.terminate).not.toHaveBeenCalled();
   });
 
+  it('loads listening ports lazily only after a duplicate runtime candidate is identified', async () => {
+    const candidate = runtime(100, { ports: [] });
+    const listListeningPorts = vi.fn(async (pid: number) => pid === candidate.pid ? [40_100] : []);
+    const deps = {
+      ...dependencies([candidate], { 40100: tunnelId }),
+      listListeningPorts,
+    } as LocalTunnelRuntimeGuardDependencies & { readonly listListeningPorts: (pid: number) => Promise<readonly number[]> };
+
+    await reconcileLocalTunnelRuntimeProcesses(request(null), deps);
+
+    expect(listListeningPorts).toHaveBeenCalledExactlyOnceWith(candidate.pid);
+    expect(deps.probeTunnelId).toHaveBeenCalledExactlyOnceWith(40_100);
+    expect(deps.terminate).toHaveBeenCalledExactlyOnceWith(candidate);
+  });
+
   it('fails closed when a candidate cannot be verified, before stopping any process', async () => {
     const verified = runtime(100);
     const unknown = runtime(200);

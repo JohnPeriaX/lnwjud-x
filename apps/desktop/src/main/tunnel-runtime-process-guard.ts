@@ -24,6 +24,7 @@ export interface LocalTunnelRuntimeGuardRequest {
 
 export interface LocalTunnelRuntimeGuardDependencies {
   readonly listProcesses: () => Promise<readonly LocalTunnelRuntimeProcess[]>;
+  readonly listListeningPorts?: (pid: number) => Promise<readonly number[]>;
   readonly probeTunnelId: (port: number) => Promise<string | null>;
   readonly terminate: (process: LocalTunnelRuntimeProcess) => Promise<void>;
 }
@@ -52,11 +53,14 @@ export async function reconcileLocalTunnelRuntimeProcesses(
     if (!sameWindowsPath(candidate.executablePath, request.clientPath)) {
       throw new Error(`Another tunnel-client PID ${candidate.pid} uses the lnwjud profile from a different executable; stop it before starting this runtime`);
     }
-    if (candidate.ports.length === 0 || candidate.ports.length > 16) {
+    const ports = dependencies.listListeningPorts === undefined
+      ? candidate.ports
+      : await dependencies.listListeningPorts(candidate.pid);
+    if (ports.length === 0 || ports.length > 16) {
       throw new Error(`Could not verify tunnel-client PID ${candidate.pid} through its local admin UI; refusing to start a duplicate`);
     }
     let observedTunnelId: string | null = null;
-    for (const port of candidate.ports) {
+    for (const port of ports) {
       observedTunnelId = await dependencies.probeTunnelId(port);
       if (observedTunnelId !== null) break;
     }
@@ -90,8 +94,7 @@ const windowsDependencies: LocalTunnelRuntimeGuardDependencies = {
     const script = [
       "$ErrorActionPreference='Stop'",
       '$processes=@(Get-CimInstance Win32_Process -Filter "Name = \'tunnel-client.exe\'" -ErrorAction Stop)',
-      "$listeners=@(Get-NetTCPConnection -State Listen -ErrorAction Stop | Where-Object { $_.LocalAddress -in @('127.0.0.1','::1') })",
-      "$items=@($processes | ForEach-Object { $p=$_; [pscustomobject]@{ pid=[int]$p.ProcessId; startedAt=$p.CreationDate.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ',[Globalization.CultureInfo]::InvariantCulture); executablePath=[string]$p.ExecutablePath; commandLine=[string]$p.CommandLine; ports=@($listeners | Where-Object { $_.OwningProcess -eq $p.ProcessId } | Select-Object -ExpandProperty LocalPort) } })",
+      "$items=@($processes | ForEach-Object { $p=$_; [pscustomobject]@{ pid=[int]$p.ProcessId; startedAt=$p.CreationDate.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ',[Globalization.CultureInfo]::InvariantCulture); executablePath=[string]$p.ExecutablePath; commandLine=[string]$p.CommandLine; ports=@() } })",
       'ConvertTo-Json -InputObject $items -Compress -Depth 4',
     ].join('; ');
     const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
@@ -100,6 +103,24 @@ const windowsDependencies: LocalTunnelRuntimeGuardDependencies = {
     const parsed: unknown = JSON.parse(stdout);
     if (!Array.isArray(parsed)) throw new Error('Tunnel process inventory was not an array');
     return parsed.map(parseProcess);
+  },
+  listListeningPorts: async (pid: number): Promise<readonly number[]> => {
+    if (process.platform !== 'win32' || !Number.isInteger(pid) || pid <= 0 || pid > 2_147_483_647) return [];
+    const script = [
+      "$ErrorActionPreference='Stop'",
+      '$pidValue=[int]$env:LNWJUD_TUNNEL_GUARD_PID',
+      "$ports=@(Get-NetTCPConnection -OwningProcess $pidValue -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalAddress -in @('127.0.0.1','::1') } | Select-Object -ExpandProperty LocalPort)",
+      'ConvertTo-Json -InputObject $ports -Compress',
+    ].join('; ');
+    const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+      windowsHide: true, encoding: 'utf8', timeout: 8_000, maxBuffer: 64 * 1024,
+      env: { ...process.env, LNWJUD_TUNNEL_GUARD_PID: String(pid) },
+    });
+    const parsed: unknown = JSON.parse(stdout);
+    if (!Array.isArray(parsed) || !parsed.every((port) => typeof port === 'number' && Number.isInteger(port) && port > 0 && port <= 65_535)) {
+      throw new Error(`Invalid tunnel process listener inventory for PID ${pid}`);
+    }
+    return parsed;
   },
   probeTunnelId: async (port: number): Promise<string | null> => {
     if (!Number.isInteger(port) || port < 1 || port > 65_535) return null;
