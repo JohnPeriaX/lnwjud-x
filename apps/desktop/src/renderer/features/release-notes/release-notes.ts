@@ -48,11 +48,25 @@ const RELEASE_NOTES: readonly ReleaseNote[] = [
         titleKey: 'whatsNew.category.experience',
         items: [
           {
+            id: 'engineering-harness-settings-persistence',
+            titleKey: 'whatsNew.572.engineeringSettingsPersistence.title',
+            descriptionKey: 'whatsNew.572.engineeringSettingsPersistence.description',
+            badge: 'fixed',
+            tags: ['Engineering Harness', 'Settings', 'restart', 'preload'],
+          },
+          {
             id: 'prosemirror-contenteditable-typing',
             titleKey: 'whatsNew.572.proseMirrorTyping.title',
             descriptionKey: 'whatsNew.572.proseMirrorTyping.description',
             badge: 'fixed',
             tags: ['dom_cdp', 'ProseMirror', 'contenteditable', 'Input.insertText'],
+          },
+          {
+            id: 'git-image-preview',
+            titleKey: 'whatsNew.572.gitImagePreview.title',
+            descriptionKey: 'whatsNew.572.gitImagePreview.description',
+            badge: 'new',
+            tags: ['Git', 'image preview', 'binary diff', 'HEAD', 'Index', 'Working Tree'],
           },
         ],
       },

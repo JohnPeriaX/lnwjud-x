@@ -96,4 +96,21 @@ describe('parseUnifiedDiff', () => {
     expect(markup).toContain('Original (HEAD)');
     expect(markup).toContain('Modified (Index (Staged))');
   });
+
+  it('renders before and after image previews instead of a text diff when image payloads are supplied', () => {
+    const markup = renderToStaticMarkup(createElement(SplitDiffViewer, {
+      locale: 'en',
+      filePath: 'assets/logo.png',
+      patch: '',
+      oldLabel: 'HEAD',
+      newLabel: 'Index (Staged)',
+      oldImage: { mimeType: 'image/png', dataBase64: 'b2xk', byteLength: 3 },
+      newImage: { mimeType: 'image/png', dataBase64: 'bmV3', byteLength: 3 },
+      onClose: () => undefined,
+    }));
+    expect(markup).toContain('data:image/png;base64,b2xk');
+    expect(markup).toContain('data:image/png;base64,bmV3');
+    expect(markup).toContain('Original (HEAD)');
+    expect(markup).toContain('Modified (Index (Staged))');
+  });
 });

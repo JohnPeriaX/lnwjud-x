@@ -531,6 +531,33 @@ describe('BrowserCdpBackend', () => {
     expect(insertTextCall?.params).toEqual({ text: 'Hello ProseMirror' });
   });
 
+  it('does not report success when CDP insertText leaves a contenteditable unchanged', async () => {
+    let evalCount = 0;
+    const protocol = protocolStub({
+      tabs: [tab('tab-1', 'Test', 'http://127.0.0.1/')],
+      responseForRequest: (_tabId, method) => {
+        if (method === 'Runtime.evaluate') {
+          evalCount += 1;
+          if (evalCount === 1) {
+            return { result: { result: { value: { ok: true, isContentEditable: true, tag: 'DIV', text: '' } } } };
+          }
+          return { result: { result: { value: { ok: true, text: '' } } } };
+        }
+        if (method === 'Input.insertText') return { result: {} };
+        return { result: {} };
+      },
+    });
+
+    const result = await new BrowserCdpBackend({ protocol }).execute({
+      action: 'type',
+      tab_id: 'tab-1',
+      parameters: { selector: 'div.ProseMirror', text: 'Hello ProseMirror' },
+      userConfirmed: true,
+    });
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'INTERNAL_ERROR' } });
+  });
+
   it('returns structured not-found error when typing into a missing element', async () => {
     const protocol = protocolStub({
       tabs: [tab('tab-1', 'Test', 'http://127.0.0.1/')],

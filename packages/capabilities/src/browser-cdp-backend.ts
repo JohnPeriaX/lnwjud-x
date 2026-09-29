@@ -235,7 +235,7 @@ export class BrowserCdpBackend implements CapabilityBackend {
           sel.removeAllRanges();
           sel.addRange(range);
         }
-        return { ok: true, isContentEditable: true, tag: el.tagName };
+        return { ok: true, isContentEditable: true, tag: el.tagName, text: el.innerText ?? el.textContent ?? '' };
       }
       const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value')?.set;
       if (setter) {
@@ -269,18 +269,28 @@ export class BrowserCdpBackend implements CapabilityBackend {
 
       const verifyScript = `(() => {
         const el = ${selector !== undefined && selector.length > 0 ? `document.querySelector(${JSON.stringify(selector)})` : 'document.activeElement'};
-        if (!el) return { ok: true, text: ${JSON.stringify(text)} };
-        return { ok: true, text: el.innerText || el.textContent || ${JSON.stringify(text)} };
+        if (!el) return { ok: false, error: 'Element not found after typing' };
+        return { ok: true, text: el.innerText ?? el.textContent ?? '' };
       })()`;
       const verifyResult = await this.evaluateProtocol(tabId, 'Runtime.evaluate', {
         expression: verifyScript,
         returnByValue: true,
         awaitPromise: true,
       }, signal);
+      if (!verifyResult.ok) return verifyResult;
+      const verifyValue = verifyResult.value;
+      if (!isRecord(verifyValue) || verifyValue.ok === false || typeof verifyValue.text !== 'string') {
+        return err(appError('INTERNAL_ERROR', 'Browser CDP text insertion could not be verified', true));
+      }
 
-      const verifiedText = verifyResult.ok && isRecord(verifyResult.value) && typeof verifyResult.value.text === 'string'
-        ? verifyResult.value.text
-        : text;
+      const beforeText = typeof inspectValue.text === 'string' ? inspectValue.text : '';
+      const verifiedText = verifyValue.text;
+      const mutationObserved = text.length === 0
+        ? (!clear || verifiedText.length === 0)
+        : verifiedText !== beforeText || (clear && verifiedText === text);
+      if (!mutationObserved) {
+        return err(appError('INTERNAL_ERROR', 'Browser CDP text insertion did not update the target', true));
+      }
 
       return ok({
         ok: true,

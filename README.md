@@ -57,6 +57,15 @@
 
 Latest published release: **v5.7.1**. The download buttons above point directly to the v5.7.1 assets. The release was published after the exact tagged main commit passed the target-native release gates.
 
+### What's new in v5.7.2 (current source)
+
+- **Git image diff previews:** the Git page can show before/after images at the real `HEAD → Index` and `Index → Working Tree` scopes, including added/deleted images. Preview payloads are bounded to 4 MB per side, with Fit/Actual Size controls and a clear fallback when Chromium cannot decode a particular image format.
+- **Engineering Harness settings persist correctly:** the preload bridge now preserves Harness settings, workspace overrides, and diagnostics, so an enabled Harness no longer appears Off after restarting the app while the saved value is still enabled.
+- **Engineering tools are discoverable and Goal-aware:** Engineering Harness primitives are exposed through the tool catalog and bind to the active Goal/lease correctly.
+- **Safer rich-text typing:** CDP typing uses native `Input.insertText` for ProseMirror/contenteditable targets and verifies that the DOM actually changed instead of reporting a silent no-op as success.
+
+ภาษาไทย: v5.7.2 เพิ่มตัวอย่างรูปก่อน/หลังในหน้า Git, แก้ Engineering Harness ให้จำสถานะเปิดหลังรีสตาร์ต, เปิดเครื่องมือ Engineering ใน catalog ให้ถูกต้อง และตรวจผลการพิมพ์ ProseMirror/ContentEditable จริงก่อนรายงานว่าสำเร็จ
+
 ### What's new in v5.7.1
 
 - **Engineering Harness checkpoints save gate results:** gate updates and review findings now reach the durable Goal instead of being silently dropped by the MCP handler.

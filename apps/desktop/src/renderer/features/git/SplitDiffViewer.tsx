@@ -1,5 +1,5 @@
 import { Fragment, useRef, useState, type ReactElement } from 'react';
-import type { UiLocale } from '@lnwjud/ipc-contracts';
+import type { GitImagePreview, UiLocale } from '@lnwjud/ipc-contracts';
 import { createTranslator } from '../../i18n/index.js';
 
 export interface DiffRow {
@@ -164,11 +164,38 @@ interface SplitDiffViewerProps {
   readonly patch: string;
   readonly oldContent?: string | undefined;
   readonly newContent?: string | undefined;
+  readonly oldImage?: GitImagePreview | undefined;
+  readonly newImage?: GitImagePreview | undefined;
+  readonly imagePreviewError?: 'too_large' | 'unsupported' | undefined;
   readonly additions?: number | undefined;
   readonly deletions?: number | undefined;
   readonly oldLabel?: string | undefined;
   readonly newLabel?: string | undefined;
   readonly onClose: () => void;
+}
+
+function renderImagePane(
+  image: GitImagePreview | undefined,
+  failed: boolean,
+  missingText: string,
+  unsupportedText: string,
+  alt: string,
+  onError: () => void,
+): ReactElement {
+  let preview: ReactElement;
+  if (image === undefined) {
+    preview = <div className="image-diff-empty">{missingText}</div>;
+  } else if (failed) {
+    preview = <div className="image-diff-empty">{unsupportedText}<small>{image.mimeType}</small></div>;
+  } else {
+    preview = <img src={`data:${image.mimeType};base64,${image.dataBase64}`} alt={alt} onError={onError} />;
+  }
+  return (
+    <figure className="image-diff-pane">
+      {preview}
+      {image === undefined ? null : <figcaption>{image.mimeType} · {image.byteLength.toLocaleString()} B</figcaption>}
+    </figure>
+  );
 }
 
 export function SplitDiffViewer({
@@ -177,6 +204,9 @@ export function SplitDiffViewer({
   patch,
   oldContent,
   newContent,
+  oldImage,
+  newImage,
+  imagePreviewError,
   additions: propAdditions,
   deletions: propDeletions,
   oldLabel = 'HEAD',
@@ -185,6 +215,9 @@ export function SplitDiffViewer({
 }: SplitDiffViewerProps): ReactElement {
   const t = createTranslator(locale);
   const [viewMode, setViewMode] = useState<'split' | 'unified'>('split');
+  const [imageFit, setImageFit] = useState(true);
+  const [oldImageFailed, setOldImageFailed] = useState(false);
+  const [newImageFailed, setNewImageFailed] = useState(false);
   const leftScrollRef = useRef<HTMLDivElement>(null);
   const rightScrollRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef<'left' | 'right' | null>(null);
@@ -192,6 +225,7 @@ export function SplitDiffViewer({
   const parsed = parseUnifiedDiff(patch, newContent, oldContent);
   const additionsCount = propAdditions ?? parsed.additions;
   const deletionsCount = propDeletions ?? parsed.deletions;
+  const isImageDiff = oldImage !== undefined || newImage !== undefined || imagePreviewError !== undefined;
 
   const handleLeftScroll = (): void => {
     if (isScrollingRef.current === 'right') return;
@@ -217,6 +251,26 @@ export function SplitDiffViewer({
     });
   };
 
+  let imageDiffBody: ReactElement | null = null;
+  if (isImageDiff) {
+    if (imagePreviewError !== undefined) {
+      const errorText = imagePreviewError === 'too_large' ? t('diff.imageTooLarge') : t('diff.imageUnsupported');
+      imageDiffBody = <div className="diff-empty-notice"><p>{errorText}</p></div>;
+    } else {
+      imageDiffBody = (
+        <div className={`image-diff-container ${imageFit ? 'image-fit' : 'image-actual'}`}>
+          <div className="diff-pane-titles">
+            <div className="diff-pane-title old-title"><span className="dot red-dot" /><span>{t('diff.original', { label: oldLabel })}</span></div>
+            <div className="diff-pane-title new-title"><span className="dot green-dot" /><span>{t('diff.modified', { label: newLabel })}</span></div>
+          </div>
+          <div className="image-diff-grid">
+            {renderImagePane(oldImage, oldImageFailed, t('diff.imageMissing'), t('diff.imageUnsupported'), t('diff.original', { label: oldLabel }), () => { setOldImageFailed(true); })}
+            {renderImagePane(newImage, newImageFailed, t('diff.imageMissing'), t('diff.imageUnsupported'), t('diff.modified', { label: newLabel }), () => { setNewImageFailed(true); })}
+          </div>
+        </div>
+      );
+    }
+  }
 
   return (
     <div className="split-diff-viewer">
@@ -245,20 +299,33 @@ export function SplitDiffViewer({
 
         <div className="diff-header-right">
           <div className="diff-view-toggle">
-            <button
-              type="button"
-              className={`toggle-btn ${viewMode === 'split' ? 'active' : ''}`}
-              onClick={() => { setViewMode('split'); }}
-            >
-              {t('diff.splitView')}
-            </button>
-            <button
-              type="button"
-              className={`toggle-btn ${viewMode === 'unified' ? 'active' : ''}`}
-              onClick={() => { setViewMode('unified'); }}
-            >
-              {t('diff.unifiedView')}
-            </button>
+            {isImageDiff ? (
+              <>
+                <button type="button" className={`toggle-btn ${imageFit ? 'active' : ''}`} onClick={() => { setImageFit(true); }}>
+                  {t('diff.imageFit')}
+                </button>
+                <button type="button" className={`toggle-btn ${imageFit ? '' : 'active'}`} onClick={() => { setImageFit(false); }}>
+                  {t('diff.imageActual')}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={`toggle-btn ${viewMode === 'split' ? 'active' : ''}`}
+                  onClick={() => { setViewMode('split'); }}
+                >
+                  {t('diff.splitView')}
+                </button>
+                <button
+                  type="button"
+                  className={`toggle-btn ${viewMode === 'unified' ? 'active' : ''}`}
+                  onClick={() => { setViewMode('unified'); }}
+                >
+                  {t('diff.unifiedView')}
+                </button>
+              </>
+            )}
           </div>
           <button
             type="button"
@@ -271,7 +338,8 @@ export function SplitDiffViewer({
         </div>
       </div>
 
-      {parsed.hunks.length === 0 ? (
+      {isImageDiff ? imageDiffBody : null}
+      {!isImageDiff && (parsed.hunks.length === 0 ? (
         <div className="diff-empty-notice">
           <p>{t('diff.noChanges')}</p>
         </div>
@@ -420,7 +488,7 @@ export function SplitDiffViewer({
             </div>
           ))}
         </div>
-      )}
+      ))}
     </div>
   );
 }

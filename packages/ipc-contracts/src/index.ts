@@ -736,11 +736,20 @@ export interface GetGitDiffRequest {
   readonly staged?: boolean;
 }
 
+export interface GitImagePreview {
+  readonly mimeType: string;
+  readonly dataBase64: string;
+  readonly byteLength: number;
+}
+
 export interface GetGitDiffResponse {
   readonly path: string;
   readonly patch: string;
   readonly oldContent?: string;
   readonly newContent?: string;
+  readonly oldImage?: GitImagePreview;
+  readonly newImage?: GitImagePreview;
+  readonly imagePreviewError?: 'too_large' | 'unsupported';
   readonly truncated: boolean;
   readonly additions?: number;
   readonly deletions?: number;
