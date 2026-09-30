@@ -113,7 +113,8 @@ function successfulObservation(result: Result<unknown>, claimedCommand: string, 
 }
 
 function exactShaCiObservation(result: Result<unknown>, evidence: EngineeringGateEvidence): boolean {
-  if (!result.ok || !isRecord(result.value) || !isCanonicalCommand(result.value, /^gh(?:\.exe)?$/i, ['run', 'view'], ['--json', 'headSha,status,conclusion'])) return false;
+  if (!result.ok || !isRecord(result.value) || typeof evidence.command !== 'string'
+    || !isCanonicalClaimedCommand(evidence.command, /^gh(?:\.exe)?$/i, ['run', 'view'], ['--json', 'headSha,status,conclusion'])) return false;
   if (typeof evidence.commit !== 'string' || !/^[0-9a-f]{40}$/i.test(evidence.commit) || evidence.conclusion !== 'success') return false;
   if (typeof result.value.stdout !== 'string') return false;
   try {
@@ -129,7 +130,8 @@ function exactShaCiObservation(result: Result<unknown>, evidence: EngineeringGat
 }
 
 function packageObservation(result: Result<unknown>, evidence: EngineeringGateEvidence): boolean {
-  if (!result.ok || !isRecord(result.value) || !isCanonicalCommand(result.value, /^node(?:\.exe)?$/i, [], ['apps/desktop/scripts/verify-release-evidence.mjs'])) return false;
+  if (!result.ok || !isRecord(result.value) || typeof evidence.command !== 'string'
+    || !isCanonicalClaimedCommand(evidence.command, /^node(?:\.exe)?$/i, [], ['apps/desktop/scripts/verify-release-evidence.mjs'])) return false;
   if (typeof evidence.commit !== 'string' || !/^[0-9a-f]{40}$/i.test(evidence.commit) || typeof evidence.artifact !== 'string' || evidence.artifact.length === 0) return false;
   if (typeof result.value.stdout !== 'string') return false;
   const match = /Release evidence verified for lnwjud (\S+) (win32|darwin|linux)\/(x64|arm64) commit ([0-9a-f]{40})/i.exec(result.value.stdout);
@@ -150,16 +152,53 @@ function packageArtifactNames(platform: string | undefined, version: string | un
   return [];
 }
 
-function isCanonicalCommand(record: Record<string, unknown>, executablePattern: RegExp, prefixArgs: readonly string[], suffixArgs: readonly string[]): boolean {
-  if (typeof record.executable !== 'string' || !executablePattern.test(record.executable.split(/[\\/]/).at(-1) ?? '')) return false;
-  let args: string[];
-  if (Array.isArray(record.arguments) && record.arguments.every((arg) => typeof arg === 'string')) args = record.arguments as string[];
-  else if (Array.isArray(record.args) && record.args.every((arg) => typeof arg === 'string')) args = record.args as string[];
-  else return false;
+function isCanonicalClaimedCommand(command: string, executablePattern: RegExp, prefixArgs: readonly string[], suffixArgs: readonly string[]): boolean {
+  const parts = parseFormattedEngineeringCommand(command);
+  if (parts === undefined || !executablePattern.test(parts.executable.split(/[\\/]/).at(-1) ?? '')) return false;
+  const { args } = parts;
   if (args.length !== prefixArgs.length + suffixArgs.length + (prefixArgs.length > 0 ? 1 : 0)) return false;
   if (!prefixArgs.every((arg, index) => args[index] === arg)) return false;
   if (prefixArgs.length > 0 && !/^\d+$/.test(args[prefixArgs.length] ?? '')) return false;
   return suffixArgs.every((arg, index) => args[args.length - suffixArgs.length + index] === arg);
+}
+
+function parseFormattedEngineeringCommand(command: string): { readonly executable: string; readonly args: readonly string[] } | undefined {
+  const parts: string[] = [];
+  let offset = 0;
+  while (offset < command.length) {
+    let part: string;
+    if (command[offset] === '"') {
+      let end = offset + 1;
+      let escaped = false;
+      for (; end < command.length; end += 1) {
+        const character = command[end];
+        if (escaped) escaped = false;
+        else if (character === '\\') escaped = true;
+        else if (character === '"') break;
+      }
+      if (end >= command.length || command[end] !== '"') return undefined;
+      try {
+        const parsed: unknown = JSON.parse(command.slice(offset, end + 1));
+        if (typeof parsed !== 'string') return undefined;
+        part = parsed;
+      } catch {
+        return undefined;
+      }
+      offset = end + 1;
+    } else {
+      let end = command.indexOf(' ', offset);
+      if (end < 0) end = command.length;
+      part = command.slice(offset, end);
+      if (!/^[A-Za-z0-9_./:@+\\-]+$/.test(part)) return undefined;
+      offset = end;
+    }
+    parts.push(part);
+    if (offset === command.length) break;
+    if (command[offset] !== ' ' || offset + 1 >= command.length || command[offset + 1] === ' ') return undefined;
+    offset += 1;
+  }
+  const executable = parts[0];
+  return executable === undefined ? undefined : { executable, args: parts.slice(1) };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

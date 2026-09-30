@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { appError, err, ok } from '@lnwjud/domain';
+import { engineeringCommandFingerprint } from '@lnwjud/shared';
 import { RuntimeEngineeringEvidenceVerifier, createEngineeringSourceStateProvider, type EngineeringSourceState } from './engineering-evidence-verifier.js';
 
 describe('RuntimeEngineeringEvidenceVerifier', () => {
@@ -72,15 +73,21 @@ describe('RuntimeEngineeringEvidenceVerifier', () => {
 
   it('accepts exact-SHA CI and package proof only from the canonical self-verifying commands', async () => {
     const commit = 'cbb9ac40cc6d1acfd0f66a0a2d62c25a8f3a1264';
+    const ciCommand = 'gh run view 36568935961 --json "headSha,status,conclusion"';
+    const nonCanonicalCiCommand = `${ciCommand} --repo example`;
+    const packageCommand = 'node apps/desktop/scripts/verify-release-evidence.mjs';
     const shell = { statusForGoalLiveness: vi.fn(async (_workspaceId: string, taskId: string) => taskId === 'ci-proof'
       ? ok({
-          state: 'completed', exit_code: 0, executable: 'gh',
-          arguments: ['run', 'view', '36568935961', '--json', 'headSha,status,conclusion'],
+          state: 'completed', exit_code: 0, command_fingerprint: engineeringCommandFingerprint(ciCommand),
           stdout: JSON.stringify({ headSha: commit, status: 'completed', conclusion: 'success' }),
         })
-      : ok({
-          state: 'completed', exit_code: 0, executable: 'node',
-          arguments: ['apps/desktop/scripts/verify-release-evidence.mjs'],
+      : taskId === 'noncanonical-ci-proof'
+        ? ok({
+            state: 'completed', exit_code: 0, command_fingerprint: engineeringCommandFingerprint(nonCanonicalCiCommand),
+            stdout: JSON.stringify({ headSha: commit, status: 'completed', conclusion: 'success' }),
+          })
+        : ok({
+          state: 'completed', exit_code: 0, command_fingerprint: engineeringCommandFingerprint(packageCommand),
           stdout: `Release evidence verified for lnwjud 5.7.2 win32/x64 commit ${commit}\n`,
         })) };
     const verifier = new RuntimeEngineeringEvidenceVerifier({
@@ -90,11 +97,11 @@ describe('RuntimeEngineeringEvidenceVerifier', () => {
 
     await expect(verifier.verify('workspace-1', {
       source: 'host_observed', observedAt: '2026-09-29T00:00:00Z', workspaceId: 'workspace-1',
-      command: 'gh run view 36568935961 --json "headSha,status,conclusion"', runId: 'ci-proof', exitCode: 0, commit, conclusion: 'success',
+      command: ciCommand, runId: 'ci-proof', exitCode: 0, commit, conclusion: 'success',
     }, 'exact_sha_ci')).resolves.toBe(true);
     await expect(verifier.verify('workspace-1', {
       source: 'host_observed', observedAt: '2026-09-29T00:00:00Z', workspaceId: 'workspace-1',
-      command: 'node apps/desktop/scripts/verify-release-evidence.mjs', runId: 'package-proof', exitCode: 0, commit,
+      command: packageCommand, runId: 'package-proof', exitCode: 0, commit,
       artifact: 'apps/desktop/dist/installers/lnwjud-Setup-5.7.2.exe',
     }, 'package')).resolves.toBe(true);
     await expect(verifier.verify('workspace-1', {
@@ -104,8 +111,12 @@ describe('RuntimeEngineeringEvidenceVerifier', () => {
     }, 'exact_sha_ci')).resolves.toBe(false);
     await expect(verifier.verify('workspace-1', {
       source: 'host_observed', observedAt: '2026-09-29T00:00:00Z', workspaceId: 'workspace-1',
-      command: 'node apps/desktop/scripts/verify-release-evidence.mjs', runId: 'package-proof', exitCode: 0, commit,
+      command: packageCommand, runId: 'package-proof', exitCode: 0, commit,
     }, 'package')).resolves.toBe(false);
+    await expect(verifier.verify('workspace-1', {
+      source: 'host_observed', observedAt: '2026-09-29T00:00:00Z', workspaceId: 'workspace-1',
+      command: nonCanonicalCiCommand, runId: 'noncanonical-ci-proof', exitCode: 0, commit, conclusion: 'success',
+    }, 'exact_sha_ci')).resolves.toBe(false);
   });
 
   it('rejects historical exact-SHA CI or package proof when the current tracked source is dirty or at another commit', async () => {
