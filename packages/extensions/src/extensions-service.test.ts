@@ -388,6 +388,37 @@ describe('LocalExtensionsService MCP bridge', () => {
     await manager.close();
   });
 
+  it('reuses the same healthy child session after one tool call rejects', async () => {
+    let connects = 0;
+    let closes = 0;
+    let calls = 0;
+    const session: McpClientSession = {
+      listTools: async () => [{ name: 'ping', description: 'Ping tool' }],
+      listResources: async () => [],
+      callTool: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error('tool invocation failed');
+        return { content: [{ type: 'text', text: 'pong' }] };
+      },
+      close: async () => { closes += 1; },
+    };
+    const manager = new McpSessionManager({
+      clientFactory: { connect: async (): Promise<McpClientSession> => { connects += 1; return session; } },
+      callTimeoutMs: 500,
+    });
+
+    await expect(manager.call('mock', { command: 'node' }, 'ping', {})).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INTERNAL_ERROR', message: expect.stringContaining('tool invocation failed') },
+    });
+    expect(manager.isConnected('mock')).toBe(true);
+    await expect(manager.call('mock', { command: 'node' }, 'ping', {})).resolves.toMatchObject({ ok: true });
+    expect(connects).toBe(1);
+    expect(closes).toBe(0);
+    await manager.close();
+    expect(closes).toBe(1);
+  });
+
   it('shares one child connection across concurrent calls', async () => {
     let connects = 0;
     const session: McpClientSession = {
@@ -467,8 +498,9 @@ describe('LocalExtensionsService MCP bridge', () => {
     expect(closes).toBe(1);
   });
 
-  it('reports an unverified lifecycle when an external session cannot be closed', async () => {
+  it('reports an unverified lifecycle and refuses to spawn a replacement while the old child cannot be proven terminated', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-extensions-unverified-'));
+    let connects = 0;
     const session: McpClientSession = {
       listTools: async () => [{ name: 'ping', description: 'Ping tool' }],
       listResources: async () => [],
@@ -479,7 +511,7 @@ describe('LocalExtensionsService MCP bridge', () => {
       settings: settingsWithMockServer(),
       homeDir: root,
       appDataDir: root,
-      clientFactory: { connect: async (): Promise<McpClientSession> => session },
+      clientFactory: { connect: async (): Promise<McpClientSession> => { connects += 1; return session; } },
     });
     try {
       await expect(service.describeMcpServer({ server: 'mock' })).resolves.toMatchObject({ ok: true });
@@ -492,19 +524,28 @@ describe('LocalExtensionsService MCP bridge', () => {
         connected: false,
         lifecycle: 'termination_unverified',
       });
+      await expect(service.describeMcpServer({ server: 'mock' })).resolves.toMatchObject({
+        ok: false,
+        error: { code: 'INTERNAL_ERROR', message: expect.stringContaining('termination is unverified') },
+      });
+      expect(connects).toBe(1);
     } finally {
       await service.close();
       await rm(root, { recursive: true, force: true });
     }
   });
 
-  it('reports a replacement external session as connected after an earlier close failure', async () => {
+  it('connects a replacement only after retrying and verifying termination of the previous child', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-extensions-reconnected-'));
+    let oldCloseAttempts = 0;
     const firstSession: McpClientSession = {
       listTools: async () => [{ name: 'ping', description: 'Ping tool' }],
       listResources: async () => [],
       callTool: async () => ({ content: [] }),
-      close: async () => { throw new Error('old tree still alive'); },
+      close: async () => {
+        oldCloseAttempts += 1;
+        if (oldCloseAttempts === 1) throw new Error('old tree still alive');
+      },
     };
     const replacementSession: McpClientSession = {
       listTools: async () => [{ name: 'ping', description: 'Ping tool' }],
@@ -525,6 +566,8 @@ describe('LocalExtensionsService MCP bridge', () => {
       await expect(service.describeMcpServer({ server: 'mock' })).resolves.toMatchObject({ ok: true });
       await service.disconnectMcpServer?.('mock');
       await expect(service.describeMcpServer({ server: 'mock' })).resolves.toMatchObject({ ok: true });
+      expect(oldCloseAttempts).toBe(2);
+      expect(connects).toBe(2);
       const listed = await service.listMcpServers();
       expect(listed.ok).toBe(true);
       if (!listed.ok) return;

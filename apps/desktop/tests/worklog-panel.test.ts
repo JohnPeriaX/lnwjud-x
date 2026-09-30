@@ -5,6 +5,7 @@ import type { InFlightWorkItem, WorkLogEntry } from '@lnwjud/ipc-contracts';
 import { formatWorkLogCopyText, newestFirstWorkLogRows, WorkLogPanel } from '../src/renderer/features/worklog/WorkLogPanel.js';
 import * as workLogPanelModule from '../src/renderer/features/worklog/WorkLogPanel.js';
 import { retainedHistoricalEntriesAfterClear } from '../src/renderer/features/worklog/WorkLogPage.js';
+import { copyCanonicalScopeId } from '../src/renderer/features/CopyableScopeBadge.js';
 
 const mockInFlight: InFlightWorkItem[] = [
   {
@@ -23,6 +24,7 @@ const mockEntries: WorkLogEntry[] = [
     id: 'entry-1',
     timestamp: '2026-08-19T14:01:18.000Z',
     kind: 'result',
+    level: 'info',
     toolName: 'shell',
     resultCode: 'SUCCESS',
     errorMessage: null,
@@ -35,7 +37,8 @@ const mockEntries: WorkLogEntry[] = [
   {
     id: 'entry-2',
     timestamp: '2026-08-19T14:00:36.000Z',
-    kind: 'error',
+    kind: 'result',
+    level: 'warn',
     toolName: 'shell',
     resultCode: 'PERMISSION_REQUIRED',
     errorMessage: 'Destructive operation requires explicit user confirmation',
@@ -46,6 +49,15 @@ const mockEntries: WorkLogEntry[] = [
     sessionId: 'session-a',
   },
 ];
+
+const mockErrorEntry: WorkLogEntry = {
+  ...mockEntries[1]!,
+  id: 'entry-error',
+  level: 'error',
+  resultCode: 'INTERNAL_ERROR',
+  errorMessage: 'Operation failed',
+  targetSummary: 'service=lnwjud',
+};
 
 describe('WorkLogPanel', () => {
   it('keeps rows and workspace metadata in one stable search snapshot until search clears', () => {
@@ -105,13 +117,15 @@ describe('WorkLogPanel', () => {
       filter: 'all',
       onFilterChange: () => {},
       onClear: async () => {},
-      entries: mockEntries,
+      entries: [...mockEntries, mockErrorEntry],
       inFlight: mockInFlight,
     }));
 
     expect(markup).toContain('บันทึกการทำงาน');
     expect(markup).toContain('[TASK]');
     expect(markup).toContain('[RESULT]');
+    expect(markup).toContain('[INFO]');
+    expect(markup).toContain('[WARN]');
     expect(markup).toContain('[ERROR]');
     expect(markup).toContain('npm test');
     expect(markup).toContain('python -c &quot;print(1)&quot;');
@@ -150,12 +164,26 @@ describe('WorkLogPanel', () => {
       filter: 'error',
       onFilterChange: () => {},
       onClear: async () => {},
-      entries: mockEntries,
+      entries: [...mockEntries, mockErrorEntry],
       inFlight: [],
     }));
 
     expect(markup).toContain('[ERROR]');
+    expect(markup).toContain('Operation failed');
+    expect(markup).not.toContain('Destructive operation requires explicit user confirmation');
+    expect(markup).not.toContain('python -c &quot;print(1)&quot;');
+  });
+
+  it('filters recoverable warning outcomes separately from hard errors', () => {
+    const markup = renderToStaticMarkup(createElement(WorkLogPanel, {
+      title: 'Work log', emptyLabel: 'Empty', filterAllLabel: 'All', filterWarningLabel: 'Warnings', filterErrorLabel: 'Errors',
+      clearSessionLabel: 'Clear session', clearWorkspaceLabel: 'Clear workspace', clearAllLabel: 'Clear all',
+      filter: 'warn', onFilterChange: () => {}, onClear: async () => {}, entries: [...mockEntries, mockErrorEntry], inFlight: [],
+    }));
+
+    expect(markup).toContain('[WARN]');
     expect(markup).toContain('Destructive operation requires explicit user confirmation');
+    expect(markup).not.toContain('Operation failed');
     expect(markup).not.toContain('python -c &quot;print(1)&quot;');
   });
 
@@ -245,6 +273,17 @@ describe('WorkLogPanel', () => {
     expect(copied).not.toContain('2026-09-09T05:23:22.224Z');
   });
 
+  it('copies the full canonical scope identifier instead of the rendered label', async () => {
+    const workspaceId = '60560b3a-0007-4917-b09b-10b9a292c70e';
+    let received = '';
+    const copied = await copyCanonicalScopeId(workspaceId, async (value) => {
+      received = value;
+      return true;
+    });
+    expect(copied).toBe(true);
+    expect(received).toBe(workspaceId);
+  });
+
   it('renders and copies complete workspace/session/call identifiers without ellipsis', () => {
     const workspaceId = '372e9384-9628-43be-b766-661cdb591383';
     const sessionId = 'session-1234567890abcdef-fully-visible';
@@ -261,6 +300,10 @@ describe('WorkLogPanel', () => {
       filter: 'all', onFilterChange: () => {}, onClear: async () => {}, entries: [entry], inFlight: [], workspaces,
     }));
     expect(markup).toContain(`lnwjud — ${workspaceId}`);
+    expect(markup).toContain(`title="${workspaceId}"`);
+    expect(markup).toContain(`title="${sessionId}"`);
+    expect(markup).toContain('scope-badge workspace copyable');
+    expect(markup).toContain('scope-badge session copyable');
     expect(markup).toContain(sessionId);
     expect(markup).not.toContain('372e9384…1383');
     expect(markup).not.toContain('session-1…');

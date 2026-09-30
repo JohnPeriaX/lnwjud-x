@@ -146,7 +146,7 @@ export class LogHub {
       this.feedMcpLifecycle(
         'work-log',
         entry.id,
-        entry.kind === 'error' ? 'error' : 'info',
+        entry.level ?? classifyMcpLogLevel(entry.toolName, event.phase, entry.resultCode, entry.errorMessage ?? null),
         formatWorkLogLine(entry),
         { kind: 'mcp', phase: event.phase, callId: entry.callId ?? entry.id, toolName: entry.toolName, resultCode: event.phase === 'started' ? null : normalizeMcpResultCode(entry.resultCode) },
         entry.timestamp,
@@ -370,6 +370,7 @@ export interface WorkLogFeedEntry {
   readonly id: string;
   readonly timestamp?: string;
   readonly kind: 'task' | 'result' | 'error';
+  readonly level?: LogLevel;
   readonly toolName: string;
   readonly resultCode: string;
   readonly errorMessage?: string | null;
@@ -433,7 +434,7 @@ function formatInFlightLine(entry: InFlightFeedEntry): string {
 }
 
 function formatWorkLogLine(entry: WorkLogFeedEntry): string {
-  return `${entry.kind === 'task' ? '[TASK]' : entry.kind === 'error' ? '[ERROR]' : '[RESULT]'} ${entry.toolName} ${entry.resultCode}${entry.callId === undefined || entry.callId.length === 0 ? '' : ` callId=${entry.callId}`}${entry.errorMessage === null || entry.errorMessage === undefined || entry.errorMessage.length === 0 ? '' : ` — ${entry.errorMessage}`}${entry.targetSummary === null ? '' : ` — ${entry.targetSummary}`}`;
+  return `${entry.kind === 'task' ? '[TASK]' : '[RESULT]'} ${entry.toolName} ${entry.resultCode}${entry.callId === undefined || entry.callId.length === 0 ? '' : ` callId=${entry.callId}`}${entry.errorMessage === null || entry.errorMessage === undefined || entry.errorMessage.length === 0 ? '' : ` — ${entry.errorMessage}`}${entry.targetSummary === null ? '' : ` — ${entry.targetSummary}`}`;
 }
 
 function parseTunnelLine(raw: string): { readonly level: LogLevel; readonly text: string; readonly timestamp?: string; readonly correlation: LogCorrelation } {
@@ -479,9 +480,10 @@ function parseMcpActivityLine(raw: string): { readonly key: string; readonly lev
   const sessionId = boundedScopeValue(record.sessionId);
   const timestamp = boundedTimestamp(record.timestamp);
   const kind = classifyMcpWorkLogKind(toolName, phase, resultCode);
+  const level = classifyMcpLogLevel(toolName, phase, resultCode, resultMessage);
   return {
     key: mcpActivityKey(callId.length > 0 ? callId : 'unknown', phase, timestamp ?? raw.slice(0, 160), workspaceId, sessionId),
-    level: kind === 'error' ? 'error' : 'info',
+    level,
     text: formatWorkLogLine({
       id: callId,
       kind,
@@ -564,11 +566,40 @@ function matchesLogScope(line: Pick<LogLine, 'workspaceId' | 'sessionId'>, scope
   return true;
 }
 
-export function classifyMcpWorkLogKind(toolName: string, phase: 'started' | 'completed', resultCode: string): 'task' | 'result' | 'error' {
-  if (phase === 'started') return 'task';
+export function classifyMcpWorkLogKind(_toolName: string, phase: 'started' | 'completed', resultCode: string): 'task' | 'result' | 'error' {
+  void resultCode;
+  return phase === 'started' ? 'task' : 'result';
+}
+
+const RECOVERABLE_MCP_RESULT_CODES = new Set([
+  'PERMISSION_REQUIRED',
+  'PERMISSION_DENIED',
+  'SECRET_ACCESS_DENIED',
+  'CONFLICT',
+  'PATH_OUTSIDE_WORKSPACE',
+  'ENGINEERING_PREFLIGHT_REQUIRED',
+  'ENGINEERING_POLICY_CHANGED',
+]);
+
+const INVALID_INPUT_WARNING_TOOL = /^(?:get_|list_|search_|find_|read_|process_(?:status|logs|context)|service_context|task_create|checkpoint_goal|update_goal_plan|claim_scheduled_continuation|prepare_scheduled_continuation|record_scheduled_continuation_receipt|cancel_scheduled_continuation|session_handoff|engineering_(?:start_task|prepare_task))/;
+const GENERIC_DIAGNOSTIC_WARNING_TOOL = /^(?:process_context|service_context)$/;
+
+export function classifyMcpLogLevel(
+  toolName: string,
+  phase: 'started' | 'completed',
+  resultCode: string,
+  resultMessage: string | null = null,
+): LogLevel {
+  if (phase === 'started') return 'info';
   const normalized = resultCode.toUpperCase();
-  if (normalized === 'SUCCESS' || normalized === 'STARTED' || normalized === 'PERMISSION_REQUIRED' || normalized === 'CONFLICT' || normalized === 'PATH_OUTSIDE_WORKSPACE') return 'result';
-  if ((toolName === 'process_status' || toolName === 'process_logs') && normalized === 'PROCESS_NOT_FOUND') return 'result';
+  if (normalized === 'SUCCESS' || normalized === 'STARTED') return 'info';
+  if (RECOVERABLE_MCP_RESULT_CODES.has(normalized)) return 'warn';
+  if (normalized === 'PROCESS_NOT_FOUND' && /^(?:process_status|process_logs|process_context)$/.test(toolName)) return 'warn';
+  if (normalized === 'INVALID_INPUT' && INVALID_INPUT_WARNING_TOOL.test(toolName)) return 'warn';
+  if (normalized === 'INTERNAL_ERROR' && GENERIC_DIAGNOSTIC_WARNING_TOOL.test(toolName)
+    && /^Operation failed$/i.test((resultMessage ?? '').trim())) return 'warn';
+  if (toolName === 'shell' && /^(?:INVALID_INPUT|PROCESS_NOT_FOUND)$/.test(normalized)
+    && /\btask\b.*\b(?:not owned|not found|not running|expired)\b/i.test(resultMessage ?? '')) return 'warn';
   return 'error';
 }
 

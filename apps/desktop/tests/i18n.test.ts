@@ -57,7 +57,6 @@ describe('i18n translations', () => {
       'guidedTunnel.tipTitle',
       'guidedTunnel.tipBody',
       'guidedTunnel.privacy',
-      'guidedTunnel.devModeWarning',
       'guidedTunnel.startSetup',
       'guidedTunnel.later',
       'guidedTunnel.openGuide',

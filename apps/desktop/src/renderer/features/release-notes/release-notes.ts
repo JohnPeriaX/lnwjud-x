@@ -21,6 +21,65 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.7.3',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          {
+            id: 'engineering-evidence-and-windows-signing',
+            titleKey: 'whatsNew.573.engineeringEvidence.title',
+            descriptionKey: 'whatsNew.573.engineeringEvidence.description',
+            badge: 'improved',
+            tags: ['Engineering Harness', 'exact SHA', 'cross-platform', 'Authenticode'],
+          },
+          {
+            id: 'durable-goal-continuity',
+            titleKey: 'whatsNew.573.goalContinuity.title',
+            descriptionKey: 'whatsNew.573.goalContinuity.description',
+            badge: 'fixed',
+            tags: ['Durable Goal', 'Ponytail', 'skill activation', 'finish_goal', 'CAS'],
+          },
+          {
+            id: 'external-mcp-session-lifecycle',
+            titleKey: 'whatsNew.573.mcpLifecycle.title',
+            descriptionKey: 'whatsNew.573.mcpLifecycle.description',
+            badge: 'fixed',
+            tags: ['Serena', 'External MCP', 'process reuse', 'cleanup'],
+          },
+        ],
+      },
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          {
+            id: 'linux-appimage-secure-storage-startup',
+            titleKey: 'whatsNew.573.linuxStartup.title',
+            descriptionKey: 'whatsNew.573.linuxStartup.description',
+            badge: 'fixed',
+            tags: ['Linux', 'AppImage', 'secure storage', 'FUSE'],
+          },
+          {
+            id: 'truthful-log-severity-and-copyable-scope',
+            titleKey: 'whatsNew.573.logSeverity.title',
+            descriptionKey: 'whatsNew.573.logSeverity.description',
+            badge: 'improved',
+            tags: ['Work Log', 'Live Logs', 'INFO', 'WARN', 'ERROR', 'Workspace ID'],
+          },
+          {
+            id: 'fresh-tunnel-and-recovery-defaults',
+            titleKey: 'whatsNew.573.tunnelRecovery.title',
+            descriptionKey: 'whatsNew.573.tunnelRecovery.description',
+            badge: 'improved',
+            tags: ['Secure MCP Tunnel', 'auto reconnect', 'recovery', '3 days'],
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.7.2',
     categories: [
       {

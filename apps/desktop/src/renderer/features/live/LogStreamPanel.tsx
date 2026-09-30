@@ -4,12 +4,13 @@ import { formatDisplayTimestampItem } from '@lnwjud/shared/date-time-display';
 import { copyTextToClipboard } from '../../clipboard.js';
 import type { MessageKey } from '../../i18n/messages.js';
 import { formatLogExportDateTime, formatLogUiTime } from '../../log-timestamp.js';
+import { CopyableScopeBadge } from '../CopyableScopeBadge.js';
 import { ExpandableTargetDetail } from '../logs/ExpandableTargetDetail.js';
 import { activeDetailMatchIds, activeLogFeed, createDetailSearchState, normalizeDetailSearchQuery, reduceDetailSearchState, transitionLogFeedFreeze } from '../logs/detail-search-state.js';
 import { collectSessionFilterOptions, collectWorkspaceFilterOptions } from '../../scope-filter-options.js';
 
 export type LogTab = LogSource;
-export type LogEventKind = 'task' | 'result' | 'error';
+export type LogEventKind = 'task' | 'result';
 
 export interface LogScopeSelection {
   readonly workspaceId: string | null;
@@ -283,8 +284,8 @@ function ScopeBadges(props: { readonly line: LogLine; readonly showWorkspace: bo
   const sessionLabel = props.line.sessionId === null ? null : shortScopeId(props.line.sessionId);
   if ((!props.showWorkspace || workspaceLabel === null) && (!props.showSession || sessionLabel === null)) return null;
   return <span className="scope-badges">
-    {props.showWorkspace && workspaceLabel !== null ? <span className="scope-badge workspace">{workspaceLabel}</span> : null}
-    {props.showSession && sessionLabel !== null ? <span className="scope-badge session">{sessionLabel}</span> : null}
+    {props.showWorkspace && workspaceLabel !== null && canonicalId !== null ? <CopyableScopeBadge kind="workspace" value={canonicalId} displayLabel={workspaceLabel} /> : null}
+    {props.showSession && sessionLabel !== null && props.line.sessionId !== null ? <CopyableScopeBadge kind="session" value={props.line.sessionId} displayLabel={sessionLabel} /> : null}
   </span>;
 }
 
@@ -307,11 +308,9 @@ export function compareLogLinesNewestFirst(left: LogLine, right: LogLine): numbe
 export function logDisplayParts(line: LogLine): { readonly kind: LogEventKind | null; readonly detail: string } {
   if (line.source === 'mcp' || line.source === 'process') {
     const match = /^\[(TASK|RESULT|ERROR)\]\s*(.*)$/s.exec(line.text);
-    if (match !== null) return { kind: match[1]!.toLowerCase() as LogEventKind, detail: match[2] ?? '' };
+    if (match !== null) return { kind: match[1] === 'TASK' ? 'task' : 'result', detail: match[2] ?? '' };
     if (line.correlation?.kind === 'mcp') {
-      if (line.correlation.phase === 'started') return { kind: 'task', detail: line.text };
-      const failed = line.correlation.resultCode !== null && line.correlation.resultCode !== 'SUCCESS';
-      return { kind: failed ? 'error' : 'result', detail: line.text };
+      return { kind: line.correlation.phase === 'started' ? 'task' : 'result', detail: line.text };
     }
   }
   return { kind: null, detail: line.text };

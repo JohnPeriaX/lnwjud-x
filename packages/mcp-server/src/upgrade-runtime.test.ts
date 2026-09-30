@@ -388,6 +388,26 @@ describe('upgrade runtime', () => {
     expect(calls).toEqual([]);
   });
 
+  it('rejects an ambiguous task_create command string instead of treating the whole line as an executable path', async () => {
+    const calls: unknown[] = [];
+    const services = {
+      capabilities: {
+        async execute(tool: string, input: unknown): Promise<ReturnType<typeof ok>> {
+          calls.push({ tool, input });
+          return ok({ started: true });
+        },
+      },
+    } as unknown as McpApplicationServices;
+    const runtime = new UpgradeRuntimeService(services, actor);
+
+    await expect(runtime.execute('task_create', { command: 'echo noop' }))
+      .resolves.toMatchObject({
+        ok: false,
+        error: { code: 'INVALID_INPUT', message: expect.stringContaining('executable') },
+      });
+    expect(calls).toEqual([]);
+  });
+
   it('bounds task_status output polling while task_result remains the full-result path', async () => {
     const calls: Array<{ tool: string; input: Record<string, unknown> }> = [];
     const longOutput = `prefix-${'x'.repeat(40_000)}-tail`;

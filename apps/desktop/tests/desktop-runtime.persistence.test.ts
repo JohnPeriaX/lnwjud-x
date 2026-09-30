@@ -807,6 +807,7 @@ describe('DesktopRuntime persistence', () => {
     try {
       const initial = firstRuntime.getUserSettings();
       expect(initial.eccEnabled).toBe(false);
+      expect(initial.tunnelAutoReconnect).toBe(false);
       const next = {
         ...initial,
         mcpCallTimeoutMs: 120_000,
@@ -826,7 +827,7 @@ describe('DesktopRuntime persistence', () => {
         closeBehavior: 'quit' as const,
         launchAtStartup: true,
         startMinimized: true,
-        tunnelAutoReconnect: false,
+        tunnelAutoReconnect: true,
         tunnelMaxAutoRestarts: 2,
         customPermission: {
           read: 'ALLOW' as const,
@@ -881,7 +882,7 @@ describe('DesktopRuntime persistence', () => {
           closeBehavior: 'quit',
           launchAtStartup: true,
           startMinimized: true,
-          tunnelAutoReconnect: false,
+          tunnelAutoReconnect: true,
           tunnelMaxAutoRestarts: 2,
           customPermission: { allowedExecutables: ['python.exe', 'docker.exe'] },
           extensions: {

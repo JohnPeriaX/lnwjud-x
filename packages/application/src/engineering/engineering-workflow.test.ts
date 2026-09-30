@@ -62,7 +62,9 @@ describe('engineering workflow routing', () => {
       projectProfile: { engineering: { architecture: { checkCommand: 'pnpm lint:arch' }, requiredPlatforms: ['win32', 'linux'] } },
     });
     expect(planned.gates.find((gate) => gate.id === 'architecture')).toMatchObject({ applicability: 'required', status: 'pending', checkCommand: 'pnpm lint:arch' });
-    expect(planned.gates.find((gate) => gate.id === 'cross_platform')).toMatchObject({ applicability: 'required', status: 'pending' });
+    expect(planned.gates.find((gate) => gate.id === 'cross_platform')).toMatchObject({
+      applicability: 'required', status: 'pending', requiredPlatforms: ['win32', 'linux'],
+    });
     expect(planned.gates.find((gate) => gate.id === 'architecture')?.checkCommand).toBe('pnpm lint:arch');
     expect(planned.gates.find((gate) => gate.id === 'cross_platform')?.reason).toContain('win32');
   });

@@ -204,6 +204,7 @@ export type GoalStateFailureCode =
   | 'not_found'
   | 'owner_mismatch'
   | 'conflict'
+  | 'precondition'
   | 'lease_invalid'
   | 'terminal'
   | 'corrupt';

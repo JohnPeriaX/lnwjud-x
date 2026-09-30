@@ -53,7 +53,7 @@ and returns the response without opening a public inbound port on the host.
 
 ## Current published version: v5.7.2
 
-## Current source version: v5.7.2
+## Current source version: v5.7.3
 
 Latest published release: **v5.7.2**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
 
@@ -619,8 +619,8 @@ corepack pnpm@10.15.0 package:windows
 The Windows 10/11 x64 artifacts are written to:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.7.2.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.7.2.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.7.3.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.7.3.exe
 ```
 
 The installer is per-user by default. The portable executable needs no installation but uses the same per-user lnwjud data/settings location. A common installed executable path is:
@@ -1128,7 +1128,7 @@ This complete index is generated from `ToolRegistry.listAll()`, not copied from 
 | 179 | `mcp_discover` | READ | default | operational | service_dispatch | Discover external MCP servers without flattening native tools. |
 | 180 | `mcp_health` | READ | default | operational | service_dispatch | Return external MCP connection health. |
 | 181 | `mcp_resources` | READ | default | dependency_gated | service_dispatch | List resources exposed by connected MCP servers when the child server supports resources/list. |
-| 182 | `task_create` | EXECUTE | default | operational | service_dispatch | Create a durable background task through the local shell task runtime. When the task belongs to a durable goal, pass goalId (or the current goalLease envelope) so terminal goals reject stale task creation before launch. Pass executable (or command), arguments, cwd, timeout_seconds, and workspaceId as needed. |
+| 182 | `task_create` | EXECUTE | default | operational | service_dispatch | Create a durable background task through the local shell task runtime. When the task belongs to a durable goal, pass goalId (or the current goalLease envelope) so terminal goals reject stale task creation before launch. Pass executable plus arguments; command is only an executable alias, never a shell command line. Pass cwd, timeout_seconds, and workspaceId as needed. |
 | 183 | `task_status` | READ | default | operational | service_dispatch | Read durable managed task state with bounded recent output by taskId; use task_result for the full captured result. |
 | 184 | `task_cancel` | EXECUTE | default | operational | service_dispatch | Cancel a durable managed task by taskId using the same verified process-tree termination path as shell tasks. |
 | 185 | `task_result` | READ | default | operational | service_dispatch | Read the current durable managed task result and captured output by taskId. |

@@ -36,6 +36,16 @@ describe('desktop packaged startup regression contract', () => {
     expect(secretBootstrap).not.toContain('shouldUseSynchronousMacosSafeStorage');
   });
 
+  it('degrades Linux startup when secure storage is unavailable without creating a checkpoint master key', () => {
+    const secretBootstrap = section(
+      'async function resolveDesktopRuntimeSecrets',
+      'async function migrateV3SafeStorageSecrets',
+    );
+    expect(secretBootstrap).toContain('shouldDegradeUnavailableSecureStorage(process.platform, status)');
+    expect(secretBootstrap).toContain('checkpointCipher: createUnavailableCheckpointCipher');
+    expect(secretBootstrap.indexOf('shouldDegradeUnavailableSecureStorage')).toBeLessThan(secretBootstrap.indexOf('new CheckpointKeyStore'));
+  });
+
   it('routes migrated v3 tunnel secrets through safeStorage before legacy migration', () => {
     const resolver = section('async function resolveDesktopRuntimeSecrets', 'async function migrateV3SafeStorageSecrets');
     const migration = section('async function migrateV3SafeStorageSecrets', 'async function readTrustedSecretFile');

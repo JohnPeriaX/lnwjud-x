@@ -23,10 +23,11 @@ describe('LogHub', () => {
       targetSummary: 'docs\\plan.md',
     }], []);
 
-    expect(hub.snapshot().lines[0]?.text).toContain('[ERROR] write_file FILE_NOT_FOUND — File or directory was not found');
+    expect(hub.snapshot().lines[0]?.level).toBe('error');
+    expect(hub.snapshot().lines[0]?.text).toContain('[RESULT] write_file FILE_NOT_FOUND — File or directory was not found');
   });
 
-  it('treats confirmation requests and stale process reads as notices, not errors', async () => {
+  it('treats recoverable control flow and generic diagnostic probes as notices, not errors', async () => {
     vi.useFakeTimers();
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-loghub-control-flow-'));
     temporaryRoots.push(root);
@@ -36,6 +37,12 @@ describe('LogHub', () => {
       { callId: 'conflict', toolName: 'edit_file', phase: 'completed', resultCode: 'CONFLICT', resultMessage: 'exact edit did not match' },
       { callId: 'scope', toolName: 'search_text', phase: 'completed', resultCode: 'PATH_OUTSIDE_WORKSPACE', resultMessage: 'outside workspace' },
       { callId: 'stale-status', toolName: 'process_status', phase: 'completed', resultCode: 'PROCESS_NOT_FOUND', resultMessage: 'Process was not found' },
+      { callId: 'stale-shell', toolName: 'shell', phase: 'completed', resultCode: 'PERMISSION_DENIED', resultMessage: 'Task is not owned by this client session and workspace' },
+      { callId: 'bad-goal-probe', toolName: 'get_scheduled_continuation', phase: 'completed', resultCode: 'INVALID_INPUT', resultMessage: 'Tool input is invalid' },
+      { callId: 'stale-engineering', toolName: 'edit_file', phase: 'completed', resultCode: 'ENGINEERING_POLICY_CHANGED', resultMessage: 'The Engineering task binding scope is stale' },
+      { callId: 'service-probe', toolName: 'service_context', phase: 'completed', resultCode: 'INTERNAL_ERROR', resultMessage: 'Operation failed' },
+      { callId: 'process-probe', toolName: 'process_context', phase: 'completed', resultCode: 'INTERNAL_ERROR', resultMessage: 'Operation failed' },
+      { callId: 'bad-task-probe', toolName: 'task_create', phase: 'completed', resultCode: 'INVALID_INPUT', resultMessage: "Executable 'echo noop' was not found" },
       { callId: 'real-error', toolName: 'write_file', phase: 'completed', resultCode: 'FILE_NOT_FOUND', resultMessage: 'File was not found' },
     ].map((entry) => JSON.stringify(entry)).join('\n') + '\n', 'utf8');
 
@@ -45,16 +52,13 @@ describe('LogHub', () => {
     hub.stop();
 
     const lines = hub.snapshot().lines.filter((line) => line.source === 'mcp');
-    expect(lines.find((line) => line.text.includes('apply_patch'))?.level).toBe('info');
-    expect(lines.find((line) => line.text.includes('edit_file'))?.level).toBe('info');
-    expect(lines.find((line) => line.text.includes('search_text'))?.level).toBe('info');
-    expect(lines.find((line) => line.text.includes('process_status'))?.level).toBe('info');
-    expect(lines.find((line) => line.text.includes('write_file'))?.level).toBe('error');
-    expect(lines.find((line) => line.text.includes('apply_patch'))?.text).toContain('[RESULT]');
-    expect(lines.find((line) => line.text.includes('edit_file'))?.text).toContain('[RESULT]');
-    expect(lines.find((line) => line.text.includes('search_text'))?.text).toContain('[RESULT]');
-    expect(lines.find((line) => line.text.includes('process_status'))?.text).toContain('[RESULT]');
-    expect(lines.find((line) => line.text.includes('write_file'))?.text).toContain('[ERROR]');
+    const byCall = (callId: string): (typeof lines)[number] | undefined => lines.find((line) => line.correlation?.kind === 'mcp' && line.correlation.callId === callId);
+    for (const callId of ['confirm', 'conflict', 'scope', 'stale-status', 'stale-shell', 'bad-goal-probe', 'stale-engineering', 'service-probe', 'process-probe', 'bad-task-probe']) {
+      expect(byCall(callId)?.level).toBe('warn');
+      expect(byCall(callId)?.text).toContain('[RESULT]');
+    }
+    expect(byCall('real-error')?.level).toBe('error');
+    expect(byCall('real-error')?.text).toContain('[RESULT]');
   });
 
   it('feeds and snapshots lines per source with dedupe', () => {

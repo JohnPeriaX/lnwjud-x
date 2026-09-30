@@ -69,20 +69,26 @@ describe('Windows release trust evidence', () => {
     expect(bridge.includes(0x0d)).toBe(false);
   });
 
-  it('uploads trust evidence from CI and verifies Authenticode when production signing is configured', async () => {
+  it('fails closed for official Windows releases unless Authenticode is valid while preserving local unsigned packaging', async () => {
     const ci = (await readFile(path.join(repositoryRoot, '.github', 'workflows', 'ci.yml'), 'utf8')).replaceAll('\r\n', '\n');
     const release = (await readFile(path.join(repositoryRoot, '.github', 'workflows', 'release.yml'), 'utf8')).replaceAll('\r\n', '\n');
+    const evidenceWriter = await readFile(path.join(desktopRoot, 'scripts', 'write-release-evidence.mjs'), 'utf8');
+    const evidenceVerifier = await readFile(path.join(desktopRoot, 'scripts', 'verify-release-evidence.mjs'), 'utf8');
 
     expect(ci).toContain('CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}');
     expect(ci).toContain('CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}');
+    expect(ci).toContain('Require Windows production signing credentials');
+    expect(ci).toContain("LNWJUD_REQUIRE_WINDOWS_AUTHENTICODE: '1'");
     expect(ci).toContain('apps/desktop/dist/installers/SHA256SUMS.txt');
     expect(ci).toContain('apps/desktop/dist/installers/PROVENANCE.json');
-    expect(ci).toContain('WINDOWS_CSC_LINK');
-    expect(ci).toContain('WINDOWS_CSC_KEY_PASSWORD');
+    expect(evidenceWriter).toContain('Get-AuthenticodeSignature');
+    expect(evidenceWriter).toContain('windowsAuthenticode');
+    expect(evidenceVerifier).toContain('LNWJUD_REQUIRE_WINDOWS_AUTHENTICODE');
+    expect(evidenceVerifier).toContain('windowsAuthenticode');
     expect(release).toContain('native-darwin-arm64-$sha');
     expect(release).toContain('native-linux-arm64-$sha');
     expect(release).toContain('collect-release-assets.mjs');
-    expect(release).not.toContain('Get-AuthenticodeSignature');
+    expect(release).toContain('LNWJUD_REQUIRE_WINDOWS_AUTHENTICODE');
     expect(release).toContain('LNWJUD_EXPECTED_COMMIT_SHA');
     expect(release).toContain('verify-release-evidence.mjs');
   });

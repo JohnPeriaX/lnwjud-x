@@ -79,7 +79,7 @@ import {
 } from '@lnwjud/ipc-contracts';
 import { readSharedActivitySnapshot, startMcpStdio, type EccRuntimeOptions, type HostMutationApprovalRequest } from '@lnwjud/mcp-server';
 import { createExplicitKeySecretProtector, DEFAULT_DISPLAY_TIME_ZONE, DEFAULT_MCP_POLL_WAIT_SECONDS, DEFAULT_SHELL_SYNCHRONOUS_WAIT_SECONDS, MAX_CONFIGURABLE_WAIT_SECONDS, MIN_CONFIGURABLE_WAIT_SECONDS, formatDisplayDateTime, formatOffsetIsoTimestamp, normalizeMcpAllowedHostname, resolveLnwjudDataPath, type SecretProtector } from '@lnwjud/shared';
-import { applyPendingSqliteRestoreSync, CheckpointKeyStore } from '@lnwjud/storage';
+import { applyPendingSqliteRestoreSync, CheckpointKeyStore, type CheckpointPayloadCipher } from '@lnwjud/storage';
 import { createDesktopRuntime, formatCompleteTargetDetail, formatIncompleteLegacyHistory, writeSerializedLogRows, type DesktopRuntime } from './desktop-services.js';
 import { resolveTunnelProfileDirectory, TUNNEL_SECRET_FILE_NAME } from './tunnel-controller.js';
 import { migrateLegacyWindowsSecrets } from './legacy-secret-migration.js';
@@ -116,7 +116,7 @@ import { isMutationApprovalResponse, mutationApprovalDialogOptions } from './mut
 import { prependBundledRuntimeToolsToPath } from './runtime-tools.js';
 import { COPY_COMMANDS, OFFICIAL_URL_TARGETS } from './tool-catalog/remediation-registry.js';
 import { SafeStorageSecretProtector } from './safe-storage-secret-protector.js';
-import { shouldUseMacos26E2eSecrets, waitForMacosAsyncSafeStorageStartup } from './safe-storage-startup.js';
+import { createUnavailableCheckpointCipher, shouldDegradeUnavailableSecureStorage, shouldUseMacos26E2eSecrets, waitForMacosAsyncSafeStorageStartup } from './safe-storage-startup.js';
 import type { ElectronNativeCapabilityApi, NativeDesktopCaptureRequest, NativeDesktopCaptureResult, NativeDialogOptions, NativeDialogResult, NativeDisplayMetadata } from './electron-native-capability-backend.js';
 import { configureLinuxAutostart } from './linux-autostart.js';
 import { InstallActivityCoordinator } from './install-activity.js';
@@ -245,7 +245,7 @@ const defaultUserSettings: UserSettings = {
   closeBehavior: 'tray',
   launchAtStartup: false,
   startMinimized: false,
-  tunnelAutoReconnect: true,
+  tunnelAutoReconnect: false,
   tunnelMaxAutoRestarts: 5,
   recoveryRetentionDays: 30,
   extensions: { mode: 'enable_all', disabledServers: [], enabledServers: [], disabledSkillRoots: [], extraSkillRoots: [], extraMcpServers: [] },
@@ -2116,7 +2116,8 @@ function initAutoUpdater(runtime: DesktopRuntime): void {
 }
 
 async function resolveDesktopRuntimeSecrets(dataPath: string): Promise<{
-  readonly checkpointEncryptionKey: Buffer;
+  readonly checkpointEncryptionKey?: Buffer;
+  readonly checkpointCipher?: CheckpointPayloadCipher;
   readonly secretProtector: SecretProtector;
 }> {
   const useMacos26E2eSecrets = shouldUseMacos26E2eSecrets({
@@ -2149,9 +2150,14 @@ async function resolveDesktopRuntimeSecrets(dataPath: string): Promise<{
     const status = await secretProtector.status();
     recordDesktopStartup(`safe-storage:status:end:${status.secure ? 'secure' : status.reason ?? 'unavailable'}`);
     if (!status.secure) {
-      throw new Error(status.reason === 'plaintext_backend'
+      const message = status.reason === 'plaintext_backend'
         ? 'Secure secret storage is unavailable: Linux is using the basic_text backend'
-        : `Secure secret storage is unavailable (${status.backend})`);
+        : `Secure secret storage is unavailable (${status.backend})`;
+      if (shouldDegradeUnavailableSecureStorage(process.platform, status)) {
+        recordDesktopStartup(`safe-storage:degraded:${status.reason ?? status.backend}`);
+        return { secretProtector, checkpointCipher: createUnavailableCheckpointCipher(message) };
+      }
+      throw new Error(message);
     }
   }
   recordDesktopStartup('safe-storage:migrations:begin');

@@ -53,6 +53,7 @@ export class McpSessionManager {
   private readonly idleTimeoutMs: number;
   private readonly processTreeTerminator: ProcessTreeTerminator;
   private readonly closeFailures = new Map<string, string>();
+  private readonly unverifiedSessions = new Map<string, McpClientSession>();
   private idleTimer: NodeJS.Timeout | undefined;
   private idleSweep: Promise<void> | undefined;
   private closed = false;
@@ -175,12 +176,14 @@ export class McpSessionManager {
     signal?: AbortSignal,
   ): Promise<Result<unknown>> {
     let managed: ManagedSession | undefined;
+    let catalogReady = false;
     try {
       if (isAborted(signal)) return cancelledCall();
       managed = await this.ensure(server, config, signal);
       const activeManaged = managed;
       if (isAborted(signal)) return cancelledCall();
       await this.refreshCatalog(server, activeManaged, signal);
+      catalogReady = true;
       const declaredTool = activeManaged.tools.find((entry) => entry.name === tool);
       if (declaredTool === undefined) {
         const availableTools = activeManaged.tools.slice(0, 20).map((entry) => entry.name).join(', ');
@@ -201,7 +204,9 @@ export class McpSessionManager {
       this.scheduleIdleSweep();
       return ok(result);
     } catch (error: unknown) {
-      if (managed !== undefined) await this.drop(server, managed);
+      if (managed !== undefined && (!catalogReady || isAborted(signal) || isMcpCallTimeout(error, server))) {
+        await this.drop(server, managed);
+      }
       if (isAborted(signal)) return cancelledCall();
       return err(appError('INTERNAL_ERROR', sanitizeError(error), true));
     }
@@ -223,6 +228,13 @@ export class McpSessionManager {
   private async ensure(server: string, config: McpServerLaunchConfig, signal?: AbortSignal): Promise<ManagedSession> {
     if (this.closed) throw new Error('Child MCP session manager is closed');
     if (isAborted(signal)) throw new Error('Child MCP connection was cancelled');
+    const unverified = this.unverifiedSessions.get(server);
+    if (unverified !== undefined) {
+      await this.closeSession(server, unverified);
+      if (this.unverifiedSessions.has(server)) {
+        throw new Error(`Child MCP termination is unverified for ${server}: ${this.closeFailures.get(server) ?? 'close failed'}`);
+      }
+    }
     const launchFingerprint = fingerprintExternalMcpValue(config);
     const existing = this.sessions.get(server);
     if (existing !== undefined && existing.launchFingerprint === launchFingerprint) {
@@ -384,8 +396,11 @@ export class McpSessionManager {
   private async closeSession(server: string, session: McpClientSession): Promise<void> {
     try {
       await session.close();
+      this.closeFailures.delete(server);
+      if (this.unverifiedSessions.get(server) === session) this.unverifiedSessions.delete(server);
     } catch (error: unknown) {
       this.closeFailures.set(server, sanitizeError(error));
+      this.unverifiedSessions.set(server, session);
     }
   }
 
@@ -432,6 +447,7 @@ export function createDefaultMcpClientFactory(
     }
     const pid = transport.pid;
     let closed = false;
+    let closing: Promise<void> | undefined;
     return {
       async listTools(listSignal?: AbortSignal): Promise<readonly McpToolSummary[]> {
         const listed = await client.listTools(undefined, listSignal === undefined ? undefined : { signal: listSignal });
@@ -459,9 +475,9 @@ export function createDefaultMcpClientFactory(
       },
       async close(): Promise<void> {
         if (closed) return;
-        closed = true;
-        let firstError: unknown;
-        try {
+        if (closing !== undefined) return closing;
+        const attempt = (async (): Promise<void> => {
+          let firstError: unknown;
           if (pid !== null && getStopPid(processTreeTerminator) !== undefined) {
             try {
               await getStopPid(processTreeTerminator)?.(pid);
@@ -474,10 +490,16 @@ export function createDefaultMcpClientFactory(
           } catch (error: unknown) {
             firstError ??= error;
           }
-        } finally {
+          if (firstError !== undefined) throw firstError;
+          closed = true;
           disposeStderrDrain();
+        })();
+        closing = attempt;
+        try {
+          await attempt;
+        } finally {
+          closing = undefined;
         }
-        if (firstError !== undefined) throw firstError;
       },
     };
     },
@@ -737,6 +759,10 @@ function stableJson(value: unknown): string {
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isMcpCallTimeout(error: unknown, server: string): boolean {
+  return error instanceof Error && error.message.startsWith(`Timed out calling ${server}/`);
 }
 
 function sanitizeError(error: unknown): string {

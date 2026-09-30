@@ -59,7 +59,7 @@ const DEFAULT_USER_SETTINGS: UserSettings = {
   closeBehavior: 'tray',
   launchAtStartup: false,
   startMinimized: false,
-  tunnelAutoReconnect: true,
+  tunnelAutoReconnect: false,
   tunnelMaxAutoRestarts: 5,
   recoveryRetentionDays: 30,
   extensions: { mode: 'enable_all', disabledServers: [], enabledServers: [], disabledSkillRoots: [], extraSkillRoots: [], extraMcpServers: [] },

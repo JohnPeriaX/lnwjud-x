@@ -1,3 +1,5 @@
+import type { CheckpointPayloadCipher } from '@lnwjud/storage';
+
 const MACOS_ASYNC_SAFE_STORAGE_SETTLE_MS = 2_000;
 
 export interface MacosAsyncSafeStorageStartupOptions {
@@ -15,6 +17,24 @@ export interface Macos26E2eSecretOptions {
   readonly isPackaged: boolean;
   readonly e2eFixture: boolean;
   readonly ephemeralSecrets: boolean;
+}
+
+export interface SecureStorageStartupStatus {
+  readonly secure: boolean;
+  readonly backend: string;
+  readonly reason?: string;
+}
+
+export function shouldDegradeUnavailableSecureStorage(
+  platform: NodeJS.Platform,
+  status: SecureStorageStartupStatus,
+): boolean {
+  return platform === 'linux' && !status.secure;
+}
+
+export function createUnavailableCheckpointCipher(message: string): CheckpointPayloadCipher {
+  const unavailable = (): never => { throw new Error(message); };
+  return { encrypt: unavailable, decrypt: unavailable, isEncrypted: () => true };
 }
 
 /**

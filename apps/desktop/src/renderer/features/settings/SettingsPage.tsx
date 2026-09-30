@@ -1007,7 +1007,7 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
                   </div>
                   <select aria-label={t('settingsPage.recoveryRetention')} disabled={retentionBusy} value={props.dashboard.settings.recoveryRetentionDays} onChange={(event) => { void setRecoveryRetentionDays(Number(event.target.value)); }}>
                     <option value={0}>{t('settingsPage.never')}</option>
-                    {[7, 14, 30, 60, 90, 180, 365].map((days) => <option key={days} value={days}>{days} {t('settingsPage.days')}</option>)}
+                    {[3, 7, 14, 30, 60, 90, 180, 365].map((days) => <option key={days} value={days}>{days} {t('settingsPage.days')}</option>)}
                   </select>
                 </div>
                 <div className="settings-mini-heading"><strong>{t('settingsPage.deletedBackups')}</strong><div className="inline-actions"><span>{props.dashboard.recovery.trashItems.length}</span><button type="button" disabled={purgeBusyCategory !== null || recoveryBusyId !== null} onClick={() => { void purgeRecoveryData('trash'); }}>{purgeBusyCategory === 'trash' ? t('settingsPage.deleting') : t('settingsPage.deleteAllTrash')}</button></div></div>

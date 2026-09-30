@@ -44,6 +44,7 @@ export function WorkLogPage(props: WorkLogPageProps): ReactElement {
         title={t('workLog.title')}
         emptyLabel={t('workLog.empty')}
         filterAllLabel={t('workLog.filterAll')}
+        filterWarningLabel={t('workLog.filterWarning')}
         filterErrorLabel={t('workLog.filterError')}
         clearSessionLabel={t('scope.clearSession')}
         clearWorkspaceLabel={t('scope.clearWorkspace')}

@@ -2841,14 +2841,14 @@ function assertCompletionReady(goal: GoalRecord, status: FinishGoalRecordRequest
   const unfinishedSteps = goal.plan.steps.filter((step) => step.status !== 'completed');
   if (unfinishedSteps.length > 0) {
     throw new GoalStateError(
-      'conflict',
+      'precondition',
       `Goal cannot be completed while plan steps remain unfinished: ${unfinishedSteps.map((step) => step.id).join(', ')}`,
     );
   }
   const incompleteCriteria = goal.acceptanceCriteria.filter((criterion) => criterion.status !== 'completed');
   if (incompleteCriteria.length > 0) {
     throw new GoalStateError(
-      'conflict',
+      'precondition',
       `Goal cannot be completed while acceptance criteria remain unfinished: ${incompleteCriteria.map((criterion) => criterion.id).join(', ')}`,
     );
   }
@@ -2860,29 +2860,29 @@ function assertCompletionReady(goal: GoalRecord, status: FinishGoalRecordRequest
     });
     if (unresolvedGates.length > 0) {
       throw new GoalStateError(
-        'conflict',
+        'precondition',
         `Engineering goal cannot be completed while required gates are unresolved: ${unresolvedGates.map((gate) => `${gate.id}:${gate.status}`).join(', ')}`,
       );
     }
     const unobservedGates = goal.engineering.gates.filter((gate) => gate.status === 'passed' && requiresHostObservedEngineeringEvidence(gate.id) && gate.evidence?.source !== 'host_observed');
     if (unobservedGates.length > 0) {
       throw new GoalStateError(
-        'conflict',
+        'precondition',
         `Engineering goal cannot be completed without host-observed evidence for gates: ${unobservedGates.map((gate) => gate.id).join(', ')}`,
       );
     }
     const blockingFindings = (goal.engineering.reviewFindings ?? []).filter((finding) => finding.severity === 'blocking' && (finding.state === 'open' || finding.state === 'validated'));
     if (blockingFindings.length > 0) {
       throw new GoalStateError(
-        'conflict',
+        'precondition',
         `Engineering goal cannot be completed while blocking review findings remain unresolved: ${blockingFindings.map((finding) => finding.id).join(', ')}`,
       );
     }
     const invalidRejectedFindings = (goal.engineering.reviewFindings ?? []).filter((finding) => finding.state === 'rejected' && finding.reason.trim().length === 0);
-    if (invalidRejectedFindings.length > 0) throw new GoalStateError('conflict', 'Rejected Engineering review findings require a recorded reason');
+    if (invalidRejectedFindings.length > 0) throw new GoalStateError('precondition', 'Rejected Engineering review findings require a recorded reason');
   }
-  if (goal.blockers.length > 0) throw new GoalStateError('conflict', 'Goal cannot be completed while durable blockers remain');
-  if (goal.activeTaskIds.length > 0) throw new GoalStateError('conflict', 'Goal cannot be completed while blocking tasks remain tracked');
+  if (goal.blockers.length > 0) throw new GoalStateError('precondition', 'Goal cannot be completed while durable blockers remain');
+  if (goal.activeTaskIds.length > 0) throw new GoalStateError('precondition', 'Goal cannot be completed while blocking tasks remain tracked');
 }
 
 function trackedTasksAtCancellation(goal: GoalRecord): readonly GoalTrackedTask[] {

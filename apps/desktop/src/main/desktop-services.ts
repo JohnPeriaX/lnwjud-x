@@ -46,6 +46,7 @@ import {
   ActivityTracker,
   LNWJUD_MCP_IDENTITY_PATH,
   RuntimeEngineeringEvidenceVerifier,
+  createEngineeringArtifactVerifier,
   createEngineeringSourceStateProvider,
   RuntimeGoalManagedTaskStateReader,
   createFileActivitySink,
@@ -116,7 +117,7 @@ import {
   type EngineeringHarnessSettings,
   type EngineeringHarnessWorkspaceOverride,
 } from '@lnwjud/shared';
-import { AesGcmCheckpointCipher, BACKUP_RESTORE_NOTICE_SETTING_KEY, parseBackupRestoreNotice, SqliteAgentSwarmRepository, SqliteAuditRepository, SqliteAutomationRepository, SqliteBackupService, SqliteCheckpointRepository, SqliteDatabase, SqliteSettingsRepository, SqliteWorkspaceRepository, type BackupReason, type BackupRestoreNotice as StorageBackupRestoreNotice, type BackupSummary } from '@lnwjud/storage';
+import { AesGcmCheckpointCipher, BACKUP_RESTORE_NOTICE_SETTING_KEY, parseBackupRestoreNotice, SqliteAgentSwarmRepository, SqliteAuditRepository, SqliteAutomationRepository, SqliteBackupService, SqliteCheckpointRepository, SqliteDatabase, SqliteSettingsRepository, SqliteWorkspaceRepository, type BackupReason, type BackupRestoreNotice as StorageBackupRestoreNotice, type BackupSummary, type CheckpointPayloadCipher } from '@lnwjud/storage';
 import { SqliteGoalRepository } from '@lnwjud/storage';
 import type { Workspace } from '@lnwjud/workspace';
 import { comparableHostPath, isDriveRoot, isMachineRootPath, resolveHostPath, SecretPolicy, WorkspacePathGuard, WorkspaceService } from '@lnwjud/workspace';
@@ -195,7 +196,7 @@ import { RequirementRegistry, type RequirementDefinition, type RequirementProbeR
 import { RemediationRegistry } from './tool-catalog/remediation-registry.js';
 import { ToolCatalogService, type ToolCatalogServiceOptions } from './tool-catalog/tool-catalog-service.js';
 import { projectExternalMcpTools } from './tool-catalog/external-tool-catalog-adapter.js';
-import { LogHub, classifyMcpWorkLogKind } from './log-hub.js';
+import { LogHub, classifyMcpLogLevel, classifyMcpWorkLogKind } from './log-hub.js';
 import { buildIncidentReport, collectRelevantListeners, collectRelevantProcessTree, type IncidentDesktopMemory, type IncidentReport } from './incident-report.js';
 import { readCrashEventHistory } from './crash-recovery.js';
 import { readDesktopSessionSnapshot } from './desktop-session-diagnostics.js';
@@ -262,6 +263,7 @@ export interface DesktopRuntimeOptions {
   readonly pdfProviderInstaller?: (dataPath: string) => Promise<InstalledPdfProvider>;
   readonly onInstallActivity?: (kind: 'ngrok' | 'pdf_provider', update: { readonly phase: InstallOperationPhase; readonly progressPercent: number | null; readonly message: string | null } | null) => void;
   readonly checkpointEncryptionKey?: Buffer;
+  readonly checkpointCipher?: CheckpointPayloadCipher;
   readonly decryptTunnelSecret?: (cipherText: string) => Promise<string>;
   /** Enables bounded SQLite polling for long-lived stdio processes that receive writes from another process. */
   readonly watchToolAvailability?: boolean;
@@ -398,8 +400,8 @@ function watcherActivityFromSink(event: ActivitySinkEvent): WatcherActivityEvent
 }
 
 export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOptions = {}): DesktopRuntime {
-  if (options.secretProtector !== undefined && options.checkpointEncryptionKey === undefined) {
-    throw new Error('Desktop runtime requires a resolved checkpoint encryption key before startup');
+  if (options.secretProtector !== undefined && options.checkpointEncryptionKey === undefined && options.checkpointCipher === undefined) {
+    throw new Error('Desktop runtime requires a resolved checkpoint encryption key or fail-closed checkpoint cipher before startup');
   }
   const databaseFilename = path.join(dataPath, 'lnwjud.sqlite');
   const backupDirectory = path.join(dataPath, 'backups');
@@ -461,11 +463,11 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
   const auditRepository = new SqliteAuditRepository(database);
   const activitySessionCatalog = new ActivitySessionCatalog(auditRepository, workLogViewState);
   const auditService = new AuditService(auditRepository);
-  const checkpointEncryptionKey = options.checkpointEncryptionKey ?? resolveTestCheckpointEncryptionKey();
-  if (checkpointEncryptionKey === undefined) {
+  const checkpointEncryptionKey = options.checkpointEncryptionKey ?? (options.checkpointCipher === undefined ? resolveTestCheckpointEncryptionKey() : undefined);
+  const checkpointCipher = options.checkpointCipher ?? (checkpointEncryptionKey === undefined ? undefined : new AesGcmCheckpointCipher(checkpointEncryptionKey));
+  if (checkpointCipher === undefined) {
     throw new Error('Desktop runtime requires a checkpoint encryption key resolved by the Electron composition root');
   }
-  const checkpointCipher = new AesGcmCheckpointCipher(checkpointEncryptionKey);
   const checkpointRepository = new SqliteCheckpointRepository(database, checkpointCipher);
   const backupService = new SqliteBackupService(database, { backupDirectory, databaseFilename, platform: process.platform, arch: process.arch });
   const startupBackup = backupService.ensureRecent().catch((error: unknown) => {
@@ -614,8 +616,14 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
     }),
   });
   const engineeringSourceState = createEngineeringSourceStateProvider(async (workspaceId, args) => gitService.run(actor, { workspaceId, args }));
+  const engineeringArtifactVerifier = createEngineeringArtifactVerifier(async (workspaceId) => (await workspaceRepository.get(workspaceId))?.realRootPath);
   const goalService = new GoalContinuationService(workspaceRepository, goalRepository, {
-    engineeringEvidenceVerifier: new RuntimeEngineeringEvidenceVerifier({ process: processService, shell: capabilityRuntime.shell, sourceState: engineeringSourceState }),
+    engineeringEvidenceVerifier: new RuntimeEngineeringEvidenceVerifier({
+      process: processService,
+      shell: capabilityRuntime.shell,
+      sourceState: engineeringSourceState,
+      artifactVerifier: engineeringArtifactVerifier,
+    }),
     scheduledContinuations: goalRepository,
     workerLiveness: goalMutationFence,
     taskCancellation,
@@ -2632,6 +2640,7 @@ function toWorkLogEntry(event: ActivityAuditEvent): WorkLogEntry {
     id: event.id,
     timestamp: event.timestamp,
     kind: classifyMcpWorkLogKind(event.toolName, event.phase, event.resultCode),
+    level: classifyMcpLogLevel(event.toolName, event.phase, event.resultCode, event.errorMessage ?? null),
     toolName: event.toolName,
     resultCode: event.resultCode,
     errorMessage: event.errorMessage ?? null,
@@ -2744,7 +2753,7 @@ function readUserSettings(settingsRepository: SqliteSettingsRepository, env: Nod
     closeBehavior: parseCloseBehavior(settingsRepository.get(USER_SETTING_KEYS.closeBehavior)),
     launchAtStartup: parseBooleanSetting(settingsRepository.get(USER_SETTING_KEYS.launchAtStartup), false),
     startMinimized: parseBooleanSetting(settingsRepository.get(USER_SETTING_KEYS.startMinimized), false),
-    tunnelAutoReconnect: parseBooleanSetting(settingsRepository.get(USER_SETTING_KEYS.tunnelAutoReconnect), true),
+    tunnelAutoReconnect: parseBooleanSetting(settingsRepository.get(USER_SETTING_KEYS.tunnelAutoReconnect), false),
     tunnelMaxAutoRestarts: parseIntegerSetting(settingsRepository.get(USER_SETTING_KEYS.tunnelMaxAutoRestarts), DEFAULT_TUNNEL_MAX_AUTO_RESTARTS, 0, 50),
     recoveryRetentionDays: parseIntegerSetting(settingsRepository.get(USER_SETTING_KEYS.recoveryRetentionDays) ?? undefined, DEFAULT_RECOVERY_RETENTION_DAYS, 0, 3650),
     extensions: toIpcExtensionsSettings(extensions),
@@ -2974,12 +2983,14 @@ function parseWorkLogIdentity(value: string): { readonly kind: 'audit' | 'inflig
 
 function formatActivityExportRow(event: ActivityAuditEvent, detail: ActivityTargetDetail | null, locale: UiLocale): string {
   const kind = classifyMcpWorkLogKind(event.toolName, event.phase, event.resultCode);
+  const level = classifyMcpLogLevel(event.toolName, event.phase, event.resultCode, event.errorMessage ?? null);
   const labels = locale === 'th'
-    ? { time: 'เวลา', type: 'ประเภท', tool: 'เครื่องมือ', result: 'ผลลัพธ์', duration: 'ระยะเวลา', target: 'เป้าหมาย', error: 'ข้อผิดพลาด', workspace: 'Workspace', session: 'Session', technical: 'ข้อมูลทางเทคนิค' }
-    : { time: 'Time', type: 'Type', tool: 'Tool', result: 'Result', duration: 'Duration', target: 'Target', error: 'Error', workspace: 'Workspace', session: 'Session', technical: 'Technical metadata' };
+    ? { time: 'เวลา', type: 'ประเภท', severity: 'ระดับ', tool: 'เครื่องมือ', result: 'ผลลัพธ์', duration: 'ระยะเวลา', target: 'เป้าหมาย', error: 'รายละเอียด', workspace: 'Workspace', session: 'Session', technical: 'ข้อมูลทางเทคนิค' }
+    : { time: 'Time', type: 'Type', severity: 'Severity', tool: 'Tool', result: 'Result', duration: 'Duration', target: 'Target', error: 'Detail', workspace: 'Workspace', session: 'Session', technical: 'Technical metadata' };
   const readable = [
     `${labels.time}: ${formatActivityExportTimestamp(event.timestamp, locale)}`,
-    `${labels.type}: ${kind === 'task' ? 'TASK' : kind === 'error' ? 'ERROR' : 'RESULT'}`,
+    `${labels.type}: ${kind === 'task' ? 'TASK' : 'RESULT'}`,
+    `${labels.severity}: ${level.toUpperCase()}`,
     `${labels.tool}: ${event.toolName}`,
     `${labels.result}: ${event.resultCode}`,
     `${labels.duration}: ${event.durationMs} ms`,
@@ -2995,6 +3006,7 @@ function formatActivityExportRow(event: ActivityAuditEvent, detail: ActivityTarg
     `sessionId=${event.sessionId ?? '<none>'}`,
     `toolName=${event.toolName}`,
     `phase=${event.phase}`,
+    `level=${level}`,
     `resultCode=${event.resultCode}`,
     `durationMs=${event.durationMs}`,
     ...(event.targetSummary === undefined ? [] : [`targetSummary=${event.targetSummary}`]),

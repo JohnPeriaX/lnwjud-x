@@ -814,7 +814,9 @@ export class ToolRegistry {
     }
     return {
       context: {
-        sessionId: this.sessionId ?? this.actor.sessionId ?? this.actor.clientId,
+        // A durable goal already scopes activation independently of one transport request/session.
+        // Keep the stable MCP client identity so HTTP session rotation cannot discard a valid load.
+        sessionId: goalId === undefined ? (this.sessionId ?? this.actor.sessionId ?? this.actor.clientId) : this.actor.clientId,
         workspaceId: resolvedWorkspaceId,
         ...(goalId === undefined ? {} : { goalId }),
       },
@@ -1600,7 +1602,7 @@ function summarizeMutationForApproval(toolName: string, input: unknown, activeWo
       lines.push(`launchCount = ${taskIds.length}`);
       if (taskIds.length > 0) lines.push(`taskIds = ${JSON.stringify(taskIds)}`);
     }
-    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.7.2 enforces read-only child sandboxes.');
+    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.7.3 enforces read-only child sandboxes.');
     return boundedApprovalSummary(lines);
   }
   const projectKind = projectCommandKind(toolName);
