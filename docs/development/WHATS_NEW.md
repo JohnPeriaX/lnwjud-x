@@ -26,7 +26,18 @@ Before packaging a new public version:
 
 `scripts/set-version.mjs` synchronizes version surfaces but intentionally does **not** invent release notes. The release-note entry is a reviewed product artifact.
 
-## Current v5.6.4 release-note coverage
+## Current v5.7.2 release-note coverage
+
+The bundled `5.7.2` entry covers the behavior shipped in the current published release:
+
+- Engineering Harness settings persist across Desktop restarts, including saved workspace overrides and diagnostics;
+- Engineering Harness tools are discoverable through the tool catalog and bind to the active Durable Goal/lease correctly;
+- ProseMirror/contenteditable typing uses native `Input.insertText` and verifies the DOM changed before reporting success;
+- Git image changes can render bounded before/after previews at the real `HEAD → Index` and `Index → Working Tree` scopes;
+- Durable Goal progress is refreshed at meaningful milestones and during sustained work so Watcher does not present stale active work;
+- transient Windows PowerShell inventory failures are retried before Secure MCP Tunnel is marked Error, while unverifiable process identity remains fail-closed.
+
+## Historical v5.6.4 release-note coverage
 
 The bundled `5.6.4` entry covers behavior verified in the Windows installer:
 
