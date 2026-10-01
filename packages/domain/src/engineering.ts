@@ -51,6 +51,7 @@ export interface EngineeringGateDefinition {
   readonly reason: string;
   readonly basedOnUserIntentRevision: number;
   readonly checkCommand?: string;
+  readonly requiredPlatforms?: readonly ('win32' | 'darwin' | 'linux')[];
   readonly evidence?: EngineeringGateEvidence;
 }
 

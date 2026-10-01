@@ -1,6 +1,8 @@
 appId: com.lnwjud.desktop
 productName: lnwjud
 asar: true
+toolsets:
+  appimage: 1.0.3
 npmRebuild: false
 directories:
   output: dist/installers

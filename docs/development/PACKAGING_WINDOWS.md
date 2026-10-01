@@ -29,7 +29,7 @@ The package script rebuilds the workspace, generates the current MCP stdio bundl
 
 ## Current electron-builder contract
 
-`apps/desktop/electron-builder.yml` is the source of truth. The current v5.7.2 packaging contract is:
+`apps/desktop/electron-builder.yml` is the source of truth. The current v5.7.3 packaging contract is:
 
 - `asar: true`.
 - Windows x64 targets: NSIS installer + portable executable.
@@ -52,7 +52,7 @@ The package script rebuilds the workspace, generates the current MCP stdio bundl
 - The launcher never falls back to a system Node runtime; a missing packaged Electron executable fails closed.
 - Generated stdio runtime files are ignored by Git and must be regenerated from source for each build/release.
 
-`signAndEditExecutable: true` does not by itself mean the release is Authenticode-signed with a publisher certificate. Production code-signing identity/certificate handling is a separate release/CI concern.
+`signAndEditExecutable: true` does not by itself mean the release is Authenticode-signed with a publisher certificate. Local developer packages may remain `NotSigned` when no production credential is configured, but official Windows updater/release publication requires `WINDOWS_CSC_LINK` + `WINDOWS_CSC_KEY_PASSWORD` and provenance-bound `Get-AuthenticodeSignature` status `Valid` for both Setup and Portable. Production publisher trust is therefore a release/CI boundary, not something the package config can manufacture.
 
 ## Hidden console-process contract
 
@@ -72,12 +72,12 @@ The `makeappx.exe`/`signtool.exe` steps need the Windows SDK. No certificate or 
 
 ## Expected Windows outputs
 
-For v5.7.2:
+For v5.7.3:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.7.2.exe
-apps/desktop/dist/installers/lnwjud-Setup-5.7.2.exe.blockmap
-apps/desktop/dist/installers/lnwjud-Portable-5.7.2.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.7.3.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.7.3.exe.blockmap
+apps/desktop/dist/installers/lnwjud-Portable-5.7.3.exe
 apps/desktop/dist/installers/latest.yml
 apps/desktop/dist/installers/portable.yml
 apps/desktop/dist/installers/SHA256SUMS.txt

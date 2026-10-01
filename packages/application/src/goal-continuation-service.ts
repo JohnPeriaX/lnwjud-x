@@ -351,7 +351,12 @@ export interface ListGoalsResult {
 }
 
 export interface EngineeringGateEvidenceVerifier {
-  verify(workspaceId: string, evidence: EngineeringGateEvidence, gateId: string): Promise<boolean>;
+  verify(
+    workspaceId: string,
+    evidence: EngineeringGateEvidence,
+    gateId: string,
+    requiredPlatforms?: readonly ('win32' | 'darwin' | 'linux')[],
+  ): Promise<boolean>;
 }
 
 export interface GoalContinuationServiceOptions {
@@ -1041,6 +1046,7 @@ export class GoalContinuationService {
         case 'owner_mismatch': return err(appError('PERMISSION_DENIED', 'Goal belongs to another client'));
         case 'lease_invalid': return err(appError('CONFLICT', `Goal lease is no longer valid (${error.message}); read the latest goal and reacquire or claim the scheduled continuation before retrying`, true));
         case 'conflict': return err(appError('CONFLICT', 'Goal state changed concurrently; read the latest revision and retry', true));
+        case 'precondition': return err(appError('CONFLICT', error.message, true));
         case 'terminal': return err(appError('CONFLICT', 'Goal is already terminal'));
         case 'not_found': return err(appError('INVALID_INPUT', 'Goal was not found'));
         case 'corrupt': return err(appError('INTERNAL_ERROR', 'Durable goal state is corrupt and was rejected'));
@@ -1216,7 +1222,7 @@ async function applyEngineeringGateUpdates(
           if (update.evidence.exitCode !== undefined && observed.exitCode !== update.evidence.exitCode) throw new Error('engineering gate evidence exit code does not match the observed command');
         }
         if (update.status === 'passed') {
-          if (evidenceVerifier === undefined || !(await evidenceVerifier.verify(workspaceId, update.evidence, gateId))) {
+          if (evidenceVerifier === undefined || !(await evidenceVerifier.verify(workspaceId, update.evidence, gateId, current.requiredPlatforms))) {
             throw new Error('host-observed engineering evidence could not be verified against the host task runtime');
           }
         }

@@ -814,7 +814,9 @@ export class ToolRegistry {
     }
     return {
       context: {
-        sessionId: this.sessionId ?? this.actor.sessionId ?? this.actor.clientId,
+        // A durable goal already scopes activation independently of one transport request/session.
+        // Keep the stable MCP client identity so HTTP session rotation cannot discard a valid load.
+        sessionId: goalId === undefined ? (this.sessionId ?? this.actor.sessionId ?? this.actor.clientId) : this.actor.clientId,
         workspaceId: resolvedWorkspaceId,
         ...(goalId === undefined ? {} : { goalId }),
       },
@@ -1184,7 +1186,7 @@ function normalizeActiveWorkspaceScopesProvider(options: ActiveWorkspaceScopeOpt
   };
 }
 
-const NATIVE_ACTIVE_SCOPE_TOOLS = new Set(['office', 'audio', 'screen_record', ...OFFICE_SEMANTIC_TOOL_NAMES]);
+const NATIVE_ACTIVE_SCOPE_TOOLS = new Set(['dom_cdp', 'office', 'audio', 'screen_record', ...OFFICE_SEMANTIC_TOOL_NAMES]);
 const COMMAND_EXECUTION_TOOLS = new Set(['shell', 'wsl_exec', 'process_start']);
 export const SCHEDULED_CONTINUATION_FENCED_TOOLS = new Set([
   'write_file', 'apply_patch', 'edit_file', 'move_file', 'copy_file', 'delete_file',
@@ -1600,7 +1602,7 @@ function summarizeMutationForApproval(toolName: string, input: unknown, activeWo
       lines.push(`launchCount = ${taskIds.length}`);
       if (taskIds.length > 0) lines.push(`taskIds = ${JSON.stringify(taskIds)}`);
     }
-    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.7.2 enforces read-only child sandboxes.');
+    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.7.3 enforces read-only child sandboxes.');
     return boundedApprovalSummary(lines);
   }
   const projectKind = projectCommandKind(toolName);

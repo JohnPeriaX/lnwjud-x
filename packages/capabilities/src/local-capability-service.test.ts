@@ -83,4 +83,54 @@ describe('LocalCapabilityService', () => {
     });
     expect(called).toBe(false);
   });
+
+  it('serializes foreground-native mutations across service instances', async () => {
+    let releaseFirst!: () => void;
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => { markStarted = resolve; });
+    const blocked = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const order: string[] = [];
+    const fallback = { execute: async (): Promise<ReturnType<typeof ok>> => ok({}) };
+    const first = new LocalCapabilityService({
+      shell: fallback, domCdp: fallback, accessibility: fallback,
+      inputEvent: { execute: async (): Promise<ReturnType<typeof ok>> => { order.push('input-start'); markStarted(); await blocked; order.push('input-end'); return ok({}); } },
+      vision: fallback, window: fallback, health: fallback,
+    });
+    const second = new LocalCapabilityService({
+      shell: fallback, domCdp: fallback,
+      accessibility: { execute: async (): Promise<ReturnType<typeof ok>> => { order.push('accessibility'); return ok({}); } },
+      inputEvent: fallback, vision: fallback, window: fallback, health: fallback,
+    });
+
+    const firstCall = first.execute('input_event', { operation: 'click' });
+    await started;
+    const secondCall = second.execute('accessibility', { action: 'click' });
+    await Promise.resolve();
+    expect(order).toEqual(['input-start']);
+    releaseFirst();
+    await Promise.all([firstCall, secondCall]);
+    expect(order).toEqual(['input-start', 'input-end', 'accessibility']);
+  });
+
+  it('reports an optional native postcondition separately from event dispatch', async () => {
+    const fallback = { execute: async (): Promise<ReturnType<typeof ok>> => ok({}) };
+    const service = new LocalCapabilityService({
+      shell: fallback,
+      domCdp: fallback,
+      accessibility: { execute: async (input: unknown): Promise<ReturnType<typeof ok>> => {
+        const action = typeof input === 'object' && input !== null && 'action' in input ? (input as { action?: unknown }).action : undefined;
+        return action === 'read_value' ? ok({ value: 'ready' }) : ok({ dispatched: true });
+      } },
+      inputEvent: { execute: async (): Promise<ReturnType<typeof ok>> => ok({ dispatched: true }) },
+      vision: fallback, window: fallback, health: fallback,
+    });
+
+    await expect(service.execute('input_event', {
+      operation: 'press_key',
+      postcondition: { parameters: { name: 'Status' }, expected_value: 'ready' },
+    })).resolves.toMatchObject({
+      ok: true,
+      value: { dispatched: true, postcondition: { verified: true, expected_value: 'ready', observed_value: 'ready' } },
+    });
+  });
 });

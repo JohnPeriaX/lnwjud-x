@@ -198,4 +198,16 @@ describe('public repository hygiene', () => {
     expect(skill).toContain('host-confirmed delete or disable evidence');
     expect(skill).toContain('A recurring run receipt is **not** cleanup proof');
   });
+
+  it('rejects outside pull requests without executing untrusted pull-request code', async () => {
+    const workflow = await readFile(path.join(repositoryRoot, '.github', 'workflows', 'reject-external-prs.yml'), 'utf8');
+    expect(workflow).toContain('pull_request_target:');
+    expect(workflow).toContain('OWNER');
+    expect(workflow).toContain('MEMBER');
+    expect(workflow).toContain('COLLABORATOR');
+    expect(workflow).toContain('gh pr close');
+    expect(workflow).toContain('/lock');
+    expect(workflow).not.toContain('actions/checkout');
+    expect(workflow).not.toContain('github.event.pull_request.head');
+  });
 });

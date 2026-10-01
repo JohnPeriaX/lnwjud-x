@@ -14,11 +14,11 @@ const ponytailSkillNames = [
 ] as const;
 
 describe('cross-platform desktop packaging', () => {
-  it('[version-contract] pins the product release to v5.7.2', async () => {
+  it('[version-contract] pins the product release to v5.7.3', async () => {
     const rootPackage = JSON.parse(await readFile(path.join(repositoryRoot, 'package.json'), 'utf8')) as { version?: unknown };
     const desktopPackage = JSON.parse(await readFile(path.join(desktopRoot, 'package.json'), 'utf8')) as { version?: unknown };
-    expect(rootPackage.version).toBe('5.7.2');
-    expect(desktopPackage.version).toBe('5.7.2');
+    expect(rootPackage.version).toBe('5.7.3');
+    expect(desktopPackage.version).toBe('5.7.3');
   });
 
   it('[version-contract] keeps every workspace package and runtime version aligned', async () => {
@@ -41,12 +41,12 @@ describe('cross-platform desktop packaging', () => {
     }
     for (const packagePath of packagePaths) {
       const packageJson = JSON.parse(await readFile(packagePath, 'utf8')) as { version?: unknown };
-      expect(packageJson.version, packagePath).toBe('5.7.2');
+      expect(packageJson.version, packagePath).toBe('5.7.3');
     }
     const ipcContracts = await readFile(path.join(repositoryRoot, 'packages', 'ipc-contracts', 'src', 'index.ts'), 'utf8');
     const shared = await readFile(path.join(repositoryRoot, 'packages', 'shared', 'src', 'index.ts'), 'utf8');
-    expect(ipcContracts).toContain("APP_VERSION = '5.7.2'");
-    expect(shared).toContain("APP_VERSION = '5.7.2'");
+    expect(ipcContracts).toContain("APP_VERSION = '5.7.3'");
+    expect(shared).toContain("APP_VERSION = '5.7.3'");
   });
 
   it('[version-contract] keeps source-version and latest-published documentation explicit and aligned', async () => {
@@ -202,11 +202,13 @@ describe('cross-platform desktop packaging', () => {
     expect(config).toContain('to: native-host/linux');
     await access(path.join(repositoryRoot, '.agents', 'skills', 'lnwjud-scheduled-continuation', 'SKILL.md'));
     expect(desktopPackage.scripts?.['package:windows']).toContain('prepare-runtime-tools.mjs');
+    expect(desktopPackage.scripts?.['package:windows']).toContain('prepare-tunnel-client.mjs');
     expect(desktopPackage.scripts?.['package:macos']).toContain('package-native.mjs macos');
     expect(desktopPackage.scripts?.['package:linux']).toContain('package-native.mjs linux');
     const nativePackagingScript = await readFile(path.join(desktopRoot, 'scripts', 'package-native.mjs'), 'utf8');
     const linuxHostBuildScript = await readFile(path.join(desktopRoot, 'scripts', 'build-linux-host.mjs'), 'utf8');
     expect(nativePackagingScript).toContain('prepare-runtime-tools.mjs');
+    expect(nativePackagingScript).toContain('prepare-tunnel-client.mjs');
     expect(nativePackagingScript).toContain("['pnpm@10.15.0', '--filter', '@lnwjud/desktop...', 'build']");
     expect(nativePackagingScript).toContain('build-macos-host.mjs');
     expect(nativePackagingScript).toContain('build-linux-host.mjs');
@@ -329,9 +331,12 @@ describe('cross-platform desktop packaging', () => {
 
   it('prepares generated launchers and desktop bundles before validating automated runtime dependency updates', async () => {
     const workflow = await readFile(path.join(repositoryRoot, '.github', 'workflows', 'runtime-dependency-update.yml'), 'utf8');
+    expect(workflow).toContain('uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4');
+    expect(workflow).toContain('version: 10.15.0');
+    expect(workflow).not.toContain('corepack prepare pnpm@10.15.0 --activate');
     const generateLauncher = 'node apps/desktop/scripts/write-stdio-launcher.mjs';
-    const desktopBuild = 'corepack pnpm@10.15.0 --filter @lnwjud/desktop build';
-    const packagingGate = 'corepack pnpm@10.15.0 test:packaging';
+    const desktopBuild = 'pnpm --filter @lnwjud/desktop build';
+    const packagingGate = 'pnpm test:packaging';
     expect(workflow).toContain(generateLauncher);
     expect(workflow).toContain(desktopBuild);
     expect(workflow).toContain(packagingGate);

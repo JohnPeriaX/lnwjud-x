@@ -217,7 +217,14 @@ function gatesFor(
   const alwaysReview = policy.profile === 'strict' || custom?.review === 'always';
   const seniorReview = policy.profile === 'senior';
   const docsImpactCheck = custom?.docsImpactCheck ?? true;
-  const add = (id: string, title: string, reason: string, applicability: EngineeringGateDefinition['applicability'] = 'required', checkCommand?: string): void => {
+  const add = (
+    id: string,
+    title: string,
+    reason: string,
+    applicability: EngineeringGateDefinition['applicability'] = 'required',
+    checkCommand?: string,
+    requiredPlatforms?: EngineeringGateDefinition['requiredPlatforms'],
+  ): void => {
     gates.push({
       id,
       title,
@@ -226,6 +233,7 @@ function gatesFor(
       reason,
       basedOnUserIntentRevision: userIntentRevision,
       ...(checkCommand === undefined ? {} : { checkCommand }),
+      ...(requiredPlatforms === undefined || requiredPlatforms.length === 0 ? {} : { requiredPlatforms }),
     });
   };
 
@@ -244,9 +252,10 @@ function gatesFor(
   if (/(persist|storage|session|token|database|restart|ฐานข้อมูล|โทเคน|เซสชัน)/i.test(objective)) add('restart_persistence', 'Restart/persistence evidence', 'Persistence work must prove behavior across restart or reload.');
   if (/(auth|token|permission|security|credential|oauth|สิทธิ์|โทเคน)/i.test(objective)) add('security_review', 'Security boundary review', 'Security-sensitive changes require explicit boundary review.');
   if (/(cross[- ]platform|windows|macos|linux|native|แพลตฟอร์ม)/i.test(objective) || (changesBehavior && project.requiredPlatforms.length > 0)) {
+    const requiredPlatforms = project.requiredPlatforms.length > 0 ? project.requiredPlatforms : inferRequiredPlatforms(objective);
     add('cross_platform', 'Cross-platform evidence', project.requiredPlatforms.length > 0
       ? `Project profile requires target-host or CI evidence for: ${project.requiredPlatforms.join(', ')}.`
-      : 'Cross-platform claims require target-host or CI evidence.');
+      : 'Cross-platform claims require target-host or CI evidence.', 'required', undefined, requiredPlatforms);
   }
   if (changesBehavior && (alwaysReview || (seniorReview && riskTier !== 'low'))) {
     add('self_review', 'Implementation review', 'Review the final diff for compatibility, side effects, missing tests, and documentation impact.');
@@ -261,4 +270,13 @@ function gatesFor(
     add('package', 'Artifact/package verification', 'Release delivery requires package/artifact evidence where the project process requires it.');
   }
   return gates;
+}
+
+function inferRequiredPlatforms(objective: string): readonly ('win32' | 'darwin' | 'linux')[] {
+  const platforms: ('win32' | 'darwin' | 'linux')[] = [];
+  if (/windows/i.test(objective)) platforms.push('win32');
+  if (/(macos|mac\s*os)/i.test(objective)) platforms.push('darwin');
+  if (/linux/i.test(objective)) platforms.push('linux');
+  if (platforms.length > 0) return platforms;
+  return ['win32', 'darwin', 'linux'];
 }

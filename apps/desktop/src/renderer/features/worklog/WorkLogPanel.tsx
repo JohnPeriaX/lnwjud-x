@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type ComponentProps, type ReactElement, type UIEvent } from 'react';
-import { canonicalWorkspaceScopeId, workspaceScopeMatches, type ActivityTargetDetail, type InFlightWorkItem, type LogSessionSummary, type UiLocale, type WorkLogEntry, type WorkspaceSummary } from '@lnwjud/ipc-contracts';
+import { canonicalWorkspaceScopeId, workspaceScopeMatches, type ActivityTargetDetail, type InFlightWorkItem, type LogLevel, type LogSessionSummary, type UiLocale, type WorkLogEntry, type WorkspaceSummary } from '@lnwjud/ipc-contracts';
 import { formatDisplayTimestampItem } from '@lnwjud/shared/date-time-display';
 import { copyTextToClipboard } from '../../clipboard.js';
 import type { MessageKey } from '../../i18n/messages.js';
 import { formatLogExportDateTime, formatLogUiTime } from '../../log-timestamp.js';
+import { CopyableScopeBadge } from '../CopyableScopeBadge.js';
 import { ExpandableTargetDetail } from '../logs/ExpandableTargetDetail.js';
 import { activeDetailMatchIds, activeLogFeed, createDetailSearchState, normalizeDetailSearchQuery, reduceDetailSearchState, transitionLogFeedFreeze } from '../logs/detail-search-state.js';
 import { collectSessionFilterOptions, collectWorkspaceFilterOptions, type ScopeFilterSample } from '../../scope-filter-options.js';
 
-export type WorkLogFilter = 'all' | 'error';
+export type WorkLogFilter = 'all' | 'warn' | 'error';
 
 export interface LogScopeSelection {
   readonly workspaceId: string | null;
@@ -24,6 +25,7 @@ interface WorkLogPanelProps {
   readonly title: string;
   readonly emptyLabel: string;
   readonly filterAllLabel: string;
+  readonly filterWarningLabel?: string;
   readonly filterErrorLabel: string;
   readonly clearSessionLabel: string;
   readonly clearWorkspaceLabel: string;
@@ -169,6 +171,13 @@ export function WorkLogPanel(props: WorkLogPanelProps): ReactElement {
           </button>
           <button
             type="button"
+            className={props.filter === 'warn' ? 'active' : undefined}
+            onClick={() => props.onFilterChange('warn')}
+          >
+            {props.filterWarningLabel ?? 'Warnings'}
+          </button>
+          <button
+            type="button"
             className={props.filter === 'error' ? 'active' : undefined}
             onClick={() => props.onFilterChange('error')}
           >
@@ -223,6 +232,7 @@ export function WorkLogPanel(props: WorkLogPanelProps): ReactElement {
         {visible.map((row) => row.kind === 'inflight' ? (
           <div key={`inflight:${row.id}`} className="worklog-line inflight">
             <time>{formatLogUiTime(row.item.startedAt, props.locale ?? 'th')}</time>
+            <span className="tag info-tag">[INFO]</span>
             <span className="tag task-tag">[TASK]</span>
             <strong>{row.item.toolName}</strong>
             <span className="worklog-summary"><ScopeBadges item={row.item} showWorkspace={workspaceId === null} showSession={sessionId === null} workspaces={feed.workspaces} />{row.item.targetSummary ?? ''}</span>
@@ -232,9 +242,10 @@ export function WorkLogPanel(props: WorkLogPanelProps): ReactElement {
             <ExpandableTargetDetail {...detailProps(props)} reference={row.item.targetDetail} legacySummary={row.item.targetSummary} {...(props.onResolveTargetDetail === undefined ? {} : { loadDetail: props.onResolveTargetDetail })} />
           </div>
         ) : (
-          <div key={`entry:${row.item.id}`} className={`worklog-line ${row.item.kind}`}>
+          <div key={`entry:${row.item.id}`} className={`worklog-line ${row.item.kind} ${workLogLevel(row.item)}`}>
             <time>{formatLogUiTime(row.item.timestamp, props.locale ?? 'th')}</time>
-            <span className={`tag ${row.item.kind}-tag`}>{tagFor(row.item.kind)}</span>
+            <span className={`tag ${workLogLevel(row.item)}-tag`}>[{workLogLevel(row.item).toUpperCase()}]</span>
+            <span className={`tag ${row.item.kind === 'task' ? 'task' : 'result'}-tag`}>{tagFor(row.item.kind)}</span>
             <strong>{row.item.toolName}</strong>
             <span className="worklog-summary"><ScopeBadges item={row.item} showWorkspace={workspaceId === null} showSession={sessionId === null} workspaces={feed.workspaces} />{renderEntryDetail(row.item, resolvedTargets)}</span>
             {row.item.kind !== 'task' ? <em>{row.item.durationMs}ms</em> : <span className="worklog-duration" />}
@@ -276,11 +287,11 @@ export function newestFirstWorkLogRows(
   const needle = search.trim().toLowerCase();
   const scopedEntries = entries.filter((entry) => matchesScope(entry, scope, workspaces));
   const scopedInFlight = inFlight.filter((entry) => matchesScope(entry, scope, workspaces));
-  const entryRows = (filter === 'error' ? scopedEntries.filter((entry) => entry.kind === 'error') : scopedEntries)
+  const entryRows = (filter === 'all' ? scopedEntries : scopedEntries.filter((entry) => workLogLevel(entry) === filter))
     .map((item): WorkLogRow => ({ kind: 'entry', timestamp: item.timestamp, id: item.id, item }));
-  const inFlightRows = filter === 'error'
-    ? []
-    : scopedInFlight.map((item): WorkLogRow => ({ kind: 'inflight', timestamp: item.startedAt, id: scopedActivityId(item), item }));
+  const inFlightRows = filter === 'all'
+    ? scopedInFlight.map((item): WorkLogRow => ({ kind: 'inflight', timestamp: item.startedAt, id: scopedActivityId(item), item }))
+    : [];
   return [...entryRows, ...inFlightRows]
     .filter((row) => needle.length === 0 || workLogSearchText(row).includes(needle) || hiddenMatches.has(workLogRowIdentity(row)))
     .sort((left, right) => {
@@ -296,7 +307,7 @@ function workLogSearchText(row: WorkLogRow): string {
   if (row.kind === 'inflight') {
     return `${row.item.callId} ${row.item.toolName} ${row.item.targetSummary ?? ''} ${row.item.workspaceId ?? ''} ${row.item.sessionId ?? ''} task`.toLowerCase();
   }
-  return `${row.item.id} ${row.item.callId ?? ''} ${row.item.toolName} ${row.item.resultCode} ${row.item.targetSummary ?? ''} ${row.item.errorMessage ?? ''} ${row.item.workspaceId ?? ''} ${row.item.sessionId ?? ''} ${row.item.kind}`.toLowerCase();
+  return `${row.item.id} ${row.item.callId ?? ''} ${row.item.toolName} ${row.item.resultCode} ${row.item.targetSummary ?? ''} ${row.item.errorMessage ?? ''} ${row.item.workspaceId ?? ''} ${row.item.sessionId ?? ''} ${row.item.kind} ${workLogLevel(row.item)}`.toLowerCase();
 }
 
 
@@ -312,12 +323,14 @@ function scopedActivityId(item: InFlightWorkItem): string {
 }
 
 function ScopeBadges(props: { readonly item: Pick<WorkLogEntry, 'workspaceId' | 'sessionId'> | Pick<InFlightWorkItem, 'workspaceId' | 'sessionId'>; readonly showWorkspace: boolean; readonly showSession: boolean; readonly workspaces: readonly WorkspaceSummary[] | undefined }): ReactElement | null {
-  const workspaceLabel = props.item.workspaceId === null ? null : displayWorkspaceLabel(props.workspaces, props.item.workspaceId);
-  const sessionLabel = props.item.sessionId === null ? null : shortScopeId(props.item.sessionId);
+  const workspaceId = props.item.workspaceId === null ? null : canonicalWorkspaceScopeId(props.workspaces ?? [], props.item.workspaceId);
+  const workspaceLabel = workspaceId === null ? null : displayWorkspaceLabel(props.workspaces, workspaceId);
+  const sessionId = props.item.sessionId;
+  const sessionLabel = sessionId === null ? null : shortScopeId(sessionId);
   if ((!props.showWorkspace || workspaceLabel === null) && (!props.showSession || sessionLabel === null)) return null;
   return <span className="scope-badges">
-    {props.showWorkspace && workspaceLabel !== null ? <span className="scope-badge workspace">{workspaceLabel}</span> : null}
-    {props.showSession && sessionLabel !== null ? <span className="scope-badge session">{sessionLabel}</span> : null}
+    {props.showWorkspace && workspaceLabel !== null && workspaceId !== null ? <CopyableScopeBadge kind="workspace" value={workspaceId} displayLabel={workspaceLabel} /> : null}
+    {props.showSession && sessionLabel !== null && sessionId !== null ? <CopyableScopeBadge kind="session" value={sessionId} displayLabel={sessionLabel} /> : null}
   </span>;
 }
 
@@ -337,18 +350,22 @@ function shortScopeId(value: string): string {
   return value;
 }
 
+function workLogLevel(entry: WorkLogEntry): LogLevel {
+  return entry.level ?? (entry.kind === 'error' ? 'error' : 'info');
+}
+
 function renderEntryDetail(entry: WorkLogEntry, resolvedTargets: ReadonlyMap<string, string>): ReactElement | string {
   const targetSummary = resolvedTargetSummary(entry, resolvedTargets);
-  if (entry.kind === 'error') {
+  if (workLogLevel(entry) !== 'info') {
     if (targetSummary && entry.errorMessage) {
       return (
         <>
           <span>{targetSummary}</span>
-          <span className="worklog-error-detail"> — {entry.errorMessage}</span>
+          <span className={`worklog-status-detail ${workLogLevel(entry)}`}> — {entry.errorMessage}</span>
         </>
       );
     }
-    if (entry.errorMessage) return <span className="worklog-error-detail">{entry.errorMessage}</span>;
+    if (entry.errorMessage) return <span className={`worklog-status-detail ${workLogLevel(entry)}`}>{entry.errorMessage}</span>;
     return targetSummary ?? legacyEntryDetail(entry);
   }
   return targetSummary ?? legacyEntryDetail(entry);
@@ -356,7 +373,7 @@ function renderEntryDetail(entry: WorkLogEntry, resolvedTargets: ReadonlyMap<str
 
 function entryDetailText(entry: WorkLogEntry, resolvedTargets: ReadonlyMap<string, string>): string {
   const targetSummary = resolvedTargetSummary(entry, resolvedTargets);
-  if (entry.kind === 'error') {
+  if (workLogLevel(entry) !== 'info') {
     if (targetSummary && entry.errorMessage) return `${targetSummary} — ${entry.errorMessage}`;
     return entry.errorMessage ?? targetSummary ?? legacyEntryDetail(entry);
   }
@@ -365,11 +382,11 @@ function entryDetailText(entry: WorkLogEntry, resolvedTargets: ReadonlyMap<strin
 
 export function formatWorkLogCopyText(row: WorkLogRow, resolvedTargets: ReadonlyMap<string, string> = new Map(), detail: ActivityTargetDetail | null = null, locale: UiLocale = 'th'): string {
   if (row.kind === 'inflight') {
-    const base = `${formatLogExportDateTime(row.item.startedAt, locale)} [TASK] ${row.item.toolName}${row.item.targetSummary === null ? '' : ` ${row.item.targetSummary}`}`;
+    const base = `${formatLogExportDateTime(row.item.startedAt, locale)} [INFO] [TASK] ${row.item.toolName}${row.item.targetSummary === null ? '' : ` ${row.item.targetSummary}`}`;
     return appendCompleteTargetDetail(`${base}\r\n${workLogMetadataLines(row).join('\r\n')}`, detail, locale);
   }
   const duration = row.item.kind === 'task' ? '' : ` ${row.item.durationMs}ms`;
-  const base = `${formatLogExportDateTime(row.item.timestamp, locale)} ${tagFor(row.item.kind)} ${row.item.toolName} ${entryDetailText(row.item, resolvedTargets)}${duration}`.trim();
+  const base = `${formatLogExportDateTime(row.item.timestamp, locale)} [${workLogLevel(row.item).toUpperCase()}] ${tagFor(row.item.kind)} ${row.item.toolName} ${entryDetailText(row.item, resolvedTargets)}${duration}`.trim();
   return appendCompleteTargetDetail(`${base}\r\n${workLogMetadataLines(row).join('\r\n')}`, detail, locale);
 }
 
@@ -381,6 +398,7 @@ function workLogMetadataLines(row: WorkLogRow): readonly string[] {
       `workspaceId=${row.item.workspaceId ?? '<none>'}`,
       `sessionId=${row.item.sessionId ?? '<none>'}`,
       `toolName=${row.item.toolName}`,
+      'level=info',
       'phase=started',
       'resultCode=STARTED',
       ...(row.item.targetSummary === null ? [] : [`targetSummary=${row.item.targetSummary}`]),
@@ -394,6 +412,7 @@ function workLogMetadataLines(row: WorkLogRow): readonly string[] {
     `sessionId=${row.item.sessionId ?? '<none>'}`,
     `toolName=${row.item.toolName}`,
     `kind=${row.item.kind}`,
+    `level=${workLogLevel(row.item)}`,
     `resultCode=${row.item.resultCode}`,
     `durationMs=${row.item.durationMs}`,
     ...(row.item.targetSummary === null ? [] : [`targetSummary=${row.item.targetSummary}`]),
@@ -448,9 +467,7 @@ function legacyEntryDetail(entry: WorkLogEntry): string {
 }
 
 function tagFor(kind: WorkLogEntry['kind']): string {
-  if (kind === 'task') return '[TASK]';
-  if (kind === 'error') return '[ERROR]';
-  return '[RESULT]';
+  return kind === 'task' ? '[TASK]' : '[RESULT]';
 }
 
 export type { MessageKey };

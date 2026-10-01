@@ -29,11 +29,11 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Enable Corepack & Setup pnpm
-        shell: bash
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.15.0 --activate
+      - name: Setup pnpm 10.15.0
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.15.0
+          run_install: false
 
       - name: Update verified runtime dependency manifest
         run: node scripts/update-runtime-dependencies.mjs --write
@@ -51,16 +51,16 @@ jobs:
 
       - name: Install dependencies
         if: steps.diff.outputs.changed == 'true'
-        run: corepack pnpm@10.15.0 install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Verify dependency contract before opening PR
         if: steps.diff.outputs.changed == 'true'
         shell: bash
         run: |
           node apps/desktop/scripts/write-stdio-launcher.mjs
-          corepack pnpm@10.15.0 --filter @lnwjud/desktop typecheck
-          corepack pnpm@10.15.0 --filter @lnwjud/desktop build
-          corepack pnpm@10.15.0 test:packaging
+          pnpm --filter @lnwjud/desktop typecheck
+          pnpm --filter @lnwjud/desktop build
+          pnpm test:packaging
 
       - name: Open update PR against dev
         if: steps.diff.outputs.changed == 'true'

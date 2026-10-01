@@ -106,6 +106,70 @@ describe('durable goal continuation persistence', () => {
     second.database.close();
   });
 
+  it('reports an unfinished completion precondition instead of a false stale-CAS conflict after runGoal reacquires the lease', async () => {
+    const { filename, workspace } = await fixture();
+    const now = new Date('2026-08-26T00:00:00.000Z');
+    const runtime = await open(filename, workspace, () => now);
+    try {
+      const created = await runtime.service.runGoal(actor('session-a'), {
+        ...createRequest,
+        acceptanceCriteria: [{ id: 'release-ready', title: 'Release evidence is complete' }],
+      });
+      if (!created.ok || created.value.leaseToken === undefined) throw new Error('goal create failed');
+
+      const checkpointed = await runtime.service.checkpointGoal(actor('session-a'), {
+        goalId: created.value.goalId,
+        leaseToken: created.value.leaseToken,
+        expectedRevision: created.value.revision,
+        currentPhase: 'completed',
+        summary: 'Plan steps are complete, but the explicit release acceptance criterion is still pending.',
+        stepUpdates: [
+          { stepId: 'implement', status: 'completed', summary: 'Implementation complete.' },
+          { stepId: 'verify', status: 'completed', summary: 'Verification complete.' },
+        ],
+        nextAction: '',
+        blockers: [],
+        evidence: [],
+        activeTaskIds: [],
+        releaseLease: true,
+      });
+      if (!checkpointed.ok) throw new Error('checkpoint failed');
+
+      const resumed = await runtime.service.runGoal(actor('session-a'), {
+        workspaceId: workspace.id,
+        goalKey: createRequest.goalKey,
+      });
+      expect(resumed).toMatchObject({
+        ok: true,
+        value: { acquired: true, revision: checkpointed.value.revision },
+      });
+      if (!resumed.ok || resumed.value.leaseToken === undefined) throw new Error('goal resume failed');
+
+      const finished = await runtime.service.finishGoal(actor('session-a'), {
+        goalId: resumed.value.goalId,
+        leaseToken: resumed.value.leaseToken,
+        expectedRevision: resumed.value.revision,
+        status: 'completed',
+        summary: 'Attempt completion using the exact lease and revision returned by runGoal.',
+        evidence: [],
+      });
+
+      expect(finished).toMatchObject({
+        ok: false,
+        error: {
+          code: 'CONFLICT',
+          message: expect.stringContaining('acceptance criteria remain unfinished: release-ready'),
+        },
+      });
+      expect((await runtime.service.getGoal(actor('session-a'), { goalId: resumed.value.goalId }))).toMatchObject({
+        ok: true,
+        value: { revision: resumed.value.revision, status: 'active' },
+      });
+    } finally {
+      runtime.database.close();
+    }
+  });
+
   it('persists a goal Ponytail override across restart and changes it only through leased checkpoint CAS', async () => {
     const { filename, workspace } = await fixture();
     let now = new Date('2026-08-26T00:00:00.000Z');

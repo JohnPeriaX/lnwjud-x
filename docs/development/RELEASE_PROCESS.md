@@ -32,8 +32,10 @@ system is never evidence for another.
    evidence, and SHA-256 coverage. The tag-triggered Release workflow verifies
    those files in artifact-only mode and does not rebuild or publish a
    replacement artifact.
-7. Signing is truthful. Windows Authenticode is required when both Windows
-   signing secrets are configured. Community macOS artifacts are ad-hoc signed
+7. Signing is truthful. Official Windows updater/release artifacts require both
+   production signing secrets and `Valid` Authenticode on Setup and Portable;
+   unsigned local developer packages remain allowed but cannot be published as
+   official Windows updater assets. Community macOS artifacts are ad-hoc signed
    with hardened runtime and a scoped Electron library-validation exception;
    Developer ID builds require one Team ID, keep Library Validation enabled,
    and require notarization/stapling when configured. Wholly unsigned macOS
@@ -365,10 +367,11 @@ unpublished branch when the reporter needs a public binary.
   prefer a corrected patch version after the fix. Never force-replace a public
   release tag.
 - Windows signing secrets `WINDOWS_CSC_LINK` and
-  `WINDOWS_CSC_KEY_PASSWORD` must either both exist or both be absent. macOS
-  signing/notarization secrets follow the same paired/protected-CI rule. The
-  workflows report unsigned community artifacts explicitly when credentials
-  are absent.
+  `WINDOWS_CSC_KEY_PASSWORD` must both exist for official Windows publication.
+  Main CI fails before packaging when either is missing, and release evidence
+  must record `Valid` Authenticode for both Setup and Portable. Local developer
+  packaging may omit both and remain unsigned. macOS signing/notarization
+  secrets follow their existing paired/protected-CI rule.
 
 ## Related release documents
 

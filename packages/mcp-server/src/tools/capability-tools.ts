@@ -103,7 +103,7 @@ export function capabilityTools(context: McpToolContext, setOfMarksStore?: SetOf
     }),
     defineTool({
       name: 'dom_cdp',
-      description: 'Default for web-page DOM work inside managed Chrome. Call list_tabs first, select the exact returned tab_id by URL/title, and pass that tab_id to every query, click, type, navigate, evaluate, wait, screenshot, close, or steps call. If no safe matching tab exists, call new_tab and use its returned ID. Target order and the OS-active tab are never ownership signals. Never navigate through the browser address bar with computer_use/accessibility/input_event. Protected ChatGPT tab mutations additionally require allow_protected_tab_action=true plus explicit user confirmation.',
+      description: 'Default for web-page DOM work inside managed Chrome. Call list_tabs first, select the exact returned tab_id by URL/title, and pass that tab_id to every query, click, type, navigate, evaluate, wait, screenshot, activate_tab, set_files, close, or steps call. Use activate_tab before crossing into native accessibility/input_event when foreground state matters. Use set_files for a browser file input instead of native dialog choreography; uploaded files remain subject to Active Project path policy. If no safe matching tab exists, call new_tab and use its returned ID. Target order and the OS-active tab are never ownership signals. Never navigate through the browser address bar with computer_use/accessibility/input_event. Protected ChatGPT tab mutations additionally require allow_protected_tab_action=true plus explicit user confirmation.',
       permission: 'READ',
       annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: domCdpCapabilitySchema,
@@ -119,7 +119,7 @@ export function capabilityTools(context: McpToolContext, setOfMarksStore?: SetOf
     }),
     defineTool({
       name: 'accessibility',
-      description: 'Semantic host-native UI tool. Inspect UI trees and named controls, then click, focus, read or set values, select controls and menus, or manage a native element when the platform provider and permission are available. Prefer shell for direct system work and dom_cdp for web pages.',
+      description: 'Semantic host-native UI tool. Inspect UI trees and named controls, then click, focus, read or set values, select controls and menus, or manage a native element when the platform provider and permission are available. Mutating calls may include postcondition {parameters, expected_value} to report whether a follow-up read_value observed the requested state. Prefer shell for direct system work and dom_cdp for web pages.',
       permission: 'READ',
       annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: accessibilityCapabilitySchema,
@@ -127,7 +127,7 @@ export function capabilityTools(context: McpToolContext, setOfMarksStore?: SetOf
     }),
     defineTool({
       name: 'input_event',
-      description: 'Low-level keyboard and pointer fallback. Use only when DOM/CDP and host Accessibility cannot operate the target and the active desktop session grants input permission. Supports text, keys, mouse movement, clicks, drag, scroll, held buttons, release_all, and batched sequences. For web navigation, do not focus/type into a browser address bar; use dom_cdp list_tabs/new_tab plus an explicit tab_id.',
+      description: 'Low-level keyboard and pointer fallback. Use only when DOM/CDP and host Accessibility cannot operate the target and the active desktop session grants input permission. Supports text, keys, mouse movement, clicks, drag, scroll, held buttons, release_all, and batched sequences. A mutating call may include postcondition {parameters, expected_value} to report whether a follow-up Accessibility read_value observed the target state. For web navigation, do not focus/type into a browser address bar; use dom_cdp list_tabs/new_tab plus an explicit tab_id.',
       permission: 'EXECUTE',
       annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: inputEventCapabilitySchema,

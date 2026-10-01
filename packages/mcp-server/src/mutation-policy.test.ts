@@ -58,6 +58,8 @@ const cases: readonly MutationCase[] = [
   { label: 'PowerPoint save-as preview by default', tool: 'office_ppt', input: { action: 'save_as' }, permission: 'WRITE', kind: 'read' },
   { label: 'PowerPoint save-as apply', tool: 'office_ppt', input: { action: 'save_as', dryRun: false }, permission: 'WRITE', kind: 'replace' },
   { label: 'browser launch is ordinary execution', tool: 'dom_cdp', input: { action: 'launch' }, permission: 'READ', kind: 'execute' },
+  { label: 'browser tab activation is ordinary local execution', tool: 'dom_cdp', input: { action: 'activate_tab', tab_id: 'tab-1' }, permission: 'READ', kind: 'execute' },
+  { label: 'browser file upload is an opaque browser mutation', tool: 'dom_cdp', input: { action: 'set_files', tab_id: 'tab-1' }, permission: 'READ', kind: 'opaque_mutation' },
   { label: 'opaque browser evaluation', tool: 'dom_cdp', input: { action: 'evaluate' }, permission: 'READ', kind: 'opaque_mutation' },
   { label: 'opaque browser typing', tool: 'dom_cdp', input: { action: 'type' }, permission: 'READ', kind: 'opaque_mutation' },
   { label: 'opaque browser navigation', tool: 'dom_cdp', input: { action: 'navigate' }, permission: 'READ', kind: 'opaque_mutation' },

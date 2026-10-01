@@ -1,5 +1,5 @@
 export const APP_NAME = 'lnwjud';
-export const APP_VERSION = '5.7.2';
+export const APP_VERSION = '5.7.3';
 
 export const ipcChannels = {
   listWorkspaces: 'lnwjud:list-workspaces',
@@ -425,6 +425,7 @@ export interface WorkLogEntry {
   readonly id: string;
   readonly timestamp: string;
   readonly kind: 'task' | 'result' | 'error';
+  readonly level?: LogLevel;
   readonly toolName: string;
   readonly resultCode: string;
   readonly errorMessage: string | null;
@@ -578,6 +579,8 @@ export interface TunnelStatus {
   readonly auth?: TunnelAuthStatus;
   readonly oauth?: TunnelOAuthCapabilityStatus;
   readonly clientPath: string | null;
+  /** Explicit user override. Null means use the bundled target-native tunnel-client. */
+  readonly configuredClientPath?: string | null;
   readonly profileExists: boolean;
   readonly message: string | null;
   readonly logPath: string | null;

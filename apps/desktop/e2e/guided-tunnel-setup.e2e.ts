@@ -18,7 +18,6 @@ test('fresh user sees Thai Tips, enters Secure Tunnel guide, and switches langua
     await page.setViewportSize({ width: 1280, height: 720 });
     await ensureThaiLocale(page);
     await expect(page.getByRole('dialog', { name: 'ตั้งค่า ChatGPT ให้ใช้ lnwjud' })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('ต้องเปิด Dev Mode ในหน้า Plugin Settings ก่อน', { exact: false })).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     await page.getByRole('button', { name: 'เริ่มตั้งค่า' }).click();

@@ -41,7 +41,7 @@ import {
   createLocalExtensionsService,
   type ExtensionsService,
 } from '@lnwjud/extensions';
-import { ActivityTracker, RuntimeEngineeringEvidenceVerifier, createEngineeringSourceStateProvider, RuntimeGoalManagedTaskStateReader, SharedActivitySnapshotLease, composeActivitySinks, createFileActivitySink, currentSharedActivityOwner, mcpActivityLogPath, type ActivitySink, type ActivitySinkEvent, type McpApplicationServices, type WorkspaceScope } from '@lnwjud/mcp-server';
+import { ActivityTracker, RuntimeEngineeringEvidenceVerifier, createEngineeringArtifactVerifier, createEngineeringSourceStateProvider, RuntimeGoalManagedTaskStateReader, SharedActivitySnapshotLease, composeActivitySinks, createFileActivitySink, currentSharedActivityOwner, mcpActivityLogPath, type ActivitySink, type ActivitySinkEvent, type McpApplicationServices, type WorkspaceScope } from '@lnwjud/mcp-server';
 import { permissionProfiles, type PermissionProfile, type PermissionProfileName } from '@lnwjud/permissions';
 import {
   AesGcmCheckpointCipher,
@@ -205,8 +205,14 @@ export function createStdioMcpRuntime(
   });
   const actor: FileActor = { clientId: 'cli-mcp-stdio', clientName: 'lnwjud cli MCP' };
   const engineeringSourceState = createEngineeringSourceStateProvider(async (workspaceId, args) => gitService.run(actor, { workspaceId, args }));
+  const engineeringArtifactVerifier = createEngineeringArtifactVerifier(async (workspaceId) => (await workspaceRepository.get(workspaceId))?.realRootPath);
   const goalService = new GoalContinuationService(workspaceRepository, goalRepository, {
-    engineeringEvidenceVerifier: new RuntimeEngineeringEvidenceVerifier({ process: processService, shell: capabilityRuntime.shell, sourceState: engineeringSourceState }),
+    engineeringEvidenceVerifier: new RuntimeEngineeringEvidenceVerifier({
+      process: processService,
+      shell: capabilityRuntime.shell,
+      sourceState: engineeringSourceState,
+      artifactVerifier: engineeringArtifactVerifier,
+    }),
     scheduledContinuations: goalRepository,
     workerLiveness: goalMutationFence,
     taskCancellation,

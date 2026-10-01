@@ -980,9 +980,14 @@ export class UpgradeRuntimeService {
     if (capabilities === undefined) return ok(truthfulUnavailable(name, 'needs_setup', ['local shell task runtime']));
     const workspaceId = readString(input, 'workspaceId');
     if (name === 'task_create') {
-      const executable = readString(input, 'executable') ?? readString(input, 'command');
+      const explicitExecutable = readString(input, 'executable');
+      const commandAlias = readString(input, 'command');
+      if (explicitExecutable === undefined && commandAlias !== undefined && /\s/.test(commandAlias)) {
+        return err(appError('INVALID_INPUT', 'task_create command is an executable alias, not a shell command line; pass executable and arguments separately'));
+      }
+      const executable = explicitExecutable ?? commandAlias;
       if (executable === undefined) {
-        return err(appError('INVALID_INPUT', 'task_create requires executable (or command); pass arguments, cwd, timeout_seconds, and workspaceId as needed'));
+        return err(appError('INVALID_INPUT', 'task_create requires executable (or command alias); pass arguments, cwd, timeout_seconds, and workspaceId as needed'));
       }
       return capabilities.execute('shell', withCapabilityOwnerMetadata({
         ...input,

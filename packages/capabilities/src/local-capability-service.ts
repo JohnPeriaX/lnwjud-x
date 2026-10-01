@@ -1,4 +1,4 @@
-import { appError, err, type InvocationAuthorization, type Result } from '@lnwjud/domain';
+import { appError, err, ok, type InvocationAuthorization, type Result } from '@lnwjud/domain';
 import type { CapabilityService, CapabilityToolName } from './index.js';
 
 export interface CapabilityBackend {
@@ -40,9 +40,12 @@ export class LocalCapabilityService implements CapabilityService {
       return Promise.resolve(err(appError('PROCESS_TIMEOUT', 'Capability operation was cancelled before dispatch', true)));
     }
     const backend = this.backendFor(tool);
-    return backend === undefined
-      ? Promise.resolve(err(appError('INVALID_INPUT', 'Capability tool is not supported')))
-      : backend.execute(input, signal, authorization);
+    if (backend === undefined) return Promise.resolve(err(appError('INVALID_INPUT', 'Capability tool is not supported')));
+    const dispatch = async (): Promise<Result<unknown>> => {
+      const result = await backend.execute(input, signal, authorization);
+      return result.ok ? this.withPostcondition(tool, input, result, signal, authorization) : result;
+    };
+    return isForegroundNativeAction(tool, input) ? withForegroundLease(dispatch, signal) : dispatch();
   }
 
   public observeAutomationShell(
@@ -55,6 +58,22 @@ export class LocalCapabilityService implements CapabilityService {
     return observe === undefined
       ? Promise.resolve(err(appError('INTERNAL_ERROR', 'Automation shell observation is unavailable', true)))
       : observe.call(this.backends.shell, ownerClientId, workspaceId, taskId, requestDigest);
+  }
+
+  private async withPostcondition(
+    tool: CapabilityToolName,
+    input: unknown,
+    result: Result<unknown>,
+    signal?: AbortSignal,
+    authorization?: InvocationAuthorization,
+  ): Promise<Result<unknown>> {
+    if ((tool !== 'accessibility' && tool !== 'input_event') || !isRecord(input) || !isRecord(input.postcondition)) return result;
+    const parameters = isRecord(input.postcondition.parameters) ? input.postcondition.parameters : undefined;
+    if (parameters === undefined || !('expected_value' in input.postcondition)) return result;
+    const check = await this.backends.accessibility.execute({ action: 'read_value', parameters }, signal, authorization);
+    if (!check.ok) return okWithPostcondition(result, false, input.postcondition.expected_value, undefined, 'check_failed');
+    const observed = isRecord(check.value) ? check.value.value : undefined;
+    return okWithPostcondition(result, Object.is(observed, input.postcondition.expected_value), input.postcondition.expected_value, observed);
   }
 
   private backendFor(tool: CapabilityToolName): CapabilityBackend | undefined {
@@ -79,4 +98,55 @@ export class LocalCapabilityService implements CapabilityService {
       case 'wsl_fs': return this.backends.wslFs;
     }
   }
+}
+
+let foregroundTail: Promise<void> = Promise.resolve();
+
+async function withForegroundLease(
+  dispatch: () => Promise<Result<unknown>>,
+  signal?: AbortSignal,
+): Promise<Result<unknown>> {
+  const previous = foregroundTail;
+  let release!: () => void;
+  foregroundTail = new Promise<void>((resolve) => { release = resolve; });
+  await previous;
+  try {
+    if (signal?.aborted === true) return err(appError('PROCESS_TIMEOUT', 'Native foreground action was cancelled before dispatch', true));
+    return await dispatch();
+  } finally {
+    release();
+  }
+}
+
+function isForegroundNativeAction(tool: CapabilityToolName, input: unknown): boolean {
+  if (tool === 'input_event' || tool === 'file_dialog') return true;
+  if (!isRecord(input)) return false;
+  const action = typeof input.action === 'string' ? input.action : typeof input.operation === 'string' ? input.operation : '';
+  if (tool === 'accessibility') return !['status', 'list_windows', 'observe', 'observe_summary', 'observe_changes', 'inspect_elements', 'find_element', 'read_value'].includes(action);
+  if (tool === 'window') return !['list', 'get_active', 'get_bounds', 'get_display'].includes(action);
+  return false;
+}
+
+function okWithPostcondition(
+  result: Result<unknown>,
+  verified: boolean,
+  expectedValue: unknown,
+  observedValue: unknown,
+  reason?: string,
+): Result<unknown> {
+  if (!result.ok) return result;
+  const value = isRecord(result.value) ? result.value : { result: result.value };
+  return ok({
+    ...value,
+    postcondition: {
+      verified,
+      expected_value: expectedValue,
+      ...(observedValue === undefined ? {} : { observed_value: observedValue }),
+      ...(reason === undefined ? {} : { reason }),
+    },
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

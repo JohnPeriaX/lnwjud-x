@@ -28,26 +28,26 @@ jobs:
         with:
           cosign-release: 'v3.1.3'
 
-      - name: Enable Corepack & Setup pnpm
-        shell: pwsh
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.15.0 --activate
+      - name: Setup pnpm 10.15.0
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.15.0
+          run_install: false
 
       - name: Install dependencies
         shell: pwsh
-        run: corepack pnpm@10.15.0 install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Verify scheduled continuation contract
         shell: pwsh
         run: |
-          corepack pnpm@10.15.0 --filter @lnwjud/mcp-server exec vitest run src/scheduled-continuation-skill-contract.test.ts src/tools/goal-tools.test.ts src/tools/scheduled-continuation-tools.test.ts
-          corepack pnpm@10.15.0 --filter @lnwjud/application exec vitest run src/scheduled-continuation-service.test.ts
-          corepack pnpm@10.15.0 --filter @lnwjud/storage exec vitest run src/scheduled-continuation.integration.test.ts
+          pnpm --filter @lnwjud/mcp-server exec vitest run src/scheduled-continuation-skill-contract.test.ts src/tools/goal-tools.test.ts src/tools/scheduled-continuation-tools.test.ts
+          pnpm --filter @lnwjud/application exec vitest run src/scheduled-continuation-service.test.ts
+          pnpm --filter @lnwjud/storage exec vitest run src/scheduled-continuation.integration.test.ts
 
       - name: Build workspace dependencies
         shell: pwsh
-        run: corepack pnpm@10.15.0 build
+        run: pnpm build
 
       - name: Build Windows Setup and Portable
         shell: pwsh
@@ -61,7 +61,7 @@ jobs:
         env:
           LNWJUD_PACKAGED_EXECUTABLE: ${{ github.workspace }}/apps/desktop/dist/installers/win-unpacked/lnwjud.exe
           PLAYWRIGHT_HTML_OPEN: never
-        run: corepack pnpm@10.15.0 --filter @lnwjud/desktop exec playwright test --config playwright.config.ts desktop-dashboard.e2e.ts desktop-mcp-client.e2e.ts tools-doctor.e2e.ts electron-security.e2e.ts --trace=retain-on-failure --reporter=list,html
+        run: pnpm --filter @lnwjud/desktop exec playwright test --config playwright.config.ts desktop-dashboard.e2e.ts desktop-mcp-client.e2e.ts tools-doctor.e2e.ts electron-security.e2e.ts --trace=retain-on-failure --reporter=list,html
 
       - name: Upload Windows packaged E2E diagnostics
         if: always()

@@ -300,6 +300,7 @@ function tunnelStatus(value: unknown): TunnelStatus {
   const runtimeCredentialAvailable = value.runtimeCredentialAvailable === undefined ? undefined : booleanField(value, 'runtimeCredentialAvailable');
   const auth = tunnelAuthStatus(value.auth);
   const oauth = tunnelOAuthCapabilityStatus(value.oauth);
+  const configuredClientPath = value.configuredClientPath === undefined ? undefined : nullableString(value.configuredClientPath);
   return {
     state,
     source,
@@ -309,6 +310,7 @@ function tunnelStatus(value: unknown): TunnelStatus {
     ...(auth === undefined ? {} : { auth }),
     ...(oauth === undefined ? {} : { oauth }),
     clientPath: nullableString(value.clientPath),
+    ...(configuredClientPath === undefined ? {} : { configuredClientPath }),
     profileExists: booleanField(value, 'profileExists'),
     message: nullableString(value.message),
     logPath: nullableString(value.logPath),
@@ -1286,7 +1288,7 @@ function setRemoteMcpTransport(request: SetRemoteMcpTransportRequest): Promise<R
 }
 
 function setTunnelClientPath(request: SetTunnelClientPathRequest): Promise<{ readonly clientPath: string }> {
-  if (!isRecord(request) || typeof request.clientPath !== 'string' || request.clientPath.trim().length === 0) {
+  if (!isRecord(request) || typeof request.clientPath !== 'string') {
     return Promise.reject(new Error('Invalid IPC request'));
   }
   return invoke(ipcChannels.setTunnelClientPath, { clientPath: request.clientPath }).then((value: unknown) => {

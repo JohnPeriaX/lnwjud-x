@@ -1,7 +1,10 @@
+import { mkdtemp, mkdir, rm, utimes, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { appError, err, ok } from '@lnwjud/domain';
 import { engineeringCommandFingerprint } from '@lnwjud/shared';
-import { RuntimeEngineeringEvidenceVerifier, createEngineeringSourceStateProvider, type EngineeringSourceState } from './engineering-evidence-verifier.js';
+import { RuntimeEngineeringEvidenceVerifier, createEngineeringArtifactVerifier, createEngineeringSourceStateProvider, type EngineeringSourceState } from './engineering-evidence-verifier.js';
 
 describe('RuntimeEngineeringEvidenceVerifier', () => {
   it('reads the current tracked source SHA and cleanliness through bounded read-only Git commands', async () => {
@@ -14,6 +17,31 @@ describe('RuntimeEngineeringEvidenceVerifier', () => {
     await expect(sourceState('workspace-1')).resolves.toEqual({ commit, clean: false });
     expect(runGit).toHaveBeenCalledWith('workspace-1', ['rev-parse', 'HEAD']);
     expect(runGit).toHaveBeenCalledWith('workspace-1', ['status', '--porcelain=v1', '--untracked-files=no']);
+  });
+
+  it('verifies only fresh non-empty package artifacts contained by the workspace root', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'lnwjud-engineering-artifact-'));
+    const artifact = join(root, 'dist', 'installer.exe');
+    try {
+      await mkdir(join(root, 'dist'), { recursive: true });
+      await writeFile(artifact, 'package-bytes');
+      const now = Date.now();
+      await utimes(artifact, new Date(now), new Date(now));
+      const verifier = createEngineeringArtifactVerifier(async () => root);
+      const observation = {
+        startedAt: new Date(now - 5_000).toISOString(),
+        finishedAt: new Date(now + 5_000).toISOString(),
+      };
+
+      await expect(verifier('workspace-1', 'dist/installer.exe', observation)).resolves.toBe(true);
+      await expect(verifier('workspace-1', '../outside.exe', observation)).resolves.toBe(false);
+      await utimes(artifact, new Date(now - 60_000), new Date(now - 60_000));
+      await expect(verifier('workspace-1', 'dist/installer.exe', observation)).resolves.toBe(false);
+      await writeFile(join(root, 'dist', 'empty.exe'), '');
+      await expect(verifier('workspace-1', 'dist/empty.exe', observation)).resolves.toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it('accepts only an actual successful host task in the same workspace', async () => {
@@ -117,6 +145,74 @@ describe('RuntimeEngineeringEvidenceVerifier', () => {
       source: 'host_observed', observedAt: '2026-09-29T00:00:00Z', workspaceId: 'workspace-1',
       command: nonCanonicalCiCommand, runId: 'noncanonical-ci-proof', exitCode: 0, commit, conclusion: 'success',
     }, 'exact_sha_ci')).resolves.toBe(false);
+  });
+
+  it('accepts a fresh generic package artifact from the exact durable shell receipt and rejects stale or missing artifacts', async () => {
+    const commit = 'cbb9ac40cc6d1acfd0f66a0a2d62c25a8f3a1264';
+    const command = 'corepack pnpm@10.15.0 desktop:pack:windows';
+    const artifact = 'dist/installers/lnwjud-Watcher-Setup-0.2.8.exe';
+    const shell = { statusForGoalLiveness: vi.fn(async () => ok({
+      state: 'completed', exit_code: 0, command_fingerprint: engineeringCommandFingerprint(command),
+      started_at: '2026-09-30T00:00:00.000Z', finished_at: '2026-09-30T00:02:00.000Z',
+    })) };
+    const artifactVerifier = vi.fn(async (_workspaceId: string, candidate: string) => candidate === artifact);
+    const verifier = new RuntimeEngineeringEvidenceVerifier({
+      shell,
+      sourceState: async (): Promise<EngineeringSourceState> => ({ commit, clean: true }),
+      artifactVerifier,
+    });
+    const evidence = {
+      source: 'host_observed' as const, observedAt: '2026-09-30T00:02:01.000Z', workspaceId: 'workspace-1',
+      command, runId: 'watcher-package', exitCode: 0, commit, artifact,
+    };
+
+    await expect(verifier.verify('workspace-1', evidence, 'package')).resolves.toBe(true);
+    expect(artifactVerifier).toHaveBeenCalledWith('workspace-1', artifact, {
+      startedAt: '2026-09-30T00:00:00.000Z', finishedAt: '2026-09-30T00:02:00.000Z',
+    });
+    await expect(verifier.verify('workspace-1', { ...evidence, artifact: 'dist/readme.txt' }, 'package')).resolves.toBe(false);
+    artifactVerifier.mockResolvedValueOnce(false);
+    await expect(verifier.verify('workspace-1', evidence, 'package')).resolves.toBe(false);
+  });
+
+  it('accepts complete exact-SHA hosted platform matrix proof and rejects partial platform evidence', async () => {
+    const commit = 'cbb9ac40cc6d1acfd0f66a0a2d62c25a8f3a1264';
+    const command = 'gh run view 36568935961 --json "headSha,status,conclusion,jobs"';
+    const completeOutput = JSON.stringify({
+      headSha: commit,
+      status: 'completed',
+      conclusion: 'success',
+      jobs: [
+        { name: 'Native Platform Contract (Windows)', status: 'completed', conclusion: 'success' },
+        { name: 'Native Platform Contract (macOS)', status: 'completed', conclusion: 'success' },
+        { name: 'Native Platform Contract (Linux)', status: 'completed', conclusion: 'success' },
+      ],
+    });
+    const partialOutput = JSON.stringify({
+      headSha: commit,
+      status: 'completed',
+      conclusion: 'success',
+      jobs: [
+        { name: 'Native Platform Contract (Windows)', status: 'completed', conclusion: 'success' },
+      ],
+    });
+    const shell = { statusForGoalLiveness: vi.fn(async (_workspaceId: string, taskId: string) => ok({
+      state: 'completed', exit_code: 0, command_fingerprint: engineeringCommandFingerprint(command),
+      stdout: taskId === 'complete-matrix' ? completeOutput : partialOutput,
+    })) };
+    const verifier = new RuntimeEngineeringEvidenceVerifier({
+      shell,
+      sourceState: async (): Promise<EngineeringSourceState> => ({ commit, clean: true }),
+    });
+    const base = {
+      source: 'host_observed' as const, observedAt: '2026-09-30T00:00:00Z', workspaceId: 'workspace-1',
+      command, exitCode: 0, commit, conclusion: 'success',
+    };
+
+    await expect(verifier.verify('workspace-1', { ...base, runId: 'complete-matrix' }, 'cross_platform', ['win32', 'linux']))
+      .resolves.toBe(true);
+    await expect(verifier.verify('workspace-1', { ...base, runId: 'partial-matrix' }, 'cross_platform', ['win32', 'linux']))
+      .resolves.toBe(false);
   });
 
   it('rejects historical exact-SHA CI or package proof when the current tracked source is dirty or at another commit', async () => {

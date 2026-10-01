@@ -41,33 +41,33 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Enable Corepack & Setup pnpm
-        shell: bash
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.15.0 --activate
+      - name: Setup pnpm 10.15.0
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.15.0
+          run_install: false
 
       - name: Install dependencies
         shell: bash
-        run: corepack pnpm@10.15.0 install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Run version contract
         shell: bash
-        run: corepack pnpm@10.15.0 test:version
+        run: pnpm test:version
 
       - name: Run portable typecheck
         shell: bash
-        run: corepack pnpm@10.15.0 typecheck
+        run: pnpm typecheck
 
       - name: Run native platform contract tests
         shell: bash
-        run: corepack pnpm@10.15.0 exec vitest run tests/integration/platform-composition.test.ts tests/integration/cross-platform-release-scenarios.test.ts tests/release/platform-support-contract.test.ts packages/mcp-server/src/tool-runtime-contract.test.ts
+        run: pnpm exec vitest run tests/integration/platform-composition.test.ts tests/integration/cross-platform-release-scenarios.test.ts tests/release/platform-support-contract.test.ts packages/mcp-server/src/tool-runtime-contract.test.ts
 
       - name: Run complete native unit and service acceptance suites
         shell: bash
         # The desktop suite runs in isolated shards below. Keep the remaining
         # workspace packages on pnpm's normal bounded recursive pool.
-        run: corepack pnpm@10.15.0 -r --filter '!@lnwjud/desktop' --if-present test
+        run: pnpm -r --filter '!@lnwjud/desktop' --if-present test
 
       - name: Test macOS native host protocol
         timeout-minutes: 10
@@ -128,23 +128,23 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Enable Corepack & Setup pnpm
-        shell: bash
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.15.0 --activate
+      - name: Setup pnpm 10.15.0
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.15.0
+          run_install: false
 
       - name: Install dependencies
         shell: bash
-        run: corepack pnpm@10.15.0 install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build workspace packages used by desktop acceptance tests
         shell: bash
-        run: corepack pnpm@10.15.0 --filter '@lnwjud/cli...' build
+        run: pnpm --filter '@lnwjud/cli...' build
 
       - name: Run isolated desktop test shard
         shell: bash
-        run: corepack pnpm@10.15.0 --filter @lnwjud/desktop exec vitest run --config vitest.config.ts --passWithNoTests --shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}
+        run: pnpm --filter @lnwjud/desktop exec vitest run --config vitest.config.ts --passWithNoTests --shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}
 
   native-package-verification:
     name: Native Package Verification (${{ matrix.name }})
@@ -189,15 +189,15 @@ jobs:
         with:
           cosign-release: 'v3.1.3'
 
-      - name: Enable Corepack & Setup pnpm
-        shell: bash
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.15.0 --activate
+      - name: Setup pnpm 10.15.0
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.15.0
+          run_install: false
 
       - name: Install dependencies
         shell: bash
-        run: corepack pnpm@10.15.0 install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Install Linux packaging and Electron smoke prerequisites
         if: matrix.platform == 'linux'
@@ -207,7 +207,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             gnome-keyring libsecret-1-0 dbus dbus-x11 xvfb xauth ripgrep \
             libnss3 libasound2t64 libgtk-3-0t64 libgbm1 libxss1 \
-            libatk-bridge2.0-0t64 libdrm2 libxkbcommon0 libfuse2t64
+            libatk-bridge2.0-0t64 libdrm2 libxkbcommon0
 
       - name: Install native ARM64 Debian packager
         if: matrix.platform == 'linux' && matrix.arch == 'arm64'
@@ -234,7 +234,7 @@ jobs:
             unset USE_SYSTEM_FPM
           fi
           mkdir -p apps/desktop/packaged-e2e-diagnostics
-          corepack pnpm@10.15.0 verify:platform -- --package 2>&1 \
+          pnpm verify:platform -- --package 2>&1 \
             | tee apps/desktop/packaged-e2e-diagnostics/platform-package.log
 
       - name: Verify packaged artifact layout
@@ -245,11 +245,11 @@ jobs:
         run: |
           version="$(node -p "require('./package.json').version")"
           if [[ "${{ matrix.platform }}" == "darwin" ]]; then
-            corepack pnpm@10.15.0 verify:macos-release "apps/desktop/dist/installers/lnwjud-${version}-${{ matrix.arch }}.dmg"
-            corepack pnpm@10.15.0 verify:macos-release "apps/desktop/dist/installers/lnwjud-${version}-${{ matrix.arch }}.zip"
+            pnpm verify:macos-release "apps/desktop/dist/installers/lnwjud-${version}-${{ matrix.arch }}.dmg"
+            pnpm verify:macos-release "apps/desktop/dist/installers/lnwjud-${version}-${{ matrix.arch }}.zip"
           else
-            corepack pnpm@10.15.0 verify:linux-release "apps/desktop/dist/installers/lnwjud-${version}-${{ matrix.arch }}.AppImage"
-            corepack pnpm@10.15.0 verify:linux-release "apps/desktop/dist/installers/lnwjud-${version}-${{ matrix.arch }}.deb"
+            pnpm verify:linux-release "apps/desktop/dist/installers/lnwjud-${version}-${{ matrix.arch }}.AppImage"
+            pnpm verify:linux-release "apps/desktop/dist/installers/lnwjud-${version}-${{ matrix.arch }}.deb"
           fi
 
       - name: Stage and launch the real macOS DMG package
@@ -380,12 +380,15 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Enable Corepack & Setup pnpm
+      - name: Setup pnpm 10.15.0
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.15.0
+          run_install: false
+
+      - name: Install dependencies
         shell: bash
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.15.0 --activate
-          corepack pnpm@10.15.0 install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Download exact macOS 15 package artifact
         uses: actions/download-artifact@v8
@@ -395,7 +398,7 @@ jobs:
 
       - name: Build packaged-smoke workspace dependencies
         shell: bash
-        run: corepack pnpm@10.15.0 --filter @lnwjud/storage... --if-present build
+        run: pnpm --filter @lnwjud/storage... --if-present build
 
       - name: Record exact v4.62.1 macOS signing-policy regression
         if: matrix.arch == 'arm64'
@@ -581,19 +584,20 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Enable Corepack & Setup pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.15.0 --activate
+      - name: Setup pnpm 10.15.0
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.15.0
+          run_install: false
 
       - name: Install dependencies
-        run: corepack pnpm@10.15.0 install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build workspace type declarations
-        run: corepack pnpm@10.15.0 typecheck
+        run: pnpm typecheck
 
       - name: Run complete Windows workspace release suite
-        run: corepack pnpm@10.15.0 test:release
+        run: pnpm test:release
 
   windows-release-build:
     # Direct non-main pushes already run the native platform contract matrix;
@@ -658,10 +662,11 @@ jobs:
           if ($versionText -notmatch 'v?3\.1\.3') { throw "Expected cosign v3.1.3, got: $versionText" }
           Write-Host $versionText
 
-      - name: Enable Corepack & Setup pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.15.0 --activate
+      - name: Setup pnpm 10.15.0
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.15.0
+          run_install: false
 
       - name: Install ripgrep for E2E search
         shell: powershell
@@ -692,21 +697,32 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/verify-release.ps1 -SkipWindowsPackaging -SkipWorkspaceTests
 
+      - name: Require Windows production signing credentials
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+        shell: powershell
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CSC_LINK) -or [string]::IsNullOrWhiteSpace($env:CSC_KEY_PASSWORD)) {
+            throw 'Official Windows release/update artifacts require WINDOWS_CSC_LINK and WINDOWS_CSC_KEY_PASSWORD before main packaging can publish.'
+          }
+
       - name: Run authoritative release verification gate
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         shell: powershell
         env:
-          # electron-builder signs only when both real production certificate secrets exist.
-          # Unsigned community releases remain supported; Release verifies provenance/hashes and reports signing state.
+          # Official Windows updater artifacts are Authenticode-required. Local development packaging remains allowed unsigned.
           CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+          LNWJUD_REQUIRE_WINDOWS_AUTHENTICODE: '1'
         run: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/verify-release.ps1 -SkipWorkspaceTests
 
       - name: Verify packaged Windows legacy-profile startup
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         env:
           LNWJUD_PACKAGED_EXECUTABLE: ${{ github.workspace }}/apps/desktop/dist/installers/win-unpacked/lnwjud.exe
-        run: corepack pnpm@10.15.0 --filter @lnwjud/desktop exec playwright test --config playwright.config.ts --grep "Windows upgrade opens"
+        run: pnpm --filter @lnwjud/desktop exec playwright test --config playwright.config.ts --grep "Windows upgrade opens"
 
       - name: Upload Windows E2E diagnostics
         if: failure()

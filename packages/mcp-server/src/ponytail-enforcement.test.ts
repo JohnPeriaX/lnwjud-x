@@ -170,6 +170,51 @@ describe('Ponytail ToolRegistry enforcement', () => {
     expect(base.writes).toEqual(['src/canonical-skill-read.ts']);
   });
 
+  it('keeps durable-goal Ponytail activation across transport session rotation for the same client/workspace/goal', async () => {
+    const base = createServices();
+    const services = {
+      ...base.services,
+      goals: {
+        async getGoal() { return ok({ workspaceId: 'workspace-1', ponytailMode: 'ultra' }); },
+      },
+    } as unknown as McpApplicationServices;
+    const ledger = new PonytailActivationLedger();
+    const firstRequest = new ToolRegistry(services, { ...actor, sessionId: 'transport-session-a' }, {
+      sessionId: 'transport-session-a',
+      ponytailModeProvider: (): 'off' => 'off',
+      ponytailActivationLedger: ledger,
+    });
+    const secondRequest = new ToolRegistry(services, { ...actor, sessionId: 'transport-session-b' }, {
+      sessionId: 'transport-session-b',
+      ponytailModeProvider: (): 'off' => 'off',
+      ponytailActivationLedger: ledger,
+    });
+    const goalLease = { goalId: 'goal-ultra', leaseToken: 'lease-token', leaseGeneration: 1 };
+
+    const loaded = await firstRequest.invoke('skills_read', {
+      skillId: BUNDLED_PONYTAIL_SKILL_ID,
+      workspaceId: 'workspace-1',
+      goalId: 'goal-ultra',
+    });
+    expect(loaded.isError).not.toBe(true);
+
+    const firstMutation = await secondRequest.invoke('write_file', {
+      workspaceId: 'workspace-1',
+      path: 'src/session-rotation-a.ts',
+      content: 'export const sessionRotationA = true;\n',
+      goalLease,
+    });
+    expect(firstMutation.isError).not.toBe(true);
+    const secondMutation = await firstRequest.invoke('write_file', {
+      workspaceId: 'workspace-1',
+      path: 'src/session-rotation-b.ts',
+      content: 'export const sessionRotationB = true;\n',
+      goalLease,
+    });
+    expect(secondMutation.isError).not.toBe(true);
+    expect(base.writes).toEqual(['src/session-rotation-a.ts', 'src/session-rotation-b.ts']);
+  });
+
   it('keeps recovery operations above Ponytail activation policy', async () => {
     const { services } = createServices();
     const registry = fullRegistry(services);

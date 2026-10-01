@@ -148,11 +148,16 @@ jobs:
               exit 1
             fi
             installer_directory="$(dirname "${provenance_files[0]}")"
+            require_windows_authenticode='0'
+            if [[ "$platform" == 'win32' ]]; then
+              require_windows_authenticode='1'
+            fi
             LNWJUD_RELEASE_INSTALLER_DIRECTORY="$installer_directory" \
             LNWJUD_RELEASE_PLATFORM="$platform" \
             LNWJUD_RELEASE_ARCH="$arch" \
             LNWJUD_EXPECTED_COMMIT_SHA="$sha" \
             LNWJUD_REQUIRE_CLEAN_PROVENANCE='1' \
+            LNWJUD_REQUIRE_WINDOWS_AUTHENTICODE="$require_windows_authenticode" \
               node apps/desktop/scripts/verify-release-evidence.mjs
           done
 

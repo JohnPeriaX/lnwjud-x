@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { shouldUseMacos26E2eSecrets, waitForMacosAsyncSafeStorageStartup } from '../src/main/safe-storage-startup.js';
+import { createUnavailableCheckpointCipher, shouldDegradeUnavailableSecureStorage, shouldUseMacos26E2eSecrets, waitForMacosAsyncSafeStorageStartup } from '../src/main/safe-storage-startup.js';
 
 describe('shouldUseMacos26E2eSecrets', () => {
   it('enables only the packaged macOS 26 arm64 fixture path when explicitly requested', () => {
@@ -21,6 +21,30 @@ describe('shouldUseMacos26E2eSecrets', () => {
     { platform: 'darwin', arch: 'arm64', release: '25.6.0', isPackaged: true, e2eFixture: true, ephemeralSecrets: false },
   ] as const)('keeps the fixture path disabled for an unsafe or unrelated host %#', (host) => {
     expect(shouldUseMacos26E2eSecrets(host)).toBe(false);
+  });
+});
+
+describe('shouldDegradeUnavailableSecureStorage', () => {
+  it.each([
+    ['basic_text', 'plaintext_backend'],
+    ['unknown', 'temporarily_unavailable'],
+  ] as const)('allows Linux desktop startup to degrade when %s secure storage is unavailable', (backend, reason) => {
+    expect(shouldDegradeUnavailableSecureStorage('linux', { secure: false, backend, reason })).toBe(true);
+  });
+
+  it('keeps non-Linux hosts strict and never degrades a secure backend', () => {
+    expect(shouldDegradeUnavailableSecureStorage('win32', { secure: false, backend: 'windows_dpapi', reason: 'temporarily_unavailable' })).toBe(false);
+    expect(shouldDegradeUnavailableSecureStorage('darwin', { secure: false, backend: 'macos_keychain', reason: 'temporarily_unavailable' })).toBe(false);
+    expect(shouldDegradeUnavailableSecureStorage('linux', { secure: true, backend: 'gnome_libsecret' })).toBe(false);
+  });
+});
+
+describe('createUnavailableCheckpointCipher', () => {
+  it('fails checkpoint reads and writes closed without rewriting existing payloads', () => {
+    const cipher = createUnavailableCheckpointCipher('Linux secure storage is unavailable');
+    expect(cipher.isEncrypted('legacy-or-encrypted-payload')).toBe(true);
+    expect(() => cipher.encrypt('secret')).toThrow(/secure storage is unavailable/i);
+    expect(() => cipher.decrypt('anything')).toThrow(/secure storage is unavailable/i);
   });
 });
 

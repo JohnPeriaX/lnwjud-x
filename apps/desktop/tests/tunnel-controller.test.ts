@@ -549,6 +549,33 @@ describe('TunnelController lifecycle', () => {
     expect(ownerPath).toBe('');
   });
 
+  it('clears a missing portable runtime owner before switching back to the bundled client when no tunnel is running', async () => {
+    const dataPath = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-tunnel-portable-owner-gone-'));
+    temporaryRoots.push(dataPath);
+    isolateTunnelProfile(dataPath);
+    const missingOwnerClient = path.join(dataPath, 'removed-portable', 'resources', 'tunnel-client', 'tunnel-client.exe');
+    let configured = missingOwnerClient;
+    let ownerPath = missingOwnerClient;
+    const controller = new TunnelController({
+      getClientPath: (): string => configured,
+      getBundledClientPath: (): string => path.join(dataPath, 'bundled-tunnel-client.exe'),
+      setClientPath: (value): void => { configured = value; },
+      getDataPath: (): string => dataPath,
+      getTunnelId: (): string => 'tunnel_fixture012345',
+      getRuntimeOwnerPath: (): string => ownerPath,
+      setRuntimeOwnerPath: (value): void => { ownerPath = value; },
+      getRuntimeDesiredState: (): 'stopped' => 'stopped',
+      isExternalTunnelRunning: async (): Promise<boolean> => false,
+      createRuntimeAdapter: (): TunnelRuntimeReconcilerAdapter => {
+        throw new Error('missing portable owner must never be executed');
+      },
+    });
+
+    await expect(controller.replaceClientPath('')).resolves.toBe('');
+    expect(configured).toBe('');
+    expect(ownerPath).toBe('');
+  });
+
   it('re-adopts a surviving native runtime after status first observes it as external', async () => {
     const dataPath = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-tunnel-restart-adopt-'));
     temporaryRoots.push(dataPath);
@@ -1460,6 +1487,26 @@ describe('TunnelController lifecycle', () => {
     expect(controller.setClientPath('   ')).toBe('');
     expect(configured).toBe('');
     expect(controller.resolveClientPath()).toBe(bundled);
+  });
+
+  it('reports the configured override separately from the effective bundled client path', async () => {
+    const dataPath = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-tunnel-controller-'));
+    temporaryRoots.push(dataPath);
+    const bundled = path.join(dataPath, 'bundled-tunnel-client.exe');
+    await writeFile(bundled, 'bundled', 'utf8');
+    let configured = '';
+    const controller = new TunnelController({
+      getClientPath: (): string => configured,
+      getBundledClientPath: (): string => bundled,
+      setClientPath: (value): void => { configured = value; },
+      getDataPath: (): string => dataPath,
+      isExternalTunnelRunning: async (): Promise<boolean> => false,
+    });
+
+    await expect(controller.status()).resolves.toMatchObject({
+      clientPath: bundled,
+      configuredClientPath: null,
+    });
   });
 
   it('reads tunnel-client version from injected file metadata without executing it', async () => {

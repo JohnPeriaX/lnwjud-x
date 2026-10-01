@@ -85,6 +85,13 @@ for (const name of artifactNames) {
   const actual = await sha256File(artifactPath);
   if (actual !== artifact.sha256.toLowerCase()) throw new Error(`Artifact SHA-256 mismatch for ${artifact.name}`);
 }
+if (provenance.platform === 'win32') {
+  const windowsAuthenticode = validateWindowsAuthenticode(provenance.build?.windowsAuthenticode, provenance.artifacts, {
+    required: process.env.LNWJUD_REQUIRE_WINDOWS_AUTHENTICODE === '1',
+    signingCredentialConfigured: provenance.build?.signingCredentialConfigured === true,
+  });
+  process.stdout.write(`Windows Authenticode evidence verified: ${windowsAuthenticode.map((entry) => `${entry.name}=${entry.status}`).join(', ')}\n`);
+}
 
 const provenanceHash = await sha256File(provenancePath);
 if (sums.get('PROVENANCE.json') !== provenanceHash) throw new Error('PROVENANCE.json SHA-256 mismatch');
@@ -181,6 +188,33 @@ function isCapabilityBridgeIdentity(value) {
     && value.sizeBytes > 0
     && typeof value.sha256 === 'string'
     && /^[0-9a-f]{64}$/.test(value.sha256);
+}
+
+function validateWindowsAuthenticode(evidence, artifacts, options) {
+  if (!Array.isArray(evidence)) throw new Error('Windows Authenticode evidence is missing');
+  const executableArtifacts = artifacts.filter((entry) => entry?.name?.toLowerCase().endsWith('.exe'));
+  if (executableArtifacts.length !== 2 || evidence.length !== executableArtifacts.length) {
+    throw new Error('Windows Authenticode evidence must cover exactly Setup and Portable executables');
+  }
+  for (const artifact of executableArtifacts) {
+    const signature = evidence.find((entry) => entry?.name === artifact.name);
+    if (!signature || typeof signature.status !== 'string' || signature.status.length === 0 || signature.status.length > 64) {
+      throw new Error(`Windows Authenticode evidence is missing or invalid for ${artifact.name}`);
+    }
+    if (typeof signature.sha256 !== 'string' || signature.sha256.toLowerCase() !== artifact.sha256.toLowerCase()) {
+      throw new Error(`Windows Authenticode evidence is not bound to the exact artifact bytes for ${artifact.name}`);
+    }
+    if (signature.status === 'Valid' && !/^[0-9a-f]{40}$/i.test(signature.signerCertificateSha1 ?? '')) {
+      throw new Error(`Valid Authenticode evidence is missing a signer certificate thumbprint for ${artifact.name}`);
+    }
+    if (options.required && signature.status !== 'Valid') {
+      throw new Error(`Official Windows release requires Authenticode status Valid for ${artifact.name}; observed ${signature.status}`);
+    }
+  }
+  if (options.required && !options.signingCredentialConfigured) {
+    throw new Error('Official Windows release requires configured production Authenticode signing credentials');
+  }
+  return evidence;
 }
 
 function validateEntry(entry, kind) {

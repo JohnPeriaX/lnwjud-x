@@ -119,6 +119,16 @@ describe('production desktop IPC acceptance', () => {
     await expect(handler({ senderFrame: { url: 'https://example.invalid/' } }, { transport: 'local' })).rejects.toThrow('IPC sender rejected');
   });
 
+  it('allows the empty tunnel-client path sentinel through production IPC for bundled mode', async () => {
+    const services = desktopServices();
+    registerIpcHandlers(() => ({}) as never, services);
+    const trusted = { senderFrame: { url: pathToFileURL(getRendererEntryPath()).href } };
+    const handler = requiredHandler(ipcChannels.setTunnelClientPath);
+
+    await expect(handler(trusted, { clientPath: '' })).resolves.toEqual({ clientPath: '' });
+    expect(services.setTunnelClientPath).toHaveBeenCalledWith({ clientPath: '' });
+  });
+
   it('routes and validates AI delete and STDIO security policy changes', async () => {
     const services = desktopServices();
     registerIpcHandlers(() => ({}) as never, services);

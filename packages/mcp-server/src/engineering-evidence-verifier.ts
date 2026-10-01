@@ -1,3 +1,5 @@
+import { realpath, stat } from 'node:fs/promises';
+import { isAbsolute, relative, resolve } from 'node:path';
 import type { EngineeringGateEvidenceVerifier } from '@lnwjud/application';
 import type { EngineeringGateEvidence, Result } from '@lnwjud/domain';
 import { engineeringCommandFingerprint, formatEngineeringCommand } from '@lnwjud/shared';
@@ -38,10 +40,48 @@ export function createEngineeringSourceStateProvider(runGit: EngineeringGitRunne
   };
 }
 
+export interface EngineeringArtifactObservation {
+  readonly startedAt: string;
+  readonly finishedAt?: string;
+}
+
+export type EngineeringArtifactVerifier = (
+  workspaceId: string,
+  artifact: string,
+  observation: EngineeringArtifactObservation,
+) => boolean | Promise<boolean>;
+
+export function createEngineeringArtifactVerifier(
+  resolveWorkspaceRoot: (workspaceId: string) => string | undefined | Promise<string | undefined>,
+): EngineeringArtifactVerifier {
+  return async (workspaceId, artifact, observation) => {
+    if (artifact.length === 0 || isAbsolute(artifact)) return false;
+    const startedAt = Date.parse(observation.startedAt);
+    const finishedAt = observation.finishedAt === undefined ? undefined : Date.parse(observation.finishedAt);
+    if (Number.isNaN(startedAt) || (finishedAt !== undefined && Number.isNaN(finishedAt))) return false;
+    try {
+      const configuredRoot = await resolveWorkspaceRoot(workspaceId);
+      if (configuredRoot === undefined) return false;
+      const root = await realpath(configuredRoot);
+      const candidate = await realpath(resolve(root, artifact));
+      const contained = relative(root, candidate);
+      if (contained.length === 0 || contained === '..' || contained.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) || isAbsolute(contained)) return false;
+      const file = await stat(candidate);
+      if (!file.isFile() || file.size <= 0) return false;
+      const toleranceMs = 2_000;
+      if (file.mtimeMs < startedAt - toleranceMs) return false;
+      return finishedAt === undefined || file.mtimeMs <= finishedAt + toleranceMs;
+    } catch {
+      return false;
+    }
+  };
+}
+
 export interface RuntimeEngineeringEvidenceVerifierOptions {
   readonly process?: EngineeringEvidenceStatusProvider;
   readonly shell?: EngineeringEvidenceStatusProvider;
   readonly sourceState?: (workspaceId: string) => Promise<EngineeringSourceState | undefined>;
+  readonly artifactVerifier?: EngineeringArtifactVerifier;
 }
 
 /**
@@ -52,24 +92,33 @@ export interface RuntimeEngineeringEvidenceVerifierOptions {
 export class RuntimeEngineeringEvidenceVerifier implements EngineeringGateEvidenceVerifier {
   private readonly providers: readonly EngineeringEvidenceStatusProvider[];
   private readonly sourceState: RuntimeEngineeringEvidenceVerifierOptions['sourceState'];
+  private readonly artifactVerifier: RuntimeEngineeringEvidenceVerifierOptions['artifactVerifier'];
 
   public constructor(options: RuntimeEngineeringEvidenceVerifierOptions) {
     this.providers = [options.process, options.shell]
       .filter((provider): provider is EngineeringEvidenceStatusProvider => provider !== undefined);
     this.sourceState = options.sourceState;
+    this.artifactVerifier = options.artifactVerifier;
   }
 
-  public async verify(workspaceId: string, evidence: EngineeringGateEvidence, gateId: string): Promise<boolean> {
+  public async verify(
+    workspaceId: string,
+    evidence: EngineeringGateEvidence,
+    gateId: string,
+    requiredPlatforms: readonly ('win32' | 'darwin' | 'linux')[] = [],
+  ): Promise<boolean> {
     const runId = evidence.runId;
     const command = evidence.command;
-    if (runId === undefined || command === undefined || this.providers.length === 0 || gateId === 'cross_platform') return false;
-    if ((gateId === 'exact_sha_ci' || gateId === 'package') && !(await this.matchesCurrentTrackedSource(workspaceId, evidence))) return false;
+    if (runId === undefined || command === undefined || this.providers.length === 0) return false;
+    if ((gateId === 'exact_sha_ci' || gateId === 'package' || gateId === 'cross_platform')
+      && !(await this.matchesCurrentTrackedSource(workspaceId, evidence))) return false;
     const results = await Promise.all(this.providers.map(async (provider) => {
       try {
         const result = await provider.statusForGoalLiveness(workspaceId, runId);
         if (!successfulObservation(result, command, evidence.exitCode)) return false;
         if (gateId === 'exact_sha_ci') return exactShaCiObservation(result, evidence);
-        if (gateId === 'package') return packageObservation(result, evidence);
+        if (gateId === 'package') return packageObservation(workspaceId, result, evidence, this.artifactVerifier);
+        if (gateId === 'cross_platform') return crossPlatformObservation(result, evidence, requiredPlatforms);
         return true;
       } catch {
         return false;
@@ -129,19 +178,73 @@ function exactShaCiObservation(result: Result<unknown>, evidence: EngineeringGat
   }
 }
 
-function packageObservation(result: Result<unknown>, evidence: EngineeringGateEvidence): boolean {
+function crossPlatformObservation(
+  result: Result<unknown>,
+  evidence: EngineeringGateEvidence,
+  requiredPlatforms: readonly ('win32' | 'darwin' | 'linux')[],
+): boolean {
   if (!result.ok || !isRecord(result.value) || typeof evidence.command !== 'string'
-    || !isCanonicalClaimedCommand(evidence.command, /^node(?:\.exe)?$/i, [], ['apps/desktop/scripts/verify-release-evidence.mjs'])) return false;
-  if (typeof evidence.commit !== 'string' || !/^[0-9a-f]{40}$/i.test(evidence.commit) || typeof evidence.artifact !== 'string' || evidence.artifact.length === 0) return false;
+    || !isCanonicalClaimedCommand(evidence.command, /^gh(?:\.exe)?$/i, ['run', 'view'], ['--json', 'headSha,status,conclusion,jobs'])) return false;
+  if (typeof evidence.commit !== 'string' || !/^[0-9a-f]{40}$/i.test(evidence.commit) || evidence.conclusion !== 'success') return false;
   if (typeof result.value.stdout !== 'string') return false;
-  const match = /Release evidence verified for lnwjud (\S+) (win32|darwin|linux)\/(x64|arm64) commit ([0-9a-f]{40})/i.exec(result.value.stdout);
-  if (match?.[4]?.toLowerCase() !== evidence.commit.toLowerCase()) return false;
-  const artifactName = evidence.artifact.replace(/\\/g, '/').split('/').at(-1);
-  const expectedNames = packageArtifactNames(match[2]?.toLowerCase(), match[1], match[3]?.toLowerCase());
-  const normalizedArtifact = evidence.artifact.replace(/\\/g, '/');
-  return artifactName !== undefined
-    && expectedNames.includes(artifactName)
-    && normalizedArtifact.endsWith(`apps/desktop/dist/installers/${artifactName}`);
+  try {
+    const output: unknown = JSON.parse(result.value.stdout.trim());
+    if (!isRecord(output)
+      || output.status !== 'completed'
+      || output.conclusion !== 'success'
+      || typeof output.headSha !== 'string'
+      || output.headSha.toLowerCase() !== evidence.commit.toLowerCase()) return false;
+    const jobs = output.jobs;
+    if (!Array.isArray(jobs)) return false;
+    const targets = requiredPlatforms.length > 0 ? requiredPlatforms : ['win32', 'darwin', 'linux'] as const;
+    return targets.every((platform) => jobs.some((job: unknown) => successfulPlatformContractJob(job, platform)));
+  } catch {
+    return false;
+  }
+}
+
+function successfulPlatformContractJob(value: unknown, platform: 'win32' | 'darwin' | 'linux'): boolean {
+  if (!isRecord(value) || value.status !== 'completed' || value.conclusion !== 'success' || typeof value.name !== 'string') return false;
+  const expected = platform === 'win32' ? 'Windows' : platform === 'darwin' ? 'macOS' : 'Linux';
+  return value.name === `Native Platform Contract (${expected})`;
+}
+
+async function packageObservation(
+  workspaceId: string,
+  result: Result<unknown>,
+  evidence: EngineeringGateEvidence,
+  artifactVerifier: EngineeringArtifactVerifier | undefined,
+): Promise<boolean> {
+  if (!result.ok || !isRecord(result.value) || typeof evidence.command !== 'string') return false;
+  if (typeof evidence.commit !== 'string' || !/^[0-9a-f]{40}$/i.test(evidence.commit)
+    || typeof evidence.artifact !== 'string' || evidence.artifact.length === 0) return false;
+
+  if (isCanonicalClaimedCommand(evidence.command, /^node(?:\.exe)?$/i, [], ['apps/desktop/scripts/verify-release-evidence.mjs'])) {
+    if (typeof result.value.stdout !== 'string') return false;
+    const match = /Release evidence verified for lnwjud (\S+) (win32|darwin|linux)\/(x64|arm64) commit ([0-9a-f]{40})/i.exec(result.value.stdout);
+    if (match?.[4]?.toLowerCase() !== evidence.commit.toLowerCase()) return false;
+    const artifactName = evidence.artifact.replace(/\\/g, '/').split('/').at(-1);
+    const expectedNames = packageArtifactNames(match[2]?.toLowerCase(), match[1], match[3]?.toLowerCase());
+    const normalizedArtifact = evidence.artifact.replace(/\\/g, '/');
+    return artifactName !== undefined
+      && expectedNames.includes(artifactName)
+      && normalizedArtifact.endsWith(`apps/desktop/dist/installers/${artifactName}`);
+  }
+
+  if (artifactVerifier === undefined || !isPackageArtifactPath(evidence.artifact)) return false;
+  const startedAt = typeof result.value.started_at === 'string' ? result.value.started_at : undefined;
+  const finishedAt = typeof result.value.finished_at === 'string' ? result.value.finished_at : undefined;
+  if (startedAt === undefined || Number.isNaN(Date.parse(startedAt)) || (finishedAt !== undefined && Number.isNaN(Date.parse(finishedAt)))) return false;
+  return artifactVerifier(workspaceId, evidence.artifact, {
+    startedAt,
+    ...(finishedAt === undefined ? {} : { finishedAt }),
+  });
+}
+
+function isPackageArtifactPath(value: string): boolean {
+  const normalized = value.replace(/\\/g, '/').toLowerCase();
+  return ['.exe', '.msi', '.msix', '.zip', '.tar.gz', '.tgz', '.dmg', '.pkg', '.appimage', '.deb', '.rpm', '.apk', '.aab', '.ipa', '.jar', '.war', '.nupkg']
+    .some((suffix) => normalized.endsWith(suffix));
 }
 
 function packageArtifactNames(platform: string | undefined, version: string | undefined, arch: string | undefined): readonly string[] {

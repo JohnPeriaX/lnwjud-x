@@ -41,6 +41,7 @@ for (const name of artifactNames) {
   const metadata = await assertRegularCanonicalFile(filePath, `Required ${platform} release artifact: ${name}`);
   artifacts.push({ name, sizeBytes: metadata.size, sha256: await sha256File(filePath) });
 }
+const windowsAuthenticode = platform === 'win32' ? inspectWindowsAuthenticode(artifacts) : null;
 
 const provenance = {
   schemaVersion: 1,
@@ -60,6 +61,7 @@ const provenance = {
     runAttempt: optionalEnv('GITHUB_RUN_ATTEMPT'),
     ref: optionalEnv('GITHUB_REF'),
     signingCredentialConfigured: signingConfigured(platform),
+    ...(windowsAuthenticode ? { windowsAuthenticode } : {}),
     ...(macSigning ? { macSigning } : {}),
     workingTreeDirtyAtEvidence,
   },
@@ -111,8 +113,71 @@ function normalizeArtifactArch(value) {
   throw new Error(`Unsupported packaged artifact architecture: ${String(value)}`);
 }
 
+function inspectWindowsAuthenticode(artifacts) {
+  const executableArtifacts = artifacts.filter((entry) => entry.name.toLowerCase().endsWith('.exe'));
+  if (executableArtifacts.length !== 2) throw new Error(`Expected exactly two Windows executable artifacts, found ${executableArtifacts.length}`);
+  const targets = executableArtifacts.map((entry) => path.join(installerDirectory, entry.name));
+  const command = [
+    "$ErrorActionPreference = 'Stop'",
+    '$targets = ConvertFrom-Json -InputObject $env:LNWJUD_AUTHENTICODE_TARGETS',
+    '$results = @($targets | ForEach-Object {',
+    '  $signature = Get-AuthenticodeSignature -LiteralPath $_',
+    '  $thumbprint = $null',
+    '  $subject = $null',
+    '  if ($null -ne $signature.SignerCertificate) {',
+    '    $thumbprint = $signature.SignerCertificate.Thumbprint',
+    '    $subject = $signature.SignerCertificate.Subject',
+    '  }',
+    '  [PSCustomObject]@{',
+    '    name = [System.IO.Path]::GetFileName($_)',
+    '    status = [string]$signature.Status',
+    '    signerCertificateSha1 = $thumbprint',
+    '    signerSubject = $subject',
+    '  }',
+    '})',
+    '$results | ConvertTo-Json -Compress -Depth 4',
+  ].join('\n');
+  const raw = execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command], {
+    encoding: 'utf8',
+    windowsHide: true,
+    env: { ...process.env, LNWJUD_AUTHENTICODE_TARGETS: JSON.stringify(targets) },
+  }).trim();
+  const parsed = JSON.parse(raw);
+  const observed = Array.isArray(parsed) ? parsed : [parsed];
+  if (observed.length !== executableArtifacts.length) throw new Error('Windows Authenticode inspection returned an unexpected artifact count');
+  return executableArtifacts.map((artifact) => {
+    const signature = observed.find((entry) => entry?.name === artifact.name);
+    if (!signature || typeof signature.status !== 'string' || signature.status.length === 0 || signature.status.length > 64) {
+      throw new Error(`Windows Authenticode evidence is missing or invalid for ${artifact.name}`);
+    }
+    const certificateSha1 = typeof signature.signerCertificateSha1 === 'string' && signature.signerCertificateSha1.length > 0
+      ? signature.signerCertificateSha1
+      : undefined;
+    const signerSubject = typeof signature.signerSubject === 'string' && signature.signerSubject.length > 0
+      ? signature.signerSubject
+      : undefined;
+    if (signature.status === 'Valid' && !/^[0-9a-f]{40}$/i.test(certificateSha1 ?? '')) {
+      throw new Error(`Valid Authenticode evidence is missing a signer certificate thumbprint for ${artifact.name}`);
+    }
+    return {
+      name: artifact.name,
+      sha256: artifact.sha256,
+      status: signature.status,
+      ...(certificateSha1 === undefined ? {} : { signerCertificateSha1: certificateSha1 }),
+      ...(signerSubject === undefined ? {} : { signerSubject }),
+    };
+  });
+}
+
 function signingConfigured(platformName) {
-  if (platformName === 'win32') return Boolean(process.env.CSC_LINK?.trim() || process.env.WIN_CSC_LINK?.trim());
+  if (platformName === 'win32') {
+    const certificateConfigured = Boolean(process.env.CSC_LINK?.trim() || process.env.WIN_CSC_LINK?.trim());
+    const passwordConfigured = Boolean(process.env.CSC_KEY_PASSWORD?.trim());
+    if (certificateConfigured !== passwordConfigured) {
+      throw new Error('Windows production signing requires both CSC_LINK and CSC_KEY_PASSWORD, or neither for a local unsigned build');
+    }
+    return certificateConfigured && passwordConfigured;
+  }
   if (platformName === 'darwin') return Boolean(process.env.CSC_LINK?.trim() || process.env.APPLE_ID?.trim() || process.env.APPLE_API_KEY?.trim());
   return false;
 }
