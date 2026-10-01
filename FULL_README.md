@@ -51,11 +51,21 @@ The tunnel is outbound-only: `tunnel-client` runs beside lnwjud, reaches OpenAI
 over outbound HTTPS, forwards MCP work to lnwjud's Desktop loopback HTTP MCP,
 and returns the response without opening a public inbound port on the host.
 
-## Current published version: v5.7.2
+## Current published version: v5.7.3
 
 ## Current source version: v5.7.3
 
-Latest published release: **v5.7.2**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
+Latest published release: **v5.7.3**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
+
+### What's new in v5.7.3
+
+- **Engineering Harness verifies real release evidence:** package gates can consume fresh durable-shell artifacts, cross-platform gates bind to the exact commit, and Windows records Authenticode state. Configured production signing must be Valid, while community releases without a certificate may remain unsigned after SHA-256 and provenance checks.
+- **Durable Goal continuity is more reliable:** Ponytail ULTRA preserves loaded skill activation across transport-session rotation, and `finish_goal` reports unfinished plan, acceptance, gate, or blocker conditions instead of false stale-CAS conflicts when the revision is unchanged.
+- **Serena and external MCP child processes are safer:** a rejected tool call no longer forces a healthy process to respawn, and replacement waits until the previous process is verified stopped, reducing duplicate processes and resource leaks.
+- **Linux AppImage startup is more resilient:** the app can start when keyring/secure storage is temporarily unavailable while encrypted secret/checkpoint operations remain fail-closed; the static AppImage runtime also avoids a FUSE2 dependency.
+- **Work Log and Live Logs report severity truthfully:** RESULT event type is separated from INFO/WARN/ERROR severity, recoverable states no longer look like hard errors, filters are clearer, and Workspace/Session badges can copy full canonical IDs.
+- **Secure MCP Tunnel, Portable, and Recovery are safer:** fresh installs no longer auto-enable persistent reconnect, Recovery adds a 3-day option, bundled `tunnel-client` selection works after clearing a custom override, and stale runtime ownership is cleared only after lnwjud proves no external Tunnel is running.
+- **Managed-browser/native foreground coordination is hardened:** `activate_tab`, browser-scoped file upload with Active Project checks, cross-project foreground serialization, and optional postcondition evidence keep native input aligned with the intended tab and target state.
 
 ### What's new in v5.7.2
 
@@ -69,13 +79,6 @@ Latest published release: **v5.7.2**. Windows, macOS, and Linux artifacts are pu
 ### What's new in v5.7.1
 
 - **Engineering Harness checkpoints save gate results:** gate updates and review findings now reach the durable Goal instead of being silently dropped by the MCP handler.
-
-### What's new in v5.7.0
-
-- **Engineering Harness is opt-in:** choose a workflow preset and project override for coding tasks. It stays Off until you enable it.
-- **Durable plans resume safely:** substantive tasks keep plans, acceptance checks, checkpoints, and evidence in the existing Goal.
-- **Mutation and evidence gates enforce scope:** active Harness binds first-party changes to the current task. Pending, stale, or local-only evidence cannot pass hosted gates.
-- **Authorized continuation handles failures:** it works through fixable failures and keeps goal ownership and checkpoint details across handoffs.
 
 See [Thai Engineering Harness setup and workflow](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for details.
 
@@ -196,13 +199,13 @@ Choose the guide for the host you will run lnwjud on:
 
 1. Download the latest published installer from
    [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/latest).
-   Current published Windows 10/11 x64 v5.7.2 artifacts are `lnwjud-Setup-5.7.2.exe` (recommended installer) and `lnwjud-Portable-5.7.2.exe` (no installation required).
+   Current published Windows 10/11 x64 v5.7.3 artifacts are `lnwjud-Setup-5.7.3.exe` (recommended installer) and `lnwjud-Portable-5.7.3.exe` (no installation required).
 2. Run the NSIS installer and launch **lnwjud Agent Control Center**.
 3. Add or select the project/workspace you want lnwjud to operate on.
 4. Review **Settings** before attaching an AI client, especially Permission
    Profile and Unrestricted Mode.
 
-If you prefer not to install the app, run the currently published `lnwjud-Portable-5.7.2.exe` directly.
+If you prefer not to install the app, run the currently published `lnwjud-Portable-5.7.3.exe` directly.
 Portable mode uses the same per-user lnwjud data/settings location as the installer;
 it is a portable executable, not a keep-all-data-next-to-the-EXE mode.
 Automatic updates preserve the distribution you chose. Installer users read
@@ -248,7 +251,7 @@ A few operating-system boundaries still apply:
 
 ### 2. Connect ChatGPT with Remote MCP + OAuth (recommended)
 
-For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.7.2 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
+For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.7.3 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
 
 1. Open **lnwjud → Settings → Remote MCP & Tunnel**.
 2. Check the ngrok status. If lnwjud shows **READY**, keep the detected installation. If it is not ready, lnwjud shows only the installation path supported by the current host: Windows may use Microsoft Store/WinGet, macOS may use Homebrew when available, and hosts without a verified automatic installer get the official ngrok download link instead. Runtime discovery itself is cross-platform and verifies `ngrok version` before use.
@@ -320,12 +323,12 @@ Use lnwjud to list registered workspaces, report Git status for the selected pro
 
 ## Quick start: install the Windows release (ภาษาไทย)
 
-ส่วนนี้สำหรับผู้ใช้ Windows ที่ต้องการติดตั้ง lnwjud แล้วเชื่อมกับ ChatGPT แบบง่ายที่สุด โดย **วิธีหลักที่แนะนำสำหรับ v5.7.2 คือ Remote MCP ผ่าน ngrok + OAuth** ไม่ต้องมี OpenAI Tunnel ID และไม่ต้องสร้าง Runtime API key สำหรับขั้นตอนหลักนี้ ส่วน **Tunnel ID + Runtime API key** ยังคงรองรับ แต่เป็นทางเลือก/โหมดขั้นสูงสำหรับผู้ที่ต้องการ OpenAI Secure MCP Tunnel โดยเฉพาะ
+ส่วนนี้สำหรับผู้ใช้ Windows ที่ต้องการติดตั้ง lnwjud แล้วเชื่อมกับ ChatGPT แบบง่ายที่สุด โดย **วิธีหลักที่แนะนำสำหรับ v5.7.3 คือ Remote MCP ผ่าน ngrok + OAuth** ไม่ต้องมี OpenAI Tunnel ID และไม่ต้องสร้าง Runtime API key สำหรับขั้นตอนหลักนี้ ส่วน **Tunnel ID + Runtime API key** ยังคงรองรับ แต่เป็นทางเลือก/โหมดขั้นสูงสำหรับผู้ที่ต้องการ OpenAI Secure MCP Tunnel โดยเฉพาะ
 
 ### 1. ติดตั้ง lnwjud หรือใช้ Portable
 
-1. แบบแนะนำ: ดาวน์โหลด public release ล่าสุด `lnwjud-Setup-5.7.2.exe` แล้วติดตั้งตามปกติ
-2. ถ้าไม่ต้องการติดตั้ง: ดาวน์โหลด `lnwjud-Portable-5.7.2.exe` แล้วเปิดได้ทันที
+1. แบบแนะนำ: ดาวน์โหลด public release ล่าสุด `lnwjud-Setup-5.7.3.exe` แล้วติดตั้งตามปกติ
+2. ถ้าไม่ต้องการติดตั้ง: ดาวน์โหลด `lnwjud-Portable-5.7.3.exe` แล้วเปิดได้ทันที
 3. เปิด **lnwjud Agent Control Center**
 4. เพิ่มหรือเลือก Project/Workspace ที่ต้องการให้ ChatGPT ทำงานด้วย
 
