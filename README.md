@@ -22,27 +22,27 @@
 </p>
 
 <h2 align="center">Download lnwjud</h2>
-<p align="center">Choose your platform and download the current v5.7.2 release directly.</p>
+<p align="center">Choose your platform and download the current v5.7.3 release directly.</p>
 
 <table align="center">
   <tr>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Setup-5.7.2.exe">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Setup-5.7.3.exe">
         <img src="assets/download/download-windows.svg" width="300" alt="Download lnwjud for Windows" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Portable-5.7.2.exe">Portable x64</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Portable-5.7.3.exe">Portable x64</a></sub>
     </td>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.7.2-arm64.dmg">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.7.3-arm64.dmg">
         <img src="assets/download/download-macos.svg" width="300" alt="Download lnwjud for macOS" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.7.2-x64.dmg">Intel x64 DMG</a> · <a href="docs/INSTALL_MACOS.md">Install guide</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.7.3-x64.dmg">Intel x64 DMG</a> · <a href="docs/INSTALL_MACOS.md">Install guide</a></sub>
     </td>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.7.2-x64.deb">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.7.3-x64.deb">
         <img src="assets/download/download-linux.svg" width="300" alt="Download lnwjud for Linux" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.7.2-x64.AppImage">x64 AppImage</a> · <a href="docs/INSTALL_LINUX.md">Other architectures</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.7.3-x64.AppImage">x64 AppImage</a> · <a href="docs/INSTALL_LINUX.md">Other architectures</a></sub>
     </td>
   </tr>
 </table>
@@ -51,11 +51,23 @@
 
 ---
 
-## Current published version: v5.7.2
+## Current published version: v5.7.3
 
 ## Current source version: v5.7.3
 
-Latest published release: **v5.7.2**. The download buttons above point directly to the v5.7.2 assets. The release was published after the exact tagged main commit passed the target-native release gates.
+Latest published release: **v5.7.3**. The download buttons above point directly to the v5.7.3 assets. The release was published after the exact tagged main commit passed the target-native release gates.
+
+### What's new in v5.7.3
+
+- **Engineering Harness verifies real release evidence:** package gates can consume fresh durable-shell artifacts, cross-platform gates bind to the exact commit, and Windows records Authenticode state. Configured production signing must be Valid, while community releases without a certificate may remain unsigned after SHA-256 and provenance checks.
+- **Durable Goal continuity is more reliable:** Ponytail ULTRA preserves loaded skill activation across transport-session rotation, and `finish_goal` reports unfinished plan, acceptance, gate, or blocker conditions instead of false stale-CAS conflicts when the revision is unchanged.
+- **Serena and external MCP child processes are safer:** a rejected tool call no longer forces a healthy process to respawn, and replacement waits until the previous process is verified stopped, reducing duplicate processes and resource leaks.
+- **Linux AppImage startup is more resilient:** the app can start when keyring/secure storage is temporarily unavailable while encrypted secret/checkpoint operations remain fail-closed; the static AppImage runtime also avoids a FUSE2 dependency.
+- **Work Log and Live Logs report severity truthfully:** RESULT event type is separated from INFO/WARN/ERROR severity, recoverable states no longer look like hard errors, filters are clearer, and Workspace/Session badges can copy full canonical IDs.
+- **Secure MCP Tunnel, Portable, and Recovery are safer:** fresh installs no longer auto-enable persistent reconnect, Recovery adds a 3-day option, bundled `tunnel-client` selection works after clearing a custom override, and stale runtime ownership is cleared only after lnwjud proves no external Tunnel is running.
+- **Managed-browser/native foreground coordination is hardened:** `activate_tab`, browser-scoped file upload with Active Project checks, cross-project foreground serialization, and optional postcondition evidence keep native input aligned with the intended tab and target state.
+
+ภาษาไทย: v5.7.3 เน้นแก้ความต่อเนื่องของ Durable Goal/Serena, Linux AppImage, Work Log, Secure MCP Tunnel และ Portable โดยเฉพาะการกลับมาใช้ bundled `tunnel-client` หลังลบ custom path, พร้อมเพิ่มหลักฐาน release แบบ exact-SHA/cross-platform และยังรองรับ community Windows release แบบ unsigned เมื่อไม่มี production certificate โดยต้องผ่าน SHA-256/provenance checks ครบ
 
 ### What's new in v5.7.2
 
@@ -71,13 +83,6 @@ Latest published release: **v5.7.2**. The download buttons above point directly 
 ### What's new in v5.7.1
 
 - **Engineering Harness checkpoints save gate results:** gate updates and review findings now reach the durable Goal instead of being silently dropped by the MCP handler.
-
-### What's new in v5.7.0
-
-- **Engineering Harness is opt-in:** choose a workflow preset and project override for coding tasks. It stays Off until you enable it.
-- **Durable plans resume safely:** substantive tasks keep plans, acceptance checks, checkpoints, and evidence in the existing Goal.
-- **Mutation and evidence gates enforce scope:** active Harness binds first-party changes to the current task. Pending, stale, or local-only evidence cannot pass hosted gates.
-- **Authorized continuation handles failures:** it works through fixable failures and keeps goal ownership and checkpoint details across handoffs.
 
 See the [Thai Engineering Harness guide](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for setup and workflow details.
 
