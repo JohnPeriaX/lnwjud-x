@@ -149,6 +149,12 @@ describe('preload Tool Catalog validation', () => {
     expect(electron.invoke).toHaveBeenLastCalledWith(ipcChannels.factoryReset);
   });
 
+  it('allows an empty tunnel-client path to select the bundled client', async () => {
+    electron.invoke.mockResolvedValueOnce({ clientPath: '' });
+    await expect(electron.exposed!.setTunnelClientPath({ clientPath: '' })).resolves.toEqual({ clientPath: '' });
+    expect(electron.invoke).toHaveBeenLastCalledWith(ipcChannels.setTunnelClientPath, { clientPath: '' });
+  });
+
   it('allows the ngrok authtoken setup target through the preload bridge', async () => {
     electron.invoke.mockResolvedValueOnce({ opened: true });
     await expect(electron.exposed!.openExternalSetupPage({ target: 'ngrok_authtoken' })).resolves.toEqual({ opened: true });

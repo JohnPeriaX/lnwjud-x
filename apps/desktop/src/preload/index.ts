@@ -1288,7 +1288,7 @@ function setRemoteMcpTransport(request: SetRemoteMcpTransportRequest): Promise<R
 }
 
 function setTunnelClientPath(request: SetTunnelClientPathRequest): Promise<{ readonly clientPath: string }> {
-  if (!isRecord(request) || typeof request.clientPath !== 'string' || request.clientPath.trim().length === 0) {
+  if (!isRecord(request) || typeof request.clientPath !== 'string') {
     return Promise.reject(new Error('Invalid IPC request'));
   }
   return invoke(ipcChannels.setTunnelClientPath, { clientPath: request.clientPath }).then((value: unknown) => {
