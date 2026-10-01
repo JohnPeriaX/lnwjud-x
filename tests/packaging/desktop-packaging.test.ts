@@ -206,6 +206,7 @@ describe('cross-platform desktop packaging', () => {
     expect(desktopPackage.scripts?.['package:macos']).toContain('package-native.mjs macos');
     expect(desktopPackage.scripts?.['package:linux']).toContain('package-native.mjs linux');
     const nativePackagingScript = await readFile(path.join(desktopRoot, 'scripts', 'package-native.mjs'), 'utf8');
+    const nativePackagingRetryScript = await readFile(path.join(desktopRoot, 'scripts', 'package-native-retry.mjs'), 'utf8');
     const linuxHostBuildScript = await readFile(path.join(desktopRoot, 'scripts', 'build-linux-host.mjs'), 'utf8');
     expect(nativePackagingScript).toContain('prepare-runtime-tools.mjs');
     expect(nativePackagingScript).toContain('prepare-tunnel-client.mjs');
@@ -221,8 +222,9 @@ describe('cross-platform desktop packaging', () => {
     expect(nativePackagingScript).toContain('write-release-evidence.mjs');
     expect(nativePackagingScript).toContain('verify-release-evidence.mjs');
     expect(nativePackagingScript).toContain('runElectronBuilderWithRetry');
-    expect(nativePackagingScript).toContain('connection reset by peer');
-    expect(nativePackagingScript).toContain('attempt <= 3');
+    expect(nativePackagingRetryScript).toContain('connection reset by peer');
+    expect(nativePackagingRetryScript).toContain('Response code (?:500|502|503|504)');
+    expect(nativePackagingRetryScript).toContain('attempt <= 3');
     expect(linuxHostBuildScript).toContain('arch === process.arch');
     expect(linuxHostBuildScript).not.toContain("process.arch === 'x64' ? undefined");
     await access(path.join(desktopRoot, 'build', 'entitlements.mac.plist'));
