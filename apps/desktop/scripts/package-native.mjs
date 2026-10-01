@@ -14,10 +14,13 @@ const environment = {
   ...process.env,
   LNWJUD_RUNTIME_TARGET: target === 'macos' ? 'darwin' : 'linux',
   LNWJUD_RUNTIME_ARCH: architecture,
+  LNWJUD_TUNNEL_TARGET: target === 'macos' ? 'darwin' : 'linux',
+  LNWJUD_TUNNEL_ARCH: architecture,
 };
 const corepack = process.platform === 'win32' ? 'corepack.cmd' : 'corepack';
 const electronBuilderArgs = [target === 'macos' ? '--mac' : '--linux', ...(target === 'macos' ? ['dmg', 'zip'] : ['AppImage', 'deb']), `--${architecture}`, '--publish', 'never'];
 
+await run('node', ['scripts/prepare-tunnel-client.mjs'], environment);
 await run('node', ['scripts/prepare-runtime-tools.mjs'], environment);
 await run('node', ['scripts/prepare-ecc-runtime.mjs'], environment);
 await run('node', [target === 'macos' ? 'scripts/build-macos-host.mjs' : 'scripts/build-linux-host.mjs'], environment);

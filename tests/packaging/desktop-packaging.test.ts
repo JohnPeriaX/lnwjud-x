@@ -202,11 +202,13 @@ describe('cross-platform desktop packaging', () => {
     expect(config).toContain('to: native-host/linux');
     await access(path.join(repositoryRoot, '.agents', 'skills', 'lnwjud-scheduled-continuation', 'SKILL.md'));
     expect(desktopPackage.scripts?.['package:windows']).toContain('prepare-runtime-tools.mjs');
+    expect(desktopPackage.scripts?.['package:windows']).toContain('prepare-tunnel-client.mjs');
     expect(desktopPackage.scripts?.['package:macos']).toContain('package-native.mjs macos');
     expect(desktopPackage.scripts?.['package:linux']).toContain('package-native.mjs linux');
     const nativePackagingScript = await readFile(path.join(desktopRoot, 'scripts', 'package-native.mjs'), 'utf8');
     const linuxHostBuildScript = await readFile(path.join(desktopRoot, 'scripts', 'build-linux-host.mjs'), 'utf8');
     expect(nativePackagingScript).toContain('prepare-runtime-tools.mjs');
+    expect(nativePackagingScript).toContain('prepare-tunnel-client.mjs');
     expect(nativePackagingScript).toContain("['pnpm@10.15.0', '--filter', '@lnwjud/desktop...', 'build']");
     expect(nativePackagingScript).toContain('build-macos-host.mjs');
     expect(nativePackagingScript).toContain('build-linux-host.mjs');

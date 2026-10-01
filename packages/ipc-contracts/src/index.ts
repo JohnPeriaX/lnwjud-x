@@ -579,6 +579,8 @@ export interface TunnelStatus {
   readonly auth?: TunnelAuthStatus;
   readonly oauth?: TunnelOAuthCapabilityStatus;
   readonly clientPath: string | null;
+  /** Explicit user override. Null means use the bundled target-native tunnel-client. */
+  readonly configuredClientPath?: string | null;
   readonly profileExists: boolean;
   readonly message: string | null;
   readonly logPath: string | null;

@@ -82,7 +82,7 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
   const [activeSection, setActiveSection] = useState<SettingsSection>(props.initialSection ?? 'general');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
-  const [clientPath, setClientPath] = useState(props.dashboard.tunnel.clientPath ?? '');
+  const [clientPath, setClientPath] = useState(props.dashboard.tunnel.configuredClientPath ?? '');
   const [tunnelId, setTunnelId] = useState('');
   const [localTunnelBusy, setLocalTunnelBusy] = useState(false);
   const tunnelBusy = props.tunnelBusy === true || localTunnelBusy;
@@ -151,8 +151,8 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
   }, [props.dashboard.stdioPermissionProfile, props.dashboard.stdioStrictRoots, persistedRootsText, stdioDirty]);
 
   useEffect(() => {
-    setClientPath(props.dashboard.tunnel.clientPath ?? '');
-  }, [props.dashboard.tunnel.clientPath]);
+    setClientPath(props.dashboard.tunnel.configuredClientPath ?? '');
+  }, [props.dashboard.tunnel.configuredClientPath]);
 
   useEffect(() => {
     setTrashVisibleCount(RECOVERY_PAGE_SIZE);
@@ -256,6 +256,17 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
       setEccMessage(cause instanceof Error ? cause.message : t('settingsPage.eccSaveFailed'));
     } finally {
       setEccBusy(false);
+    }
+  }
+
+  async function saveTunnelClientPath(): Promise<void> {
+    setTunnelMessage(null);
+    try {
+      await props.onSetTunnelClientPath(clientPath);
+      setSavedMessage(clientPath.trim().length === 0 ? t('settingsPage.usingBundled') : t('settings.saved'));
+    } catch (cause: unknown) {
+      setTunnelMessage(cause instanceof Error ? cause.message : 'Could not save tunnel-client');
+      await props.onRefresh().catch(() => undefined);
     }
   }
 
@@ -948,7 +959,7 @@ export function SettingsPage(props: SettingsPageProps): ReactElement {
                 </div>
                 <div className="setting-field">
                   <label className="field-label" htmlFor="tunnel-client-path">{t('settingsPage.tunnelClientBundled')}</label>
-                  <div className="form-row"><input id="tunnel-client-path" placeholder={t('settingsPage.tunnelClientBundledPlaceholder')} value={clientPath} onChange={(event) => setClientPath(event.target.value)} /><button type="button" onClick={() => { void browseTunnelClient(); }}>{t('settingsPage.browse')}</button><button type="button" className="btn-save-gold" onClick={() => { void props.onSetTunnelClientPath(clientPath).then(() => setSavedMessage(clientPath.trim().length === 0 ? t('settingsPage.usingBundled') : t('settings.saved'))); }}>{clientPath.trim().length === 0 ? t('settingsPage.useBundled') : t('settingsPage.saveOverride')}</button></div>
+                  <div className="form-row"><input id="tunnel-client-path" placeholder={t('settingsPage.tunnelClientBundledPlaceholder')} value={clientPath} onChange={(event) => setClientPath(event.target.value)} /><button type="button" onClick={() => { void browseTunnelClient(); }}>{t('settingsPage.browse')}</button><button type="button" className="btn-save-gold" onClick={() => { void saveTunnelClientPath(); }}>{clientPath.trim().length === 0 ? t('settingsPage.useBundled') : t('settingsPage.saveOverride')}</button></div>
                   <p className="hint">{t('settingsPage.tunnelClientHint')}</p>
                 </div>
               </div>
