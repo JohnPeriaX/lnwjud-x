@@ -329,9 +329,12 @@ describe('cross-platform desktop packaging', () => {
 
   it('prepares generated launchers and desktop bundles before validating automated runtime dependency updates', async () => {
     const workflow = await readFile(path.join(repositoryRoot, '.github', 'workflows', 'runtime-dependency-update.yml'), 'utf8');
+    expect(workflow).toContain('uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4');
+    expect(workflow).toContain('version: 10.15.0');
+    expect(workflow).not.toContain('corepack prepare pnpm@10.15.0 --activate');
     const generateLauncher = 'node apps/desktop/scripts/write-stdio-launcher.mjs';
-    const desktopBuild = 'corepack pnpm@10.15.0 --filter @lnwjud/desktop build';
-    const packagingGate = 'corepack pnpm@10.15.0 test:packaging';
+    const desktopBuild = 'pnpm --filter @lnwjud/desktop build';
+    const packagingGate = 'pnpm test:packaging';
     expect(workflow).toContain(generateLauncher);
     expect(workflow).toContain(desktopBuild);
     expect(workflow).toContain(packagingGate);

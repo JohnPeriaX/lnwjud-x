@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -615,6 +615,7 @@ describe('BrowserCdpBackend', () => {
     const file = path.join(nested, 'fixture.txt');
     await mkdir(nested);
     await writeFile(file, 'fixture');
+    const canonicalFile = await realpath(file);
     const requests: { readonly method: string; readonly params: Record<string, unknown> }[] = [];
     const protocol = protocolStub({
       tabs: [tab('tab-1', 'Upload', 'https://example.com/upload')],
@@ -637,7 +638,7 @@ describe('BrowserCdpBackend', () => {
 
       expect(result).toEqual({ ok: true, value: { files_set: true, tab_id: 'tab-1', file_count: 1 } });
       expect(requests.map((request) => request.method)).toEqual(['DOM.getDocument', 'DOM.querySelector', 'DOM.setFileInputFiles']);
-      expect(requests[2]?.params).toMatchObject({ nodeId: 7, files: [file] });
+      expect(requests[2]?.params).toMatchObject({ nodeId: 7, files: [canonicalFile] });
     } finally {
       await rm(root, { recursive: true, force: true });
     }

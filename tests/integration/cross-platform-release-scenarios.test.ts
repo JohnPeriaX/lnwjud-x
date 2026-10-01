@@ -180,7 +180,7 @@ const nativeCiScenarios: readonly Scenario[] = [
   ['096 native platform contract runs the release-scenario suite', () => expectWorkflowContains('tests/integration/cross-platform-release-scenarios.test.ts')],
   ['097 native contract keeps non-desktop packages and shards the desktop suite', async () => {
     const workflow = await workflowSource();
-    expect(workflow).toContain("run: corepack pnpm@10.15.0 -r --filter '!@lnwjud/desktop' --if-present test");
+    expect(workflow).toContain("run: pnpm -r --filter '!@lnwjud/desktop' --if-present test");
     expect(workflow).toContain('desktop-test-shards:');
     expect(workflow).toContain('--shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}');
     expect(workflow).toContain("--filter '@lnwjud/cli...' build");
@@ -467,6 +467,9 @@ const extendedCiScenarios: readonly Scenario[] = [
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).not.toContain('\n  push:');
     expect(workflow).not.toContain('[build-installer]');
+    expect(workflow).toContain('uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4');
+    expect(workflow).toContain('version: 10.15.0');
+    expect(workflow).not.toContain('corepack prepare pnpm@10.15.0 --activate');
   }],
   ['ci-extra dev workflow builds Windows Setup and Portable when manually dispatched', () => expectRepositoryFileContains('.github/workflows/dev-installer.yml', 'Build Windows Setup and Portable')],
   ['ci-extra dev workflow installs cosign before provenance-bound packaging', () => expectRepositoryFileContains('.github/workflows/dev-installer.yml', 'Install cosign for tunnel provenance verification')],

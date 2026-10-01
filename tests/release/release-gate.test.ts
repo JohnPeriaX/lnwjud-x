@@ -123,6 +123,9 @@ describe('MVP release verification gate', () => {
     const script = await readFile(path.join(repositoryRoot, 'scripts', 'verify-release.ps1'), 'utf8');
     const workflow = await readFile(path.join(repositoryRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
 
+    expect(workflow).toContain('uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4');
+    expect(workflow).toContain('version: 10.15.0');
+    expect(workflow).not.toContain('corepack prepare pnpm@10.15.0 --activate');
     expect(script).toContain('[switch]$SkipWindowsPackaging');
     expect(script).toContain("if ($SkipWindowsPackaging)");
     expect(script).toContain("package:windows (skipped for non-main CI)");
@@ -144,9 +147,9 @@ describe('MVP release verification gate', () => {
     const buildJob = workflow.slice(workflow.indexOf('  windows-release-build:\n'), workflow.indexOf('  verify:\n'));
     const requiredJob = workflow.slice(workflow.indexOf('  verify:\n'));
 
-    expect(testJob).toContain('run: corepack pnpm@10.15.0 test:release');
+    expect(testJob).toContain('run: pnpm test:release');
     expect(testJob.indexOf('Build workspace type declarations')).toBeGreaterThan(testJob.indexOf('Install dependencies'));
-    expect(testJob).toContain('run: corepack pnpm@10.15.0 typecheck');
+    expect(testJob).toContain('run: pnpm typecheck');
     expect(testJob.indexOf('Build workspace type declarations')).toBeLessThan(testJob.indexOf('Run complete Windows workspace release suite'));
     expect(testJob).toContain("if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'");
     expect(buildJob).toContain('scripts/verify-release.ps1 -SkipWorkspaceTests');
