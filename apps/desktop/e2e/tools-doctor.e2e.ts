@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { electronExecutablePath, terminateProcessTree } from './electron-runtime.js';
+import { buildWindowsSecretMigratorFixture, windowsSecretMigratorE2eTimeoutMs } from './windows-secret-migrator-fixture.mjs';
 import { ToolRegistry } from '@lnwjud/mcp-server';
 import { chromium, expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 
@@ -29,7 +30,7 @@ test.describe('Tools catalog and Doctor real Electron acceptance', () => {
   test.setTimeout(120_000);
 
   test('Windows upgrade opens with a real legacy checkpoint and retains its backup', async () => {
-    test.setTimeout(180_000); // Includes first-run native helper fixture compilation in source mode.
+    test.setTimeout(windowsSecretMigratorE2eTimeoutMs(globalThis.process.env.CI === 'true')); // Includes first-run native helper fixture compilation in source mode.
     test.skip(process.platform !== 'win32', 'Windows DPAPI upgrade acceptance');
     const app = await launchDesktop({ legacyCheckpoint: true });
     try {
@@ -202,7 +203,13 @@ async function launchDesktop(options: { readonly dataRoot?: string; readonly fix
     const env = Object.fromEntries(Object.entries(globalThis.process.env).filter(([key]) => key.toLowerCase() !== 'psmodulepath'));
     const sourceHelper = path.join(desktopRoot, '../../native/windows-secret-migrator/bin/win-x64/lnwjud-windows-secret-migrator.exe');
     if (packagedExecutable === undefined && !existsSync(sourceHelper)) {
-      await promisify(execFile)(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(desktopRoot, '../../scripts/build-windows-secret-migrator.ps1')], { windowsHide: true, env, timeout: 120_000 });
+      await buildWindowsSecretMigratorFixture({
+        execFile: promisify(execFile),
+        powershell,
+        scriptPath: path.join(desktopRoot, '../../scripts/build-windows-secret-migrator.ps1'),
+        env,
+        ci: globalThis.process.env.CI === 'true',
+      });
     }
     const encrypted = await promisify(execFile)(powershell, ['-NoProfile', '-NonInteractive', '-Command',
       "Add-Type -AssemblyName System.Security; $bytes = [Text.Encoding]::UTF8.GetBytes('KioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKio='); [Convert]::ToBase64String([Security.Cryptography.ProtectedData]::Protect($bytes, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser))",
