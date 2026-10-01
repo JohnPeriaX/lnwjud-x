@@ -697,25 +697,14 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/verify-release.ps1 -SkipWindowsPackaging -SkipWorkspaceTests
 
-      - name: Require Windows production signing credentials
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
-        shell: powershell
-        env:
-          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:CSC_LINK) -or [string]::IsNullOrWhiteSpace($env:CSC_KEY_PASSWORD)) {
-            throw 'Official Windows release/update artifacts require WINDOWS_CSC_LINK and WINDOWS_CSC_KEY_PASSWORD before main packaging can publish.'
-          }
-
       - name: Run authoritative release verification gate
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         shell: powershell
         env:
-          # Official Windows updater artifacts are Authenticode-required. Local development packaging remains allowed unsigned.
+          # electron-builder signs only when both real production certificate secrets exist.
+          # Unsigned community releases remain supported; Release verifies provenance/hashes and reports signing state.
           CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
-          LNWJUD_REQUIRE_WINDOWS_AUTHENTICODE: '1'
         run: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/verify-release.ps1 -SkipWorkspaceTests
 
       - name: Verify packaged Windows legacy-profile startup

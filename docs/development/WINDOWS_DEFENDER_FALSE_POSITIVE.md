@@ -14,7 +14,7 @@ Microsoft's current guidance for software developers is to dispute incorrect det
 
 ## If SmartScreen says Unknown/Unrecognized publisher
 
-SmartScreen reputation is not the same as a Defender malware verdict. Local development packages may remain unsigned when no production certificate is configured, but official Windows updater/release artifacts now fail closed unless both Setup and Portable have `Get-AuthenticodeSignature` status `Valid` from the configured production publisher credential. SHA-256 and source provenance remain separate mandatory checks; they do not substitute for Authenticode publisher trust.
+SmartScreen reputation is not the same as a Defender malware verdict. Authenticode signing with a stable trusted publisher identity is recommended for non-Store distribution because it improves publisher identity and reputation behavior, but lnwjud does not require a paid signing credential to publish. When production signing secrets are configured, Setup and Portable must have `Get-AuthenticodeSignature` status `Valid`; when they are absent, the workflow permits an unsigned community release only after the same SHA-256 and source-provenance verification and reports the unsigned status explicitly.
 
 The build pipeline supports electron-builder Authenticode signing through repository secrets:
 
@@ -47,7 +47,7 @@ Every Windows package build produces:
 - bundled `rg.exe`
 - bundled `tunnel-client.exe`
 
-The release workflow verifies the provenance commit against the tagged commit, requires clean-source provenance, and re-hashes release artifacts before creating a public GitHub Release. For Windows, it also requires provenance-bound Authenticode evidence showing `Valid` for both Setup and Portable; missing signing credentials or any non-`Valid` status blocks official publication. Local developer packaging keeps the separate unsigned-allowed policy described above.
+The release workflow verifies the provenance commit against the tagged commit, requires clean-source provenance, and re-hashes release artifacts before creating a public GitHub Release. For Windows it records provenance-bound Authenticode evidence for both Setup and Portable; configured signing must verify as `Valid`, while absent signing credentials are reported as unsigned rather than blocking a community release.
 
 ## User support rule
 
