@@ -207,8 +207,8 @@ function validateWindowsAuthenticode(evidence, artifacts, options) {
     if (signature.status === 'Valid' && !/^[0-9a-f]{40}$/i.test(signature.signerCertificateSha1 ?? '')) {
       throw new Error(`Valid Authenticode evidence is missing a signer certificate thumbprint for ${artifact.name}`);
     }
-    if (options.required && signature.status !== 'Valid') {
-      throw new Error(`Official Windows release requires Authenticode status Valid for ${artifact.name}; observed ${signature.status}`);
+    if ((options.required || options.signingCredentialConfigured) && signature.status !== 'Valid') {
+      throw new Error(`Configured Windows signing requires Authenticode status Valid for ${artifact.name}; observed ${signature.status}`);
     }
   }
   if (options.required && !options.signingCredentialConfigured) {

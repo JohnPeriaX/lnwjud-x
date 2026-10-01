@@ -52,7 +52,7 @@ The package script rebuilds the workspace, generates the current MCP stdio bundl
 - The launcher never falls back to a system Node runtime; a missing packaged Electron executable fails closed.
 - Generated stdio runtime files are ignored by Git and must be regenerated from source for each build/release.
 
-`signAndEditExecutable: true` does not by itself mean the release is Authenticode-signed with a publisher certificate. Local developer packages may remain `NotSigned` when no production credential is configured, but official Windows updater/release publication requires `WINDOWS_CSC_LINK` + `WINDOWS_CSC_KEY_PASSWORD` and provenance-bound `Get-AuthenticodeSignature` status `Valid` for both Setup and Portable. Production publisher trust is therefore a release/CI boundary, not something the package config can manufacture.
+`signAndEditExecutable: true` does not by itself mean the release is Authenticode-signed with a publisher certificate. lnwjud does not require a paid signing credential to publish a community release: when production signing secrets are absent, Windows artifacts may remain `NotSigned` after the same SHA-256/provenance checks; when signing is configured, Setup and Portable must verify as Authenticode `Valid`. Production publisher trust is therefore optional release metadata, not something the package config can manufacture.
 
 ## Hidden console-process contract
 

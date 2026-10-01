@@ -69,7 +69,7 @@ describe('Windows release trust evidence', () => {
     expect(bridge.includes(0x0d)).toBe(false);
   });
 
-  it('fails closed for official Windows releases unless Authenticode is valid while preserving local unsigned packaging', async () => {
+  it('permits unsigned community releases while still validating configured Windows signing', async () => {
     const ci = (await readFile(path.join(repositoryRoot, '.github', 'workflows', 'ci.yml'), 'utf8')).replaceAll('\r\n', '\n');
     const release = (await readFile(path.join(repositoryRoot, '.github', 'workflows', 'release.yml'), 'utf8')).replaceAll('\r\n', '\n');
     const evidenceWriter = await readFile(path.join(desktopRoot, 'scripts', 'write-release-evidence.mjs'), 'utf8');
@@ -77,18 +77,19 @@ describe('Windows release trust evidence', () => {
 
     expect(ci).toContain('CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}');
     expect(ci).toContain('CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}');
-    expect(ci).toContain('Require Windows production signing credentials');
-    expect(ci).toContain("LNWJUD_REQUIRE_WINDOWS_AUTHENTICODE: '1'");
+    expect(ci).not.toContain('Require Windows production signing credentials');
+    expect(ci).not.toContain("LNWJUD_REQUIRE_WINDOWS_AUTHENTICODE: '1'");
     expect(ci).toContain('apps/desktop/dist/installers/SHA256SUMS.txt');
     expect(ci).toContain('apps/desktop/dist/installers/PROVENANCE.json');
     expect(evidenceWriter).toContain('Get-AuthenticodeSignature');
     expect(evidenceWriter).toContain('windowsAuthenticode');
     expect(evidenceVerifier).toContain('LNWJUD_REQUIRE_WINDOWS_AUTHENTICODE');
+    expect(evidenceVerifier).toContain('options.required || options.signingCredentialConfigured');
     expect(evidenceVerifier).toContain('windowsAuthenticode');
     expect(release).toContain('native-darwin-arm64-$sha');
     expect(release).toContain('native-linux-arm64-$sha');
     expect(release).toContain('collect-release-assets.mjs');
-    expect(release).toContain('LNWJUD_REQUIRE_WINDOWS_AUTHENTICODE');
+    expect(release).not.toContain('LNWJUD_REQUIRE_WINDOWS_AUTHENTICODE');
     expect(release).toContain('LNWJUD_EXPECTED_COMMIT_SHA');
     expect(release).toContain('verify-release-evidence.mjs');
   });
