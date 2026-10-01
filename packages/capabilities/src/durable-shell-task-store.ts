@@ -1165,12 +1165,24 @@ try {
     if (stopTarget || settled) return;
     if (timer) clearTimeout(timer);
     void (async () => {
-      // The direct command is the durable task boundary. A detached descendant
-      // may inherit stdout/stderr and keep Node's child close event pending
-      // indefinitely after the command itself has already exited. Give queued
-      // output one event-loop turn to drain, then sever only our read ends so
-      // task completion follows the direct child lifecycle instead of pipe EOF.
-      await new Promise((resolve) => setImmediate(resolve));
+      // Prefer the child's close event because it fires only after direct-child
+      // stdio has drained. A detached descendant can inherit those pipes and
+      // postpone close indefinitely, so bound that wait before severing only
+      // our read ends and completing on the direct child lifecycle.
+      await new Promise((resolve) => {
+        const directChild = child;
+        if (!directChild) {
+          resolve();
+          return;
+        }
+        const done = () => {
+          clearTimeout(drainTimer);
+          directChild.off('close', done);
+          resolve();
+        };
+        const drainTimer = setTimeout(done, 250);
+        directChild.once('close', done);
+      });
       child?.stdout?.destroy();
       child?.stderr?.destroy();
       await finish(code === 0 ? 'completed' : 'failed', code ?? -1);

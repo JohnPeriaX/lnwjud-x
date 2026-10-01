@@ -215,6 +215,9 @@ describe('cross-platform desktop packaging', () => {
     expect(nativePackagingScript).toContain('LNWJUD_RUNTIME_ARCH');
     expect(nativePackagingScript).toContain('must be built on its target operating system');
     expect(nativePackagingScript).toContain('`--${architecture}`');
+    expect(nativePackagingScript).toContain("'--config.mac.identity=-'");
+    expect(nativePackagingScript).toContain('requiresMacCertificate');
+    expect(nativePackagingScript).toContain("'CSC_KEYCHAIN'");
     expect(nativePackagingScript).toContain('write-release-evidence.mjs');
     expect(nativePackagingScript).toContain('verify-release-evidence.mjs');
     expect(nativePackagingScript).toContain('runElectronBuilderWithRetry');
