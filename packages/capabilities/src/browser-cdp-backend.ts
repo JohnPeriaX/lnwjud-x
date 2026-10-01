@@ -1,6 +1,9 @@
-import { appError, err, isApplicationAuthorized, ok, type InvocationAuthorization, type Result } from '@lnwjud/domain';
+import { realpath, stat } from 'node:fs/promises';
+import path from 'node:path';
+import { appError, err, isApplicationAuthorized, isFullBypassAuthorization, ok, type InvocationAuthorization, type Result } from '@lnwjud/domain';
 import type { CapabilityBackend } from './local-capability-service.js';
 import { NodeBrowserCdpProtocol } from './browser-cdp-protocol.js';
+import { readCapabilityActiveWorkspaceRoot } from './task-ownership.js';
 
 export interface BrowserCdpTab {
   readonly id: string;
@@ -27,22 +30,23 @@ export interface BrowserCdpBackendOptions {
   readonly launcher?: (url: string | undefined, signal?: AbortSignal) => Promise<Result<unknown>>;
 }
 
-type BrowserAction = 'launch' | 'status' | 'list_tabs' | 'new_tab' | 'close_tab' | 'navigate' | 'evaluate' | 'query' | 'click' | 'type' | 'wait' | 'screenshot';
+type BrowserAction = 'launch' | 'status' | 'list_tabs' | 'new_tab' | 'activate_tab' | 'set_files' | 'close_tab' | 'navigate' | 'evaluate' | 'query' | 'click' | 'type' | 'wait' | 'screenshot';
 
 interface BrowserRequest {
   readonly action?: BrowserAction;
   readonly parameters: Record<string, unknown>;
   readonly steps?: readonly { readonly action: BrowserAction; readonly parameters: Record<string, unknown> }[];
   readonly tabId?: string;
+  readonly activeWorkspaceRoot?: string;
   readonly allowProtectedTabAction: boolean;
   readonly timeoutSeconds: number;
   readonly dryRun: boolean;
   readonly userConfirmed: boolean;
 }
 
-const BROWSER_ACTIONS: readonly BrowserAction[] = ['launch', 'status', 'list_tabs', 'new_tab', 'close_tab', 'navigate', 'evaluate', 'query', 'click', 'type', 'wait', 'screenshot'];
-const TARGET_SCOPED_ACTIONS = new Set<BrowserAction>(['close_tab', 'navigate', 'evaluate', 'query', 'click', 'type', 'wait', 'screenshot']);
-const PROTECTED_TAB_MUTATIONS = new Set<BrowserAction>(['close_tab', 'navigate', 'evaluate', 'click', 'type']);
+const BROWSER_ACTIONS: readonly BrowserAction[] = ['launch', 'status', 'list_tabs', 'new_tab', 'activate_tab', 'set_files', 'close_tab', 'navigate', 'evaluate', 'query', 'click', 'type', 'wait', 'screenshot'];
+const TARGET_SCOPED_ACTIONS = new Set<BrowserAction>(['activate_tab', 'set_files', 'close_tab', 'navigate', 'evaluate', 'query', 'click', 'type', 'wait', 'screenshot']);
+const PROTECTED_TAB_MUTATIONS = new Set<BrowserAction>(['set_files', 'close_tab', 'navigate', 'evaluate', 'click', 'type']);
 const DEFAULT_TIMEOUT_SECONDS = 30;
 const MAX_TIMEOUT_SECONDS = 3600;
 
@@ -125,6 +129,11 @@ export class BrowserCdpBackend implements CapabilityBackend {
       case 'launch': return this.ensureStarted(readString(parameters, 'url'), signal);
       case 'list_tabs': return ok({ tabs: await this.protocol.listTabs(signal) });
       case 'new_tab': return ok(await this.protocol.newTab(readString(parameters, 'url') ?? 'about:blank', signal));
+      case 'activate_tab': return this.withTab(request, action, async (tab) => {
+        await this.protocol.request(tab.id, 'Page.bringToFront', {}, signal);
+        return ok({ activated: true, tab_id: tab.id });
+      }, signal);
+      case 'set_files': return this.withTab(request, action, async (tab) => this.setFilesProtocol(tab.id, parameters, request.activeWorkspaceRoot, authorization, signal), signal);
       case 'close_tab': return this.withTab(request, action, async (tab) => ok(await this.protocol.closeTab(tab.id, signal)), signal);
       case 'navigate': return this.withTab(request, action, async (tab) => this.navigateProtocol(tab.id, readString(parameters, 'url') ?? '', signal), signal);
       case 'evaluate': {
@@ -142,6 +151,46 @@ export class BrowserCdpBackend implements CapabilityBackend {
         const data = readScreenshotData(result);
         return data === undefined ? err(appError('INTERNAL_ERROR', 'Browser screenshot response was invalid', true)) : ok({ format: 'png', data_base64: data });
       }, signal);
+    }
+  }
+
+  private async setFilesProtocol(
+    tabId: string,
+    parameters: Record<string, unknown>,
+    activeWorkspaceRoot: string | undefined,
+    authorization: InvocationAuthorization | undefined,
+    signal?: AbortSignal,
+  ): Promise<Result<unknown>> {
+    const selector = readString(parameters, 'selector')?.trim();
+    const files = readStringArray(parameters, 'files');
+    if (selector === undefined || selector.length === 0) return err(appError('INVALID_INPUT', 'File upload requires parameters.selector'));
+    if (files === undefined || files.length === 0) return err(appError('INVALID_INPUT', 'File upload requires a non-empty parameters.files array'));
+
+    const fullBypass = isFullBypassAuthorization(authorization);
+    const root = activeWorkspaceRoot === undefined ? null : await canonicalDirectory(activeWorkspaceRoot);
+    if (!fullBypass && root === null) return err(appError('PATH_OUTSIDE_WORKSPACE', 'Browser file upload requires an available Active Project root'));
+
+    const canonicalFiles: string[] = [];
+    for (const file of files) {
+      const canonical = await canonicalExistingFile(file);
+      if (canonical === null) return err(appError('INVALID_INPUT', 'Browser file upload target is unavailable'));
+      if (!fullBypass && root !== null && !isWithinPath(root, canonical)) {
+        return err(appError('PATH_OUTSIDE_WORKSPACE', 'Browser file upload target is outside the Active Project'));
+      }
+      canonicalFiles.push(canonical);
+    }
+
+    try {
+      const documentResponse = await this.protocol.request(tabId, 'DOM.getDocument', {}, signal);
+      const rootNodeId = readProtocolNodeId(documentResponse, 'root');
+      if (rootNodeId === undefined) return err(appError('INTERNAL_ERROR', 'Browser DOM document response was invalid', true));
+      const queryResponse = await this.protocol.request(tabId, 'DOM.querySelector', { nodeId: rootNodeId, selector }, signal);
+      const nodeId = readProtocolNumber(queryResponse, 'nodeId');
+      if (nodeId === undefined || nodeId <= 0) return err(appError('INVALID_INPUT', 'Browser file input selector did not match an element'));
+      await this.protocol.request(tabId, 'DOM.setFileInputFiles', { files: canonicalFiles, nodeId }, signal);
+      return ok({ files_set: true, tab_id: tabId, file_count: canonicalFiles.length });
+    } catch {
+      return err(appError('INTERNAL_ERROR', 'Browser CDP file upload failed', true));
     }
   }
 
@@ -332,6 +381,7 @@ function parseBrowserRequest(value: unknown): Result<BrowserRequest> {
   }
   const tabId = topLevelTabId.value ?? nestedTabId.value;
   const parameters = nestedTabId.value === undefined ? rawParameters : omitKey(rawParameters, 'tab_id');
+  const activeWorkspaceRoot = readCapabilityActiveWorkspaceRoot(value);
 
   const allowProtectedTabAction = value.allow_protected_tab_action === undefined ? false : value.allow_protected_tab_action;
   if (typeof allowProtectedTabAction !== 'boolean') return err(appError('INVALID_INPUT', 'Protected-tab override flag is invalid'));
@@ -367,6 +417,7 @@ function parseBrowserRequest(value: unknown): Result<BrowserRequest> {
     parameters,
     ...(stepsValue === undefined ? {} : { steps: normalizedSteps }),
     ...(tabId === undefined ? {} : { tabId }),
+    ...(activeWorkspaceRoot === undefined ? {} : { activeWorkspaceRoot }),
     allowProtectedTabAction,
     timeoutSeconds,
     dryRun,
@@ -427,6 +478,49 @@ function readString(value: Record<string, unknown>, key: string): string | undef
 function readNumber(value: Record<string, unknown>, key: string): number | undefined {
   const result = value[key];
   return typeof result === 'number' && Number.isFinite(result) ? result : undefined;
+}
+
+function readStringArray(value: Record<string, unknown>, key: string): string[] | undefined {
+  const result = value[key];
+  if (!Array.isArray(result) || result.length < 1 || result.length > 32) return undefined;
+  const files = result.map((entry) => typeof entry === 'string' ? entry.trim() : '');
+  return files.every((entry) => entry.length > 0 && entry.length <= 4096) ? files : undefined;
+}
+
+function readProtocolNumber(response: unknown, key: string): number | undefined {
+  if (!isRecord(response) || !isRecord(response.result)) return undefined;
+  const value = response.result[key];
+  return typeof value === 'number' && Number.isInteger(value) ? value : undefined;
+}
+
+function readProtocolNodeId(response: unknown, key: string): number | undefined {
+  if (!isRecord(response) || !isRecord(response.result) || !isRecord(response.result[key])) return undefined;
+  const nodeId = response.result[key].nodeId;
+  return typeof nodeId === 'number' && Number.isInteger(nodeId) ? nodeId : undefined;
+}
+
+async function canonicalDirectory(value: string): Promise<string | null> {
+  try {
+    const resolved = await realpath(path.resolve(value));
+    return (await stat(resolved)).isDirectory() ? resolved : null;
+  } catch {
+    return null;
+  }
+}
+
+async function canonicalExistingFile(value: string): Promise<string | null> {
+  if (value.includes('\0')) return null;
+  try {
+    const resolved = await realpath(path.resolve(value));
+    return (await stat(resolved)).isFile() ? resolved : null;
+  } catch {
+    return null;
+  }
+}
+
+function isWithinPath(root: string, candidate: string): boolean {
+  const relative = path.relative(path.resolve(root), path.resolve(candidate));
+  return relative === '' || (!path.isAbsolute(relative) && !relative.split(path.sep).includes('..'));
 }
 
 function readNavigationResult(response: unknown): Result<unknown> {

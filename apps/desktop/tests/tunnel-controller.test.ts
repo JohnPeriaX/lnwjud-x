@@ -549,6 +549,33 @@ describe('TunnelController lifecycle', () => {
     expect(ownerPath).toBe('');
   });
 
+  it('clears a missing portable runtime owner before switching back to the bundled client when no tunnel is running', async () => {
+    const dataPath = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-tunnel-portable-owner-gone-'));
+    temporaryRoots.push(dataPath);
+    isolateTunnelProfile(dataPath);
+    const missingOwnerClient = path.join(dataPath, 'removed-portable', 'resources', 'tunnel-client', 'tunnel-client.exe');
+    let configured = missingOwnerClient;
+    let ownerPath = missingOwnerClient;
+    const controller = new TunnelController({
+      getClientPath: (): string => configured,
+      getBundledClientPath: (): string => path.join(dataPath, 'bundled-tunnel-client.exe'),
+      setClientPath: (value): void => { configured = value; },
+      getDataPath: (): string => dataPath,
+      getTunnelId: (): string => 'tunnel_fixture012345',
+      getRuntimeOwnerPath: (): string => ownerPath,
+      setRuntimeOwnerPath: (value): void => { ownerPath = value; },
+      getRuntimeDesiredState: (): 'stopped' => 'stopped',
+      isExternalTunnelRunning: async (): Promise<boolean> => false,
+      createRuntimeAdapter: (): TunnelRuntimeReconcilerAdapter => {
+        throw new Error('missing portable owner must never be executed');
+      },
+    });
+
+    await expect(controller.replaceClientPath('')).resolves.toBe('');
+    expect(configured).toBe('');
+    expect(ownerPath).toBe('');
+  });
+
   it('re-adopts a surviving native runtime after status first observes it as external', async () => {
     const dataPath = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-tunnel-restart-adopt-'));
     temporaryRoots.push(dataPath);

@@ -1,5 +1,9 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { appError, err, type Result } from '@lnwjud/domain';
+import { CAPABILITY_ACTIVE_WORKSPACE_ROOT_METADATA_KEY } from './task-ownership.js';
 import { BrowserCdpBackend, type BrowserCdpProtocol, type BrowserCdpTab } from './browser-cdp-backend.js';
 
 const tab = (id: string, title: string, url: string): BrowserCdpTab => ({
@@ -46,7 +50,7 @@ function reorderingProtocolStub(options: {
   };
 }
 
-function protectedActionInput(action: 'navigate' | 'close_tab' | 'evaluate' | 'click' | 'type'): Record<string, unknown> {
+function protectedActionInput(action: 'navigate' | 'close_tab' | 'evaluate' | 'click' | 'type' | 'set_files'): Record<string, unknown> {
   const parameters = action === 'navigate'
     ? { url: 'https://example.com/' }
     : action === 'evaluate'
@@ -55,7 +59,9 @@ function protectedActionInput(action: 'navigate' | 'close_tab' | 'evaluate' | 'c
         ? { selector: '#continue' }
         : action === 'type'
           ? { selector: '#prompt', text: 'test' }
-          : {};
+          : action === 'set_files'
+            ? { selector: 'input[type=file]', files: ['C:\\fixture.txt'] }
+            : {};
   return { action, tab_id: 'chatgpt-tab', parameters, userConfirmed: true };
 }
 
@@ -219,7 +225,7 @@ describe('BrowserCdpBackend', () => {
     expect(actions).toEqual(['Runtime.evaluate']);
   });
 
-  it.each(['navigate', 'close_tab', 'evaluate', 'click', 'type'] as const)(
+  it.each(['navigate', 'close_tab', 'evaluate', 'click', 'type', 'set_files'] as const)(
     'blocks %s on a ChatGPT tab without an explicit protected-tab confirmation',
     async (action) => {
       const requests: string[] = [];
@@ -584,5 +590,86 @@ describe('BrowserCdpBackend', () => {
         selector: '#does-not-exist',
       },
     });
+  });
+
+  it('activates only the explicitly pinned tab before native fallback', async () => {
+    const requests: { readonly tabId: string; readonly method: string }[] = [];
+    const protocol = protocolStub({
+      tabs: [tab('tab-a', 'A', 'https://example.com/a'), tab('tab-b', 'B', 'https://example.com/b')],
+      onRequest: (tabId, method) => requests.push({ tabId, method }),
+    });
+
+    const result = await new BrowserCdpBackend({ protocol }).execute({
+      action: 'activate_tab',
+      tab_id: 'tab-b',
+      userConfirmed: true,
+    });
+
+    expect(result).toEqual({ ok: true, value: { activated: true, tab_id: 'tab-b' } });
+    expect(requests).toEqual([{ tabId: 'tab-b', method: 'Page.bringToFront' }]);
+  });
+
+  it('sets browser file inputs only from files inside the Active Project', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-browser-upload-'));
+    const nested = path.join(root, '0-fixture');
+    const file = path.join(nested, 'fixture.txt');
+    await mkdir(nested);
+    await writeFile(file, 'fixture');
+    const requests: { readonly method: string; readonly params: Record<string, unknown> }[] = [];
+    const protocol = protocolStub({
+      tabs: [tab('tab-1', 'Upload', 'https://example.com/upload')],
+      onRequest: (_tabId, method, params) => requests.push({ method, params }),
+      responseForRequest: (_tabId, method) => {
+        if (method === 'DOM.getDocument') return { result: { root: { nodeId: 1 } } };
+        if (method === 'DOM.querySelector') return { result: { nodeId: 7 } };
+        return { result: {} };
+      },
+    });
+
+    try {
+      const result = await new BrowserCdpBackend({ protocol }).execute({
+        action: 'set_files',
+        tab_id: 'tab-1',
+        parameters: { selector: 'input[type=file]', files: [file] },
+        metadata: { [CAPABILITY_ACTIVE_WORKSPACE_ROOT_METADATA_KEY]: root },
+        userConfirmed: true,
+      });
+
+      expect(result).toEqual({ ok: true, value: { files_set: true, tab_id: 'tab-1', file_count: 1 } });
+      expect(requests.map((request) => request.method)).toEqual(['DOM.getDocument', 'DOM.querySelector', 'DOM.setFileInputFiles']);
+      expect(requests[2]?.params).toMatchObject({ nodeId: 7, files: [file] });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects browser file uploads outside the Active Project before any CDP mutation', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-browser-root-'));
+    const outside = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-browser-outside-'));
+    const file = path.join(outside, 'fixture.txt');
+    await writeFile(file, 'fixture');
+    const requests: string[] = [];
+    const protocol = protocolStub({
+      tabs: [tab('tab-1', 'Upload', 'https://example.com/upload')],
+      onRequest: (_tabId, method) => requests.push(method),
+    });
+
+    try {
+      const result = await new BrowserCdpBackend({ protocol }).execute({
+        action: 'set_files',
+        tab_id: 'tab-1',
+        parameters: { selector: 'input[type=file]', files: [file] },
+        metadata: { [CAPABILITY_ACTIVE_WORKSPACE_ROOT_METADATA_KEY]: root },
+        userConfirmed: true,
+      });
+
+      expect(result).toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
+      expect(requests).toEqual([]);
+    } finally {
+      await Promise.all([
+        rm(root, { recursive: true, force: true }),
+        rm(outside, { recursive: true, force: true }),
+      ]);
+    }
   });
 });

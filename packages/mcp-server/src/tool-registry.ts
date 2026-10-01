@@ -1186,7 +1186,7 @@ function normalizeActiveWorkspaceScopesProvider(options: ActiveWorkspaceScopeOpt
   };
 }
 
-const NATIVE_ACTIVE_SCOPE_TOOLS = new Set(['office', 'audio', 'screen_record', ...OFFICE_SEMANTIC_TOOL_NAMES]);
+const NATIVE_ACTIVE_SCOPE_TOOLS = new Set(['dom_cdp', 'office', 'audio', 'screen_record', ...OFFICE_SEMANTIC_TOOL_NAMES]);
 const COMMAND_EXECUTION_TOOLS = new Set(['shell', 'wsl_exec', 'process_start']);
 export const SCHEDULED_CONTINUATION_FENCED_TOOLS = new Set([
   'write_file', 'apply_patch', 'edit_file', 'move_file', 'copy_file', 'delete_file',

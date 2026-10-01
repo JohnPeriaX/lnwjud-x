@@ -277,6 +277,10 @@ export const workspaceIndexStopSchema = workspaceInfoSchema;
 
 const capabilityMetadataSchema = z.record(z.string(), z.unknown());
 const capabilityParametersSchema = z.record(z.string(), z.unknown());
+const nativePostconditionSchema = z.object({
+  parameters: capabilityParametersSchema,
+  expected_value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+}).strict();
 
 function hasFiniteParameter(parameters: Record<string, unknown> | undefined, name: string): boolean {
   return typeof parameters?.[name] === 'number' && Number.isFinite(parameters[name]);
@@ -364,11 +368,11 @@ export const wslFilesystemCapabilitySchema = z.object({
 }).strict();
 
 const domActionSchema = z.enum([
-  'launch', 'status', 'list_tabs', 'new_tab', 'close_tab', 'navigate',
+  'launch', 'status', 'list_tabs', 'new_tab', 'activate_tab', 'set_files', 'close_tab', 'navigate',
   'evaluate', 'query', 'click', 'type', 'wait', 'screenshot',
 ]);
 const domTargetActions = new Set([
-  'close_tab', 'navigate', 'evaluate', 'query', 'click', 'type', 'wait', 'screenshot',
+  'activate_tab', 'set_files', 'close_tab', 'navigate', 'evaluate', 'query', 'click', 'type', 'wait', 'screenshot',
 ]);
 
 const domStepSchema = z.object({
@@ -404,6 +408,7 @@ export const domCdpCapabilitySchema = z.object({
 export const accessibilityCapabilitySchema = z.object({
   action: z.enum(['status', 'launch_app', 'activate_app', 'list_windows', 'observe', 'observe_summary', 'observe_changes', 'inspect_elements', 'find_element', 'click', 'focus', 'read_value', 'set_value', 'select_item', 'menu_select', 'close_window', 'minimize_window', 'maximize_window', 'restore_window', 'set_window_frame']),
   parameters: capabilityParametersSchema.optional(),
+  postcondition: nativePostconditionSchema.optional(),
   display_id: z.string().trim().min(1).max(128).optional(),
   timeout_seconds: z.number().min(0.1).max(14_400).optional(),
   approval: capabilityApprovalSchema,
@@ -422,11 +427,15 @@ export const accessibilityCapabilitySchema = z.object({
   if (value.action === 'set_window_frame' && (!hasFiniteParameter(parameters, 'x') || !hasFiniteParameter(parameters, 'y') || !hasPositiveParameter(parameters, 'width') || !hasPositiveParameter(parameters, 'height'))) {
     addParameterIssue(ctx, 'accessibility set_window_frame requires finite x/y and positive width/height');
   }
+  if (value.postcondition !== undefined && !hasSemanticUiTarget(value.postcondition.parameters)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['postcondition', 'parameters'], message: 'postcondition requires parameters.name or parameters.automation_id' });
+  }
 });
 
 export const inputEventCapabilitySchema = z.object({
   operation: z.enum(['type_text', 'paste_text', 'press_key', 'hotkey', 'key_down', 'key_up', 'mouse_move', 'click', 'double_click', 'right_click', 'drag', 'scroll', 'button_down', 'button_up', 'release_all', 'sequence']),
   parameters: capabilityParametersSchema.optional(),
+  postcondition: nativePostconditionSchema.optional(),
   display_id: z.string().trim().min(1).max(128).optional(),
   timeout_seconds: z.number().min(0.1).max(14_400).optional(),
   approval: capabilityApprovalSchema,
@@ -458,6 +467,9 @@ export const inputEventCapabilitySchema = z.object({
   }
   if (value.operation === 'sequence' && (!Array.isArray(parameters?.steps) || parameters.steps.length < 1 || parameters.steps.length > 100)) {
     addParameterIssue(ctx, 'input_event sequence requires 1 to 100 parameters.steps');
+  }
+  if (value.postcondition !== undefined && !hasSemanticUiTarget(value.postcondition.parameters)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['postcondition', 'parameters'], message: 'postcondition requires parameters.name or parameters.automation_id' });
   }
 });
 

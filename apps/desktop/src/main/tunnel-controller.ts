@@ -1124,7 +1124,7 @@ export class TunnelController {
     const storedTunnelId = /^tunnel_[A-Za-z0-9_-]{8,128}$/.test(storedTunnelIdRaw) ? storedTunnelIdRaw : null;
     const recordedOwner = this.runtimeOwnerPath();
     if (recordedOwner !== null && !existsSync(recordedOwner)) {
-      throw new Error(`Recorded Persistent Tunnel Runtime owner is missing: ${recordedOwner}. Refusing to stop it through a different tunnel-client.`);
+      return this.clearRecordedRuntimeOwnerOnlyWhenExternalGone('the recorded owner executable is missing');
     }
     const clientPath = recordedOwner ?? this.resolveClientPath();
     if (clientPath === null || !existsSync(clientPath)) return false;
