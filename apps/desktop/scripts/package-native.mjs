@@ -18,7 +18,12 @@ const environment = {
   LNWJUD_TUNNEL_ARCH: architecture,
 };
 const corepack = process.platform === 'win32' ? 'corepack.cmd' : 'corepack';
-const electronBuilderArgs = [target === 'macos' ? '--mac' : '--linux', ...(target === 'macos' ? ['dmg', 'zip'] : ['AppImage', 'deb']), `--${architecture}`, '--publish', 'never'];
+const requiresMacCertificate = target === 'macos' && (process.env.LNWJUD_REQUIRE_CODESIGN === '1'
+  || process.env.LNWJUD_REQUIRE_NOTARIZATION === '1'
+  || ['CSC_LINK', 'CSC_NAME', 'CSC_KEYCHAIN', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID', 'APPLE_API_KEY', 'APPLE_API_KEY_ID', 'APPLE_API_ISSUER', 'APPLE_KEYCHAIN_PROFILE']
+    .some((key) => Boolean(process.env[key]?.trim())));
+const electronBuilderArgs = [target === 'macos' ? '--mac' : '--linux', ...(target === 'macos' ? ['dmg', 'zip'] : ['AppImage', 'deb']), `--${architecture}`,
+  ...(target === 'macos' && !requiresMacCertificate ? ['--config.mac.identity=-'] : []), '--publish', 'never'];
 
 await run('node', ['scripts/prepare-tunnel-client.mjs'], environment);
 await run('node', ['scripts/prepare-runtime-tools.mjs'], environment);
