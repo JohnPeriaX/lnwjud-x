@@ -1196,8 +1196,8 @@ function parseSetRemoteMcpTransportRequest(payload: unknown): SetRemoteMcpTransp
 }
 
 function parseSetTunnelClientPathRequest(payload: unknown): SetTunnelClientPathRequest {
-  if (!isRecord(payload)) throw new Error('Invalid IPC payload');
-  return { clientPath: nonEmptyString(payload.clientPath, 'clientPath') };
+  if (!isRecord(payload) || typeof payload.clientPath !== 'string') throw new Error('Invalid IPC payload: clientPath');
+  return { clientPath: payload.clientPath };
 }
 
 function parseGetToolCatalogRequest(payload: unknown): GetToolCatalogRequest {
