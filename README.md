@@ -87,10 +87,6 @@ Latest published release: **v5.7.4**. The download buttons above point directly 
 
 ภาษาไทย: v5.7.2 เพิ่มตัวอย่างรูปก่อน/หลังในหน้า Git, แก้ Engineering Harness ให้จำสถานะเปิดหลังรีสตาร์ต, เปิดเครื่องมือ Engineering ใน catalog ให้ถูกต้อง, ตรวจผลการพิมพ์ ProseMirror/ContentEditable จริงก่อนรายงานว่าสำเร็จ, กำหนดให้ Durable Goal อัปเดต checkpoint ตาม milestone/อย่างน้อยทุก 10 นาทีระหว่างงานต่อเนื่อง เพื่อให้ lnwjud Watcher แสดงสถานะล่าสุดพร้อมปิด Goal ที่ถูกแทนที่ไม่ให้ค้างเป็นงาน active และแก้ Secure MCP Tunnel บน Windows ไม่ให้สถานะหลุดเป็น Error เพียงเพราะคำสั่ง PowerShell ตรวจ process/listener ล้มเหลวชั่วคราว โดยยังคง fail closed เมื่อยืนยัน process ซ้ำหรือ identity ไม่ได้
 
-### What's new in v5.7.1
-
-- **Engineering Harness checkpoints save gate results:** gate updates and review findings now reach the durable Goal instead of being silently dropped by the MCP handler.
-
 See the [Thai Engineering Harness guide](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for setup and workflow details.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for previous releases and the complete release history.

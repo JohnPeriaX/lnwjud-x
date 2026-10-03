@@ -83,10 +83,6 @@ Latest published release: **v5.7.4**. Windows, macOS, and Linux artifacts are pu
 - **Durable Goal progress stays fresh for Watcher:** lnwjud now instructs every connected worker to checkpoint immediately at step/task/blocker/commit/push/CI/package milestones and at least every 10 minutes during sustained work without a natural milestone, while stale superseded Goals should be reconciled instead of remaining active.
 - **Secure MCP Tunnel avoids false Windows Error state:** a temporary PowerShell failure while inventorying local tunnel-client processes/listeners is retried as a transient runtime check instead of permanently flipping an otherwise healthy Tunnel to Error; duplicate/unverifiable process identity checks remain fail-closed.
 
-### What's new in v5.7.1
-
-- **Engineering Harness checkpoints save gate results:** gate updates and review findings now reach the durable Goal instead of being silently dropped by the MCP handler.
-
 See [Thai Engineering Harness setup and workflow](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for details.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for complete version history and [Thai troubleshooting](docs/USAGE_TH.md#13-doctor--troubleshooting) for Agent Swarm setup.
