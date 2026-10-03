@@ -44,6 +44,7 @@ import {
   type OpenExternalSetupPageRequest,
   type LogSnapshot,
   type ManagedBrowserStatus,
+  type MutationApprovalPrompt,
   type PdfProviderInstallResult,
   type McpConnectionStatus,
   type PermissionProfileName,
@@ -54,6 +55,7 @@ import {
   type ProcessSummary,
   type PurgeRecoveryDataRequest,
   type RestoreCheckpointRequest,
+  type ResolveMutationApprovalPromptRequest,
   type RestoreRecoveryItemRequest,
   type SaveTunnelApiKeyRequest,
   type SaveRemoteMcpAuthtokenRequest,
@@ -1552,6 +1554,20 @@ function onLogEvent(callback: (line: LogLine) => void): () => void {
   };
 }
 
+function mutationApprovalPrompt(value: unknown): MutationApprovalPrompt | null {
+  if (value === null) return null;
+  if (!isRecord(value) || !Array.isArray(value.buttons) || value.buttons.length !== 2
+    || typeof value.buttons[0] !== 'string' || typeof value.buttons[1] !== 'string') {
+    throw new Error('Invalid IPC response');
+  }
+  return {
+    title: stringField(value, 'title'),
+    message: stringField(value, 'message'),
+    detail: stringField(value, 'detail'),
+    buttons: [value.buttons[0], value.buttons[1]],
+  };
+}
+
 const api: LnwjudApi = {
   listWorkspaces: () => invoke(ipcChannels.listWorkspaces).then(workspaceList),
   addWorkspace,
@@ -1625,6 +1641,12 @@ const api: LnwjudApi = {
   }),
   getUpdateStatus: () => invoke(ipcChannels.getUpdateStatus).then(updateStatus),
   getInstallActivity: () => invoke(ipcChannels.getInstallActivity).then(installActivitySnapshot),
+  getMutationApprovalPrompt: () => invoke(ipcChannels.getMutationApprovalPrompt).then(mutationApprovalPrompt),
+  resolveMutationApprovalPrompt: (request: ResolveMutationApprovalPromptRequest) =>
+    invoke(ipcChannels.resolveMutationApprovalPrompt, request).then((value: unknown) => {
+      if (!isRecord(value)) throw new Error('Invalid IPC response');
+      return { accepted: booleanField(value, 'accepted') };
+    }),
   factoryReset: () => invoke(ipcChannels.factoryReset).then((value: unknown) => {
     if (!isRecord(value)) throw new Error('Invalid IPC response');
     return { accepted: booleanField(value, 'accepted') };

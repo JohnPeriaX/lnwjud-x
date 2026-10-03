@@ -21,6 +21,37 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.7.4',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          {
+            id: 'scrollable-high-risk-approval',
+            titleKey: 'whatsNew.574.mutationApproval.title',
+            descriptionKey: 'whatsNew.574.mutationApproval.description',
+            badge: 'fixed',
+            tags: ['mutation approval', 'scrollable', 'Windows', 'macOS', 'Linux'],
+          },
+        ],
+      },
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          {
+            id: 'bounded-native-alert-text',
+            titleKey: 'whatsNew.574.nativeDialogs.title',
+            descriptionKey: 'whatsNew.574.nativeDialogs.description',
+            badge: 'improved',
+            tags: ['native dialogs', 'long errors', 'screen fit'],
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.7.3',
     categories: [
       {
