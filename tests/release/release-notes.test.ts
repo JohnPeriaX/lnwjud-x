@@ -151,6 +151,16 @@ describe('standardized GitHub release notes', () => {
     expect(body).not.toContain('None.');
   });
 
+  it('uses current-source change bullets as highlights before the version is published', async () => {
+    const { extractCuratedHighlights } = await import(releaseNotesModuleUrl);
+    const readme = `### Current source changes in v5.7.4\n\n- High-risk approval dialogs stay on-screen across operating systems.\n- Other native alerts bound oversized error text.`;
+
+    expect(extractCuratedHighlights(readme, 'v5.7.4', 'engasnm111/lnwjud')).toEqual([
+      'High-risk approval dialogs stay on-screen across operating systems.',
+      'Other native alerts bound oversized error text.',
+    ]);
+  });
+
   it('uses the published comparison base when unpublished tags sit between releases', async () => {
     const { extractPreviousTag } = await import(releaseNotesModuleUrl);
     expect(extractPreviousTag('**Full Changelog**: https://github.com/engasnm111/lnwjud/compare/v4.56.1...v4.60.0', 'v4.60.0')).toBe('v4.56.1');
