@@ -137,10 +137,16 @@ function inspectWindowsAuthenticode(artifacts) {
     '})',
     '$results | ConvertTo-Json -Compress -Depth 4',
   ].join('\n');
+  const windowsRoot = process.env.SystemRoot ?? process.env.WINDIR ?? 'C:\\Windows';
+  const windowsPowerShellModulePath = path.join(windowsRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'Modules');
   const raw = execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command], {
     encoding: 'utf8',
     windowsHide: true,
-    env: { ...process.env, LNWJUD_AUTHENTICODE_TARGETS: JSON.stringify(targets) },
+    env: {
+      ...process.env,
+      PSModulePath: windowsPowerShellModulePath,
+      LNWJUD_AUTHENTICODE_TARGETS: JSON.stringify(targets),
+    },
   }).trim();
   const parsed = JSON.parse(raw);
   const observed = Array.isArray(parsed) ? parsed : [parsed];

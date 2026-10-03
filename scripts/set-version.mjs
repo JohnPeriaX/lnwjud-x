@@ -118,6 +118,7 @@ async function syncAllVersions() {
       .replace(/v[0-9.]+ keeps that fix while/g, `v${version} keeps that fix while`)
       .replace(/The v[0-9.]+ release target and runtime contract/g, 'The v' + version + ' release target and runtime contract')
       .replace(/current source\/release candidate is `v[0-9.]+`/g, 'current version is `v' + version + '`')
+      .replace(/current v[0-9.]+ source line/g, `current v${version} source line`)
       .replace(/apps\/desktop\/dist\/installers\/lnwjud-Setup-[0-9.]+\.exe/g, `apps/desktop/dist/installers/lnwjud-Setup-${version}.exe`)
       .replace(/apps\/desktop\/dist\/installers\/lnwjud-Portable-[0-9.]+\.exe/g, `apps/desktop/dist/installers/lnwjud-Portable-${version}.exe`)
       .replace(/current v[0-9.]+ `ToolRegistry`/g, 'current v' + version + ' `ToolRegistry`');

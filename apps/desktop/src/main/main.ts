@@ -40,6 +40,7 @@ import {
   type LoadLogSessionHistoryResult,
   type LogSnapshot,
   type ManagedBrowserStatus,
+  type MutationApprovalPrompt,
   type PdfProviderInstallResult,
   type McpConnectionStatus,
   type ProcessSummary,
@@ -88,7 +89,7 @@ import { DesktopShutdownCoordinator } from './desktop-shutdown.js';
 import { DesktopIpcDrainBarrier } from './desktop-ipc-drain.js';
 import { parseOpenExternalSetupPageRequest, resolveExternalSetupUrl } from './external-setup-links.js';
 import { shouldHoldSingleInstanceLock, wantsMcpStdio } from './instance-lock.js';
-import { createLogViewerWindow, createMainWindow, getRendererEntryPath, isAllowedRendererUrl } from './window.js';
+import { createLogViewerWindow, createMainWindow, createMutationApprovalWindow, getRendererEntryPath, isAllowedRendererUrl } from './window.js';
 import { createTrayMenuTemplate, createTrayToolTip, createTrayUpdateLabel, getTrayIconPath, shouldHideMainWindowOnClose } from './tray.js';
 import { confirmTunnelStopForUpdate, UpdateInstallCoordinator, updateInstallNeedsTunnelStopConfirmation, type UpdateSharedActivitySnapshot } from './update-install.js';
 import { UpdateCheckScheduler } from './update-check-scheduler.js';
@@ -112,7 +113,7 @@ import { configureNativeCrashDiagnostics, pruneNativeCrashDumpsForDataPath } fro
 import { RuntimeDiagnosticsHistoryRecorder, type RuntimeDiagnosticsSample } from './runtime-diagnostics-history.js';
 import { FACTORY_RESET_APPLY_ARG, applyPendingFactoryResetSync, clearFactoryResetBootstrapSync, clearFactoryResetStageSync, factoryResetBootstrapUserDataPath, stageFactoryResetSync } from './factory-reset.js';
 import { decryptV3WindowsSafeStorageSecretIfPresent } from './checkpoint-key-compat.js';
-import { isMutationApprovalResponse, mutationApprovalDialogOptions } from './mutation-approval.js';
+import { mutationApprovalDialogOptions } from './mutation-approval.js';
 import { prependBundledRuntimeToolsToPath } from './runtime-tools.js';
 import { COPY_COMMANDS, OFFICIAL_URL_TARGETS } from './tool-catalog/remediation-registry.js';
 import { SafeStorageSecretProtector } from './safe-storage-secret-protector.js';
@@ -798,6 +799,19 @@ export function registerIpcHandlers(
     assertNoPayload(payload);
     return installActivity.snapshot();
   });
+  registerHandler(ipcChannels.getMutationApprovalPrompt, (event, payload: unknown) => {
+    if (!isTrustedIpcSender(event, getMainWindow())) throw new Error('IPC sender rejected');
+    assertNoPayload(payload);
+    return pendingMutationApprovals.get(event.sender.id)?.prompt ?? null;
+  });
+  registerHandler(ipcChannels.resolveMutationApprovalPrompt, (event, payload: unknown) => {
+    if (!isTrustedIpcSender(event, getMainWindow())) throw new Error('IPC sender rejected');
+    if (!isRecord(payload) || typeof payload.approved !== 'boolean') throw new Error('Invalid IPC payload');
+    const pending = pendingMutationApprovals.get(event.sender.id);
+    if (pending === undefined) return { accepted: false };
+    pending.complete(payload.approved);
+    return { accepted: true };
+  });
   registerHandler(ipcChannels.factoryReset, async (event, payload: unknown) => {
     assertTrustedSender(event, getMainWindow());
     assertNoPayload(payload);
@@ -1443,6 +1457,12 @@ function isPermissionProfile(value: unknown): value is PermissionProfileName {
 
 let mainWindow: BrowserWindow | null = null;
 let logViewerWindow: BrowserWindow | null = null;
+interface PendingMutationApproval {
+  readonly prompt: MutationApprovalPrompt;
+  readonly complete: (approved: boolean) => void;
+}
+const pendingMutationApprovals = new Map<number, PendingMutationApproval>();
+let mutationApprovalQueue: Promise<void> = Promise.resolve();
 let desktopRuntime: DesktopRuntime | null = null;
 let tray: Tray | null = null;
 let desktopLocale: UiLocale = 'th';
@@ -1478,18 +1498,43 @@ let currentUpdateStatus: UpdateStatus = {
   canInstall: false,
 };
 
-async function requestNativeMutationApproval(request: HostMutationApprovalRequest): Promise<boolean> {
+function requestMutationApproval(request: HostMutationApprovalRequest): Promise<boolean> {
+  const queued = mutationApprovalQueue.then(() => showMutationApprovalPrompt(request));
+  mutationApprovalQueue = queued.then(() => undefined, () => undefined);
+  return queued;
+}
+
+function showMutationApprovalPrompt(request: HostMutationApprovalRequest): Promise<boolean> {
   const options = mutationApprovalDialogOptions(desktopLocale, request);
-  const dialogOptions = { ...options, buttons: [...options.buttons] };
   const parent = mainWindow !== null && !mainWindow.isDestroyed()
     ? mainWindow
     : logViewerWindow !== null && !logViewerWindow.isDestroyed()
       ? logViewerWindow
       : null;
-  const result = parent === null
-    ? await dialog.showMessageBox(dialogOptions)
-    : await dialog.showMessageBox(parent, dialogOptions);
-  return isMutationApprovalResponse(result.response);
+  const promptWindow = createMutationApprovalWindow(parent, options.title);
+  const senderId = promptWindow.webContents.id;
+  const prompt: MutationApprovalPrompt = {
+    title: options.title,
+    message: options.message,
+    detail: options.detail,
+    buttons: options.buttons,
+  };
+
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const complete = (approved: boolean, closeWindow = true): void => {
+      if (settled) return;
+      settled = true;
+      pendingMutationApprovals.delete(senderId);
+      resolve(approved);
+      if (closeWindow && !promptWindow.isDestroyed()) promptWindow.close();
+    };
+
+    pendingMutationApprovals.set(senderId, { prompt, complete });
+    promptWindow.once('closed', () => complete(false, false));
+    promptWindow.webContents.once('did-fail-load', () => complete(false));
+    void promptWindow.loadFile(getRendererEntryPath(), { hash: 'mutation-approval' }).catch(() => complete(false));
+  });
 }
 
 function openLogViewerWindow(): BrowserWindow | null {
@@ -1621,7 +1666,7 @@ function requestUpdateCheck(source: 'automatic' | 'tray' | 'renderer'): UpdateSt
   if (!app.isPackaged) {
     const status = patchUpdateStatus({ phase: 'unavailable', message: messages.updaterUnavailable, canInstall: false });
     if (source === 'tray') {
-      void dialog.showMessageBox({ type: 'info', title: messages.updaterCheckTitle, message: status.message ?? messages.updaterUnavailablePackagedOnly, buttons: [messages.ok] });
+      void dialog.showMessageBox({ type: 'info', title: messages.updaterCheckTitle, message: boundedNativeDialogText(status.message ?? messages.updaterUnavailablePackagedOnly), buttons: [messages.ok] });
     }
     return status;
   }
@@ -1638,7 +1683,7 @@ function requestUpdateCheck(source: 'automatic' | 'tray' | 'renderer'): UpdateSt
         patchUpdateStatus({ phase: 'error', message, canInstall: false });
         if (source === 'tray') {
           const currentMessages = nativeMessages(desktopLocale);
-          void dialog.showMessageBox({ type: 'error', title: currentMessages.updaterCheckTitle, message, buttons: [currentMessages.ok] });
+          void dialog.showMessageBox({ type: 'error', title: currentMessages.updaterCheckTitle, message: boundedNativeDialogText(message), buttons: [currentMessages.ok] });
         }
       });
       return status;
@@ -1662,10 +1707,26 @@ function requestUpdateCheck(source: 'automatic' | 'tray' | 'renderer'): UpdateSt
     patchUpdateStatus({ phase: 'error', lastCheckedAt: new Date().toISOString(), message, canInstall: false });
     if (source === 'tray') {
       const currentMessages = nativeMessages(desktopLocale);
-      void dialog.showMessageBox({ type: 'error', title: currentMessages.updaterCheckTitle, message, buttons: [currentMessages.ok] });
+      void dialog.showMessageBox({ type: 'error', title: currentMessages.updaterCheckTitle, message: boundedNativeDialogText(message), buttons: [currentMessages.ok] });
     }
   });
   return status;
+}
+
+const MAX_NATIVE_DIALOG_TEXT_LENGTH = 640;
+const MAX_NATIVE_DIALOG_LINE_COUNT = 4;
+const MAX_NATIVE_DIALOG_LINE_LENGTH = 120;
+
+function boundedNativeDialogText(text: string): string {
+  const lines = text.split(/\r\n?|\n|\u2028|\u2029/);
+  const boundedLines = lines.slice(0, MAX_NATIVE_DIALOG_LINE_COUNT).map((line) => line.slice(0, MAX_NATIVE_DIALOG_LINE_LENGTH));
+  let bounded = boundedLines.join('\n');
+  const truncated = lines.length > MAX_NATIVE_DIALOG_LINE_COUNT
+    || lines.some((line) => line.length > MAX_NATIVE_DIALOG_LINE_LENGTH)
+    || bounded.length > MAX_NATIVE_DIALOG_TEXT_LENGTH;
+  if (!truncated) return text;
+  bounded = bounded.slice(0, MAX_NATIVE_DIALOG_TEXT_LENGTH - 1).trimEnd();
+  return `${bounded}…`;
 }
 
 async function requestUpdateInstall(): Promise<{ readonly accepted: boolean; readonly status: UpdateStatus }> {
@@ -1734,7 +1795,7 @@ async function stopTunnelForUpdateInstall(runtime: DesktopRuntime): Promise<bool
       type: 'error',
       title: messages.updaterTunnelStopFailedTitle,
       message: messages.updaterTunnelStopFailedMessage,
-      detail,
+      detail: boundedNativeDialogText(detail),
       buttons: [messages.ok],
     });
     return false;
@@ -1821,7 +1882,7 @@ function bootstrapMcpStdio(): void {
     const secrets = await resolveDesktopRuntimeSecrets(dataPath);
     const runtime = createDesktopRuntime(dataPath, {
       permissionProfile: 'full',
-      hostMutationApprovalProvider: requestNativeMutationApproval,
+      hostMutationApprovalProvider: requestMutationApproval,
       nativeCapabilityApi: createElectronNativeCapabilityApi(() => null),
       eccRuntimeOptions: resolveDesktopEccRuntimeOptions(),
       ...secrets,
@@ -1844,7 +1905,7 @@ function bootstrapMcpStdio(): void {
       destructivePolicyProvider: () => runtime.getDestructivePolicy(),
       activeWorkspaceScopeProvider: () => runtime.getActiveWorkspaceScope(),
       activeWorkspaceScopesProvider: () => runtime.getActiveWorkspaceScopes(),
-      hostMutationApprovalProvider: requestNativeMutationApproval,
+      hostMutationApprovalProvider: requestMutationApproval,
       codexToolsEnabledProvider: () => runtime.getUserSettings().codexToolsEnabled,
       ponytailModeProvider: () => runtime.getUserSettings().ponytailMode,
       engineeringHarnessEnabledProvider: (): boolean => {
@@ -2017,7 +2078,7 @@ function initAutoUpdater(runtime: DesktopRuntime): void {
         void dialog.showMessageBox({
           type: 'info',
           title: messages.updaterAvailableTitle,
-          message: messages.updateAvailableDialog(info.version),
+          message: boundedNativeDialogText(messages.updateAvailableDialog(info.version)),
           buttons: [messages.ok],
         });
       }
@@ -2057,7 +2118,7 @@ function initAutoUpdater(runtime: DesktopRuntime): void {
       void dialog.showMessageBox({
         type: 'info',
         title: messages.updaterCheckTitle,
-        message: messages.updateCurrentDialog(info.version),
+        message: boundedNativeDialogText(messages.updateCurrentDialog(info.version)),
         buttons: [messages.ok],
       });
     });
@@ -2101,7 +2162,7 @@ function initAutoUpdater(runtime: DesktopRuntime): void {
       void dialog.showMessageBox({
         type: 'error',
         title: messages.updaterCheckTitle,
-        message,
+        message: boundedNativeDialogText(message),
         buttons: [messages.ok],
       });
     });
@@ -2334,7 +2395,7 @@ async function createNativeDesktopRuntime(dataPath: string): Promise<DesktopRunt
       logSessionId: desktopLogSession.current.sessionId,
       ...(desktopLogSession.previous === null ? {} : { previousLogSessionStartedAt: desktopLogSession.previous.startedAt }),
     }),
-    hostMutationApprovalProvider: requestNativeMutationApproval,
+    hostMutationApprovalProvider: requestMutationApproval,
     pdfProviderInstaller: (rootPath) => installPdfProvider(rootPath, {
       fetchImpl: (url) => net.fetch(url, { redirect: 'follow' }),
       onProgress: (phase) => installActivity.set({ kind: 'pdf_provider', phase, progressPercent: null, message: null }),
@@ -2660,7 +2721,7 @@ function configureDesktopShutdown(runtime: DesktopRuntime): void {
         type: 'error',
         title: 'lnwjud is still running',
         message: 'The owned tunnel could not be confirmed stopped. lnwjud will remain open; retry Quit after checking the tunnel status.',
-        detail: error.message,
+        detail: boundedNativeDialogText(error.message),
         buttons: ['OK'],
       });
     },

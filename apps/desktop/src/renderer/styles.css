@@ -2331,6 +2331,20 @@ button.titlebar-version:hover {
 .tool-modal-header code { color: var(--muted); overflow-wrap: anywhere; }
 .tool-modal-close { width: 42px; height: 42px; flex: 0 0 42px; padding: 0; display: grid; place-items: center; border-radius: 12px; font-size: 20px; line-height: 1; }
 .tool-modal-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 22px; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.mutation-approval-window { display: flex; width: 100%; height: 100%; min-width: 0; min-height: 0; padding: clamp(12px, 2.5vw, 24px); background: var(--bg); }
+.mutation-approval-card { display: flex; flex: 1 1 auto; flex-direction: column; width: min(100%, 820px); min-width: 0; min-height: 0; margin: 0 auto; }
+.mutation-approval-header { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; padding-bottom: 14px; }
+.mutation-approval-header h1 { min-width: 0; margin: 0; font-size: 19px; line-height: 1.35; overflow-wrap: anywhere; }
+.mutation-approval-icon { display: grid; flex: 0 0 32px; width: 32px; height: 32px; place-items: center; border: 1px solid rgba(245, 197, 66, .55); border-radius: 50%; color: var(--gold-primary); font-size: 20px; font-weight: 700; }
+.mutation-approval-message { flex: 0 0 auto; margin: 0 0 14px; color: var(--text); line-height: 1.55; }
+.mutation-approval-detail { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 14px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-elevated); overscroll-behavior: contain; scrollbar-gutter: stable; }
+.mutation-approval-detail pre { margin: 0; color: var(--text); font: 12px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.mutation-approval-actions { display: flex; flex: 0 0 auto; justify-content: flex-end; gap: 10px; padding-top: 14px; }
+.mutation-approval-actions button { min-width: 120px; min-height: 40px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg-elevated); color: var(--text); font: 600 13px/1.3 var(--font); cursor: pointer; }
+.mutation-approval-actions button:focus-visible { outline: 2px solid var(--gold-primary); outline-offset: 2px; }
+.mutation-approval-actions button:disabled { cursor: wait; opacity: .65; }
+.mutation-approval-actions .mutation-approval-confirm { border-color: var(--gold-primary); background: var(--gold-primary); color: #16130a; }
+.mutation-approval-loading { margin: auto; color: var(--muted); }
 .whats-new-modal { width: min(760px, calc(100vw - 48px)); }
 .whats-new-scroll { display: grid; gap: 22px; }
 .whats-new-category { display: grid; gap: 12px; }

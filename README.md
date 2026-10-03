@@ -53,9 +53,16 @@
 
 ## Current published version: v5.7.3
 
-## Current source version: v5.7.3
+## Current source version: v5.7.4
 
 Latest published release: **v5.7.3**. The download buttons above point directly to the v5.7.3 assets. The release was published after the exact tagged main commit passed the target-native release gates.
+
+### Current source changes in v5.7.4
+
+- **High-risk approval details stay on screen across Windows, macOS, and Linux:** the complete command appears in a bounded lnwjud window with its own scrollable detail area. Cancel is focused by default, and closing the window or pressing Escape cancels the request.
+- **Other native alerts resist oversized error text:** variable Update, Tunnel, and shutdown error messages are bounded before they reach native dialogs.
+
+ภาษาไทย: v5.7.4 แก้กล่องยืนยันคำสั่งเสี่ยงสูงที่ยาวจนล้นจอ โดยยังดูคำสั่งฉบับเต็มผ่านพื้นที่เลื่อนได้เหมือนกันบน Windows, macOS และ Linux; ปุ่มยกเลิกเป็นค่าเริ่มต้น และยังจำกัด error text ที่ยาวผิดปกติใน native alert จุดอื่นด้วย
 
 ### What's new in v5.7.3
 

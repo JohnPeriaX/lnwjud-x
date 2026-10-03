@@ -1,5 +1,5 @@
 export const APP_NAME = 'lnwjud';
-export const APP_VERSION = '5.7.3';
+export const APP_VERSION = '5.7.4';
 
 export const ipcChannels = {
   listWorkspaces: 'lnwjud:list-workspaces',
@@ -71,6 +71,8 @@ export const ipcChannels = {
   openLogViewer: 'lnwjud:open-log-viewer',
   getUpdateStatus: 'lnwjud:get-update-status',
   getInstallActivity: 'lnwjud:get-install-activity',
+  getMutationApprovalPrompt: 'lnwjud:get-mutation-approval-prompt',
+  resolveMutationApprovalPrompt: 'lnwjud:resolve-mutation-approval-prompt',
   factoryReset: 'lnwjud:factory-reset',
   checkForUpdates: 'lnwjud:check-for-updates',
   installUpdate: 'lnwjud:install-update',
@@ -1117,6 +1119,17 @@ export interface PdfProviderInstallResult {
   readonly restartRequired: boolean;
 }
 
+export interface MutationApprovalPrompt {
+  readonly title: string;
+  readonly message: string;
+  readonly detail: string;
+  readonly buttons: readonly [string, string];
+}
+
+export interface ResolveMutationApprovalPromptRequest {
+  readonly approved: boolean;
+}
+
 export interface IpcRequestMap {
   readonly [ipcChannels.listWorkspaces]: undefined;
   readonly [ipcChannels.addWorkspace]: AddWorkspaceRequest;
@@ -1185,6 +1198,8 @@ export interface IpcRequestMap {
   readonly [ipcChannels.openLogViewer]: undefined;
   readonly [ipcChannels.getUpdateStatus]: undefined;
   readonly [ipcChannels.getInstallActivity]: undefined;
+  readonly [ipcChannels.getMutationApprovalPrompt]: undefined;
+  readonly [ipcChannels.resolveMutationApprovalPrompt]: ResolveMutationApprovalPromptRequest;
   readonly [ipcChannels.factoryReset]: undefined;
   readonly [ipcChannels.checkForUpdates]: undefined;
   readonly [ipcChannels.installUpdate]: undefined;
@@ -1261,6 +1276,8 @@ export interface IpcResponseMap {
   readonly [ipcChannels.openLogViewer]: { readonly opened: boolean };
   readonly [ipcChannels.getUpdateStatus]: UpdateStatus;
   readonly [ipcChannels.getInstallActivity]: InstallActivitySnapshot;
+  readonly [ipcChannels.getMutationApprovalPrompt]: MutationApprovalPrompt | null;
+  readonly [ipcChannels.resolveMutationApprovalPrompt]: { readonly accepted: boolean };
   readonly [ipcChannels.factoryReset]: { readonly accepted: boolean };
   readonly [ipcChannels.checkForUpdates]: UpdateStatus;
   readonly [ipcChannels.installUpdate]: { readonly accepted: boolean; readonly status: UpdateStatus };
@@ -1337,6 +1354,8 @@ export interface LnwjudApi {
   openLogViewer(): Promise<IpcResponseMap[typeof ipcChannels.openLogViewer]>;
   getUpdateStatus(): Promise<IpcResponseMap[typeof ipcChannels.getUpdateStatus]>;
   getInstallActivity(): Promise<IpcResponseMap[typeof ipcChannels.getInstallActivity]>;
+  getMutationApprovalPrompt(): Promise<IpcResponseMap[typeof ipcChannels.getMutationApprovalPrompt]>;
+  resolveMutationApprovalPrompt(request: ResolveMutationApprovalPromptRequest): Promise<IpcResponseMap[typeof ipcChannels.resolveMutationApprovalPrompt]>;
   factoryReset(): Promise<IpcResponseMap[typeof ipcChannels.factoryReset]>;
   checkForUpdates(): Promise<IpcResponseMap[typeof ipcChannels.checkForUpdates]>;
   installUpdate(): Promise<IpcResponseMap[typeof ipcChannels.installUpdate]>;
