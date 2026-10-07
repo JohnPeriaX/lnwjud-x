@@ -38,7 +38,8 @@ export class StrictWorkspaceRepository implements WorkspaceRepository {
   private isAllowed(workspace: Workspace): boolean {
     const realRoot = normalize(workspace.realRootPath, this.platform);
     const root = normalize(workspace.rootPath, this.platform);
-    return (realRoot !== null && this.allowed.has(realRoot)) || (root !== null && this.allowed.has(root));
+    return (realRoot !== null && [...this.allowed].some((allowedRoot) => isHostPathWithin(allowedRoot, realRoot, this.platform)))
+      || (root !== null && [...this.allowed].some((allowedRoot) => isHostPathWithin(allowedRoot, root, this.platform)));
   }
 }
 

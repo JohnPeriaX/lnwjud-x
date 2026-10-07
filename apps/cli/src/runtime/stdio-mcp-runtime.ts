@@ -133,6 +133,9 @@ export function createStdioMcpRuntime(
   const activeProfile = profileName === 'custom' ? customPermissionProfile(settingsRepository) : permissionProfiles[profileName];
   const fullBypassAll = profileName === 'full' && options.fullBypassAll === true;
   const strictRoots = options.strictAllowedRoots !== undefined && !fullBypassAll;
+  const externalReadRoots = strictRoots
+    ? [...(options.strictAllowedRoots ?? parseAllowedRoots(settingsRepository.get(STDIO_ALLOWED_ROOTS_SETTING_KEY)))]
+    : [];
   const effectiveUnrestricted = strictRoots ? false : unrestricted || fullBypassAll;
   const profileProvider = (): PermissionProfile => activeProfile;
   const destructivePolicyProvider = (): DestructiveAutoApprovalPolicy => parseDestructiveAutoApprovalPolicy(
@@ -157,12 +160,17 @@ export function createStdioMcpRuntime(
     profile: activeProfile,
     platform: process.platform,
   });
-  const pathGuard = new WorkspacePathGuard(new SecretPolicy(), { unrestricted: effectiveUnrestricted, trustedWorkspaceAccess: !strictRoots });
+  const pathGuard = new WorkspacePathGuard(new SecretPolicy(), {
+    unrestricted: effectiveUnrestricted,
+    trustedWorkspaceAccess: !strictRoots,
+    externalReadRoots,
+  });
   const fileService = new FileService(workspaceRepository, pathGuard, undefined, {
     checkpointService,
     profileProvider,
     unrestricted: effectiveUnrestricted,
     trustedWorkspaceAccess: !strictRoots,
+    externalReadRoots,
     allowDeleteWithoutConfirmation: allowAiDeleteProvider,
     protectCriticalFiles: (): boolean => !fullBypassAll && destructivePolicyProvider().protectCriticalFiles,
     recoverableDelete: (): boolean => destructivePolicyProvider().recoverableDelete,

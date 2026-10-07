@@ -120,6 +120,24 @@ describe('WorkspacePathGuard', () => {
     expectError(await guard.resolveForRead(workspace, path.join('..', '..', 'outside')), 'PATH_OUTSIDE_WORKSPACE');
   });
 
+  it('allows explicit absolute reads under configured external read roots', async () => {
+    const workspace = await createWorkspace();
+    const allowedRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-allowed-read-'));
+    const deniedRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-denied-read-'));
+    temporaryRoots.push(allowedRoot, deniedRoot);
+    const allowedFile = path.join(allowedRoot, 'proof.txt');
+    const deniedFile = path.join(deniedRoot, 'secret.txt');
+    await writeFile(allowedFile, 'allowed', 'utf8');
+    await writeFile(deniedFile, 'denied', 'utf8');
+    const guard = new WorkspacePathGuard(undefined, { externalReadRoots: [allowedRoot] });
+
+    await expect(guard.resolveForRead(workspace, allowedFile)).resolves.toMatchObject({
+      ok: true,
+      value: { outsideWorkspace: true, realPath: await realpath(allowedFile) },
+    });
+    expectError(await guard.resolveForRead(workspace, deniedFile), 'PATH_OUTSIDE_WORKSPACE');
+  });
+
   it('allows only explicit absolute outside paths under per-invocation Full Bypass', async () => {
     const workspace = await createWorkspace();
     const outsideRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-outside-'));

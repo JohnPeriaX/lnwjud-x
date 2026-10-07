@@ -1,4 +1,4 @@
-import { mkdtemp, realpath, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -11,13 +11,16 @@ afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root,
 describe('strict stdio workspace repository', () => {
   it('hides previously registered broad roots and exposes only explicit allowed roots', async () => {
     const allowed = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-strict-allowed-'));
+    const nested = path.join(allowed, 'project');
     const broad = path.parse(allowed).root;
+    await mkdir(nested);
     roots.push(allowed);
     const allowedReal = await realpath(allowed);
-    const rows: Workspace[] = [workspace('broad', broad, broad), workspace('allowed', allowed, allowedReal)];
+    const nestedReal = await realpath(nested);
+    const rows: Workspace[] = [workspace('broad', broad, broad), workspace('allowed', allowed, allowedReal), workspace('nested', nested, nestedReal)];
     const repo = new MemoryRepo(rows);
     const strict = new StrictWorkspaceRepository(repo, [allowedReal]);
-    expect((await strict.list()).map((entry) => entry.id)).toEqual(['allowed']);
+    expect((await strict.list()).map((entry) => entry.id)).toEqual(['allowed', 'nested']);
     expect(await strict.get('broad')).toBeNull();
   });
 

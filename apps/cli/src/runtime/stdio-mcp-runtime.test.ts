@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -338,31 +338,41 @@ describe('stdio MCP runtime', { timeout: STDIO_RUNTIME_TEST_TIMEOUT_MS }, () => 
     expect((await readdir(leaseDirectory)).filter((name) => name.endsWith('.json'))).toEqual([]);
   });
 
-  it('uses the selected stdio profile and hides broad workspaces when strict roots are enabled', async () => {
+  it('uses allowed roots for external reads while keeping shell outside the root blocked', async () => {
     const dataPath = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-stdio-strict-data-'));
-    const allowedRaw = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-stdio-strict-allowed-'));
-    const outsideRaw = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-stdio-strict-outside-'));
-    temporaryRoots.push(dataPath, allowedRaw, outsideRaw);
-    const allowed = await realpath(allowedRaw);
-    const outside = await realpath(outsideRaw);
-    await writeFile(path.join(outside, 'outside.txt'), 'outside', 'utf8');
-    const allowedWorkspace = { id: 'allowed-workspace', displayName: 'allowed', rootPath: allowed, realRootPath: allowed, createdAt: '2026-08-22T00:00:00.000Z' };
-    const outsideWorkspace = { id: 'outside-workspace', displayName: 'outside', rootPath: outside, realRootPath: outside, createdAt: '2026-08-22T00:00:01.000Z' };
+    const allowedRootRaw = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-stdio-strict-root-'));
+    const workspaceRaw = path.join(allowedRootRaw, 'project');
+    const externalRaw = path.join(allowedRootRaw, 'screenshots');
+    const deniedRaw = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-stdio-strict-denied-'));
+    await mkdir(workspaceRaw);
+    await mkdir(externalRaw);
+    temporaryRoots.push(dataPath, allowedRootRaw, deniedRaw);
+    const allowedRoot = await realpath(allowedRootRaw);
+    const allowedWorkspacePath = await realpath(workspaceRaw);
+    const externalPath = await realpath(externalRaw);
+    const denied = await realpath(deniedRaw);
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    await writeFile(path.join(externalPath, 'screen.png'), png);
+    await writeFile(path.join(denied, 'outside.txt'), 'outside', 'utf8');
+    const allowedWorkspace = { id: 'allowed-workspace', displayName: 'allowed', rootPath: allowedWorkspacePath, realRootPath: allowedWorkspacePath, createdAt: '2026-08-22T00:00:00.000Z' };
+    const outsideWorkspace = { id: 'outside-workspace', displayName: 'outside', rootPath: denied, realRootPath: denied, createdAt: '2026-08-22T00:00:01.000Z' };
     const database = new SqliteDatabase(path.join(dataPath, 'lnwjud.sqlite'));
     const repo = new SqliteWorkspaceRepository(database);
     await repo.insert(allowedWorkspace);
     await repo.insert(outsideWorkspace);
     database.close();
 
-    const runtime = createStdioMcpRuntime(dataPath, allowedWorkspace, true, { permissionProfile: 'safe', strictAllowedRoots: [allowed] });
+    const runtime = createStdioMcpRuntime(dataPath, allowedWorkspace, true, { permissionProfile: 'safe', strictAllowedRoots: [allowedRoot] });
     try {
       expect(runtime.profileProvider()).toEqual(permissionProfiles.safe);
       const listed = await runtime.services.workspaceInfo?.list?.(runtime.actor);
       expect(listed).toMatchObject({ ok: true, value: [expect.objectContaining({ id: 'allowed-workspace' })] });
-      const readOutside = await runtime.services.file?.readFile(runtime.actor, undefined, { path: path.join(outside, 'outside.txt') });
-      expect(readOutside).toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
+      const readExternal = await runtime.services.file?.readFile(runtime.actor, allowedWorkspace.id, { path: path.join(externalPath, 'screen.png') });
+      expect(readExternal).toMatchObject({ ok: true, value: { encoding: 'base64', mimeType: 'image/png' } });
+      const readDenied = await runtime.services.file?.readFile(runtime.actor, allowedWorkspace.id, { path: path.join(denied, 'outside.txt') });
+      expect(readDenied).toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
       const shellOutside = await runtime.services.capabilities?.execute('shell', {
-        operation: 'run', executable: process.execPath, arguments: ['-e', 'process.exit(0)'], cwd: outside, execution: 'foreground',
+        operation: 'run', executable: process.execPath, arguments: ['-e', 'process.exit(0)'], cwd: denied, execution: 'foreground',
       });
       expect(shellOutside).toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
     } finally {

@@ -53,6 +53,18 @@ describe('resolveWorkspaceForPath', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
   });
 
+  it('keeps the explicit workspace as an audit anchor for an allowed external read root', async () => {
+    const result = await resolveWorkspaceForPath(
+      repository([drive, nested]),
+      nested.id,
+      'D:\\Shared\\Screenshots\\proof.png',
+      undefined,
+      'win32',
+      ['D:\\Shared\\Screenshots'],
+    );
+    expect(result).toMatchObject({ ok: true, value: { id: 'project' } });
+  });
+
   it('keeps the explicit workspace as an audit anchor for an outside absolute path under Full Bypass', async () => {
     const result = await resolveWorkspaceForPath(
       repository([drive, nested]),

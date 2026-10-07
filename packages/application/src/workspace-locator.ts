@@ -11,11 +11,15 @@ export async function resolveWorkspaceForPath(
   inputPath: string,
   authorization?: InvocationAuthorization,
   platform: NodeJS.Platform = process.platform,
+  externalReadRoots: readonly string[] = [],
 ): Promise<Result<Workspace>> {
   if (workspaceId !== undefined && workspaceId.trim().length > 0) {
     const workspace = await workspaces.get(workspaceId);
     if (workspace === null) return err(appError('WORKSPACE_NOT_FOUND', 'Workspace was not found'));
-    if (isAbsoluteFsPath(inputPath, platform) && !workspaceContains(workspace, inputPath, platform) && !isFullBypassAuthorization(authorization)) {
+    if (isAbsoluteFsPath(inputPath, platform)
+      && !workspaceContains(workspace, inputPath, platform)
+      && externalReadRoots.length === 0
+      && !isFullBypassAuthorization(authorization)) {
       return err(appError('PATH_OUTSIDE_WORKSPACE', 'Path is outside the workspace'));
     }
     return ok(workspace);

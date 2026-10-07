@@ -55,6 +55,28 @@ describe('FileService', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'SECRET_ACCESS_DENIED' } });
   });
 
+  it('reads an external image only when its absolute path is under an allowed read root', async () => {
+    const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-files-workspace-'));
+    const allowedRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-files-allowed-'));
+    const deniedRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-files-denied-'));
+    temporaryRoots.push(workspaceRoot, allowedRoot, deniedRoot);
+    const workspace = await realpath(workspaceRoot);
+    const allowed = await realpath(allowedRoot);
+    const denied = await realpath(deniedRoot);
+    const fixture: Workspace = { id: 'workspace-1', displayName: 'Fixture', rootPath: workspace, realRootPath: workspace, createdAt: new Date(0).toISOString() };
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    await writeFile(path.join(allowed, 'pixel.png'), png);
+    await writeFile(path.join(denied, 'pixel.png'), png);
+
+    const guard = new WorkspacePathGuard(undefined, { externalReadRoots: [allowed] });
+    const service = new FileService(repository(fixture), guard, undefined, { externalReadRoots: [allowed] });
+    const allowedResult = await service.readFile({ clientId: 'test', clientName: 'test' }, fixture.id, { path: path.join(allowed, 'pixel.png') });
+    expect(allowedResult).toMatchObject({ ok: true, value: { encoding: 'base64', mimeType: 'image/png' } });
+
+    const deniedResult = await service.readFile({ clientId: 'test', clientName: 'test' }, fixture.id, { path: path.join(denied, 'pixel.png') });
+    expect(deniedResult).toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
+  });
+
   it('allows secret and binary reads for an explicitly trusted registered workspace on any drive', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-files-trusted-'));
     temporaryRoots.push(root);
