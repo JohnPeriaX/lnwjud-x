@@ -21,6 +21,43 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.0',
+    categories: [
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'git-expanded', titleKey: 'whatsNew.580.git.title', descriptionKey: 'whatsNew.580.git.description', badge: 'improved', tags: ['Git', 'untracked files', 'search', 'binary'] },
+          { id: 'ui-controls', titleKey: 'whatsNew.580.ui.title', descriptionKey: 'whatsNew.580.ui.description', badge: 'fixed', tags: ['Prompt', 'Doctor', 'Tools', 'dropdown', 'validation', 'Git tree'] },
+          { id: 'workflow-templates', titleKey: 'whatsNew.580.workflows.title', descriptionKey: 'whatsNew.580.workflows.description', badge: 'new', tags: ['workflows', 'Thai', 'English', 'AI handoff'] },
+          { id: 'dialog-close', titleKey: 'whatsNew.580.dialog.title', descriptionKey: 'whatsNew.580.dialog.description', badge: 'fixed', tags: ['What’s New', 'Tool Detail', 'Tunnel guide', 'modal', 'close'] },
+          { id: 'worklog-filters', titleKey: 'whatsNew.580.worklog.title', descriptionKey: 'whatsNew.580.worklog.description', badge: 'improved', tags: ['Work Log', 'Live Logs', 'workspace', 'filter'] },
+        ],
+      },
+      {
+        id: 'office',
+        titleKey: 'whatsNew.category.office',
+        items: [
+          { id: 'file-audit', titleKey: 'whatsNew.580.office.title', descriptionKey: 'whatsNew.580.office.description', badge: 'new', tags: ['CSV', 'XLSX', 'audit', 'report preview'] },
+        ],
+      },
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'observability', titleKey: 'whatsNew.580.observability.title', descriptionKey: 'whatsNew.580.observability.description', badge: 'improved', tags: ['MCP', 'Goal', 'resource', 'audit'] },
+          { id: 'history', titleKey: 'whatsNew.580.history.title', descriptionKey: 'whatsNew.580.history.description', badge: 'new', tags: ['MCP', 'history', 'latency', 'Goal filters'] },
+          { id: 'results', titleKey: 'whatsNew.580.results.title', descriptionKey: 'whatsNew.580.results.description', badge: 'new', tags: ['Goal', 'checkpoints', 'artifacts', 'permissions'] },
+          { id: 'resources', titleKey: 'whatsNew.580.resources.title', descriptionKey: 'whatsNew.580.resources.description', badge: 'improved', tags: ['Windows', 'PID', 'CPU', 'memory', 'Context Economy'] },
+          { id: 'tunnel-reconnect', titleKey: 'whatsNew.580.tunnel.title', descriptionKey: 'whatsNew.580.tunnel.description', badge: 'fixed', tags: ['Secure MCP Tunnel', 'readiness', 'reconnect', 'backoff'] },
+          { id: 'runtime-dependencies', titleKey: 'whatsNew.580.dependencies.title', descriptionKey: 'whatsNew.580.dependencies.description', badge: 'improved', tags: ['tunnel-client 0.0.16', 'dependabot', 'CI', 'PR'] },
+          { id: 'release-evidence', titleKey: 'whatsNew.580.release.title', descriptionKey: 'whatsNew.580.release.description', badge: 'improved', tags: ['release', 'SHA256', 'provenance', 'tests'] },
+        ],
+      },
+    ],
+  },
+
+  {
     version: '5.7.4',
     categories: [
       {
