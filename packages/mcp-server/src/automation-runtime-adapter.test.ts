@@ -124,6 +124,47 @@ describe('AutomationRuntimeAdapter', () => {
     });
   });
 
+  it('maps timed-out task completion to a terminal failure without treating timeout as success', async () => {
+    const request = dispatchRequest('C:\\\\workspace-a');
+    const registry: AutomationToolRegistryPort = {
+      invokeAutomationShell: vi.fn(async () => ({
+        content: [],
+        structuredContent: {
+          task_id: request.context.taskId,
+          state: 'timed_out',
+          exit_code: 124,
+          finished_at: '2026-09-20T00:00:04.000Z',
+        },
+      })),
+      observeAutomationShell: vi.fn(async () => ok({
+        task_id: request.context.taskId,
+        state: 'timed_out',
+        exit_code: 124,
+        finished_at: '2026-09-20T00:00:04.000Z',
+      })),
+    };
+    const adapter = new AutomationRuntimeAdapter(registry, actor);
+
+    await expect(adapter.launch(actor, request)).resolves.toEqual({
+      ok: true,
+      value: {
+        presence: 'found',
+        state: 'failed',
+        observedAt: '2026-09-20T00:00:04.000Z',
+        terminalState: 'timed_out:124',
+      },
+    });
+    await expect(adapter.observe(actor, request)).resolves.toEqual({
+      ok: true,
+      value: {
+        presence: 'found',
+        state: 'failed',
+        observedAt: '2026-09-20T00:00:04.000Z',
+        terminalState: 'timed_out:124',
+      },
+    });
+  });
+
   it('dispatches deterministically through ToolRegistry while keeping the reserved context out of the public schema', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-automation-adapter-'));
     roots.push(root);
