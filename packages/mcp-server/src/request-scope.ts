@@ -19,6 +19,8 @@ export interface McpRequestScope {
 export interface HttpRequestScopeOptions {
   readonly request?: Request;
   readonly fallbackSessionId: string;
+  /** Server-extracted ChatGPT conversation identity. Never read from tool input. */
+  readonly openAiSessionId?: string;
 }
 
 /** One synthetic identity for one STDIO serving lifetime. */
@@ -36,9 +38,12 @@ export function createHttpRequestScope(options: HttpRequestScopeOptions): McpReq
   const traceParent = boundedHeader(options.request?.headers.get('traceparent'), 256);
   const traceState = boundedHeader(options.request?.headers.get('tracestate'), 512);
   const baggage = boundedBaggageHeader(options.request?.headers.get('baggage'));
+  const openAiSessionId = boundedProtocolSessionId(options.openAiSessionId);
   return {
     sessionId: protocolSessionId === undefined
-      ? normalizeInternalSessionId(options.fallbackSessionId)
+      ? openAiSessionId === undefined
+        ? normalizeInternalSessionId(options.fallbackSessionId)
+        : `chatgpt-${fingerprint(openAiSessionId)}`
       : `http-${fingerprint(protocolSessionId)}`,
     transport: 'http',
     ...(protocolSessionId === undefined ? {} : { protocolSessionId }),
@@ -52,6 +57,24 @@ export function createProtocolHttpRequestScope(protocolSessionId: string): McpRe
   const bounded = boundedProtocolSessionId(protocolSessionId);
   if (bounded === undefined) throw new Error('Protocol session ID is invalid');
   return { sessionId: `http-${fingerprint(bounded)}`, transport: 'http', protocolSessionId: bounded };
+}
+
+/**
+ * Create a stable, non-secret internal identity for one ChatGPT conversation.
+ * OpenAI documents `_meta["openai/session"]` as an anonymized conversation id
+ * that can be used to correlate tool calls within the same ChatGPT session.
+ */
+export function createOpenAiSessionRequestScope(openAiSessionId: string): McpRequestScope {
+  const bounded = boundedProtocolSessionId(openAiSessionId);
+  if (bounded === undefined) throw new Error('OpenAI session ID is invalid');
+  return { sessionId: `chatgpt-${fingerprint(bounded)}`, transport: 'http' };
+}
+
+/** Extract only the server-supplied OpenAI conversation metadata from an MCP message. */
+export function openAiSessionIdFromMeta(meta: unknown): string | undefined {
+  if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) return undefined;
+  const value = (meta as Record<string, unknown>)['openai/session'];
+  return typeof value === 'string' ? boundedProtocolSessionId(value) : undefined;
 }
 
 /** Keep the transport client identity stable while making ownership session-specific. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CAPABILITY_TASK_OWNER_METADATA_KEY } from '@lnwjud/capabilities';
-import { actorForRequestScope, createHttpRequestScope, createProtocolHttpRequestScope, createStdioRequestScope, withCapabilityOwnerMetadata } from './request-scope.js';
+import { actorForRequestScope, createHttpRequestScope, createProtocolHttpRequestScope, createStdioRequestScope, openAiSessionIdFromMeta, withCapabilityOwnerMetadata } from './request-scope.js';
 
 describe('MCP request scope', () => {
   it('keeps protocol HTTP sessions stable and distinct', () => {
@@ -18,6 +18,21 @@ describe('MCP request scope', () => {
   it('uses a stable endpoint fallback only when HTTP has no protocol session', () => {
     const request = new Request('http://127.0.0.1/mcp');
     expect(createHttpRequestScope({ request, fallbackSessionId: 'endpoint-a' }).sessionId).toBe('endpoint-a');
+  });
+
+  it('uses a stable conversation-scoped identity when OpenAI session metadata is present', () => {
+    const first = createHttpRequestScope({ request: new Request('http://127.0.0.1/mcp'), fallbackSessionId: 'endpoint-a', openAiSessionId: 'chat-a' });
+    const reconnect = createHttpRequestScope({ request: new Request('http://127.0.0.1/mcp'), fallbackSessionId: 'endpoint-a', openAiSessionId: 'chat-a' });
+    const other = createHttpRequestScope({ request: new Request('http://127.0.0.1/mcp'), fallbackSessionId: 'endpoint-a', openAiSessionId: 'chat-b' });
+    expect(reconnect.sessionId).toBe(first.sessionId);
+    expect(other.sessionId).not.toBe(first.sessionId);
+    expect(first.sessionId).toMatch(/^chatgpt-/);
+  });
+
+  it('extracts only the server-supplied OpenAI session metadata', () => {
+    expect(openAiSessionIdFromMeta({ 'openai/session': 'chat-a' })).toBe('chat-a');
+    expect(openAiSessionIdFromMeta({ 'openai/session': 123 })).toBeUndefined();
+    expect(openAiSessionIdFromMeta(undefined)).toBeUndefined();
   });
 
   it('captures bounded W3C trace headers and redacts sensitive baggage members', () => {

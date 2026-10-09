@@ -16,7 +16,12 @@ import {
 import { createMcpServer, type McpServerOptions } from './server.js';
 import { createMcpContinuationState } from './tool-registry.js';
 import { SetOfMarksObservationStore } from './set-of-marks-service.js';
-import { actorForRequestScope, createHttpRequestScope, createProtocolHttpRequestScope } from './request-scope.js';
+import {
+  actorForRequestScope,
+  createHttpRequestScope,
+  createProtocolHttpRequestScope,
+  openAiSessionIdFromMeta,
+} from './request-scope.js';
 import { ModernTasksProtocol } from './modern-tasks-protocol.js';
 import { maybeHandleModernTasksWireRequest, maybeTransformModernTasksWireResponse } from './modern-tasks-wire.js';
 import { IncrementalVerifier } from './incremental-verifier.js';
@@ -182,6 +187,13 @@ async function readJsonRpcRequest(request: Request): Promise<JSONRPCMessage | un
   }
 }
 
+function readOpenAiSessionId(requestMessage: JSONRPCMessage): string | undefined {
+  if (!('params' in requestMessage) || requestMessage.params === undefined || typeof requestMessage.params !== 'object' || requestMessage.params === null) {
+    return undefined;
+  }
+  return openAiSessionIdFromMeta((requestMessage.params as Record<string, unknown>)._meta);
+}
+
 async function transformModernJsonResponse(
   protocol: ModernTasksProtocol,
   requestMessage: JSONRPCMessage,
@@ -271,6 +283,7 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
   const modernContextEconomy = options.contextEconomy ?? new ContextEconomyRuntime();
   const endpointFallbackSessionId = randomUUID();
   const modernServersByRequest = new WeakMap<Request, McpServer>();
+  const openAiSessionByRequest = new WeakMap<Request, string>();
   const activeModernServers = new Set<McpServer>();
 
   const factory = (request?: Request): McpServer => {
@@ -283,7 +296,13 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
       continuationState,
       contextEconomy: modernContextEconomy,
       legacyTasksProtocol: false,
-      requestScope: createHttpRequestScope({ ...(request === undefined ? {} : { request }), fallbackSessionId: endpointFallbackSessionId }),
+      requestScope: createHttpRequestScope({
+        ...(request === undefined ? {} : { request }),
+        fallbackSessionId: endpointFallbackSessionId,
+        ...(request === undefined || openAiSessionByRequest.get(request) === undefined
+          ? {}
+          : { openAiSessionId: openAiSessionByRequest.get(request) as string }),
+      }),
     });
     if (request !== undefined) {
       modernServersByRequest.set(request, server);
@@ -372,7 +391,13 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
             throw error;
           }
         }
-        const requestScope = createHttpRequestScope({ request, fallbackSessionId: endpointFallbackSessionId });
+        const openAiSessionId = readOpenAiSessionId(requestMessage);
+        if (openAiSessionId !== undefined) openAiSessionByRequest.set(request, openAiSessionId);
+        const requestScope = createHttpRequestScope({
+          request,
+          fallbackSessionId: endpointFallbackSessionId,
+          ...(openAiSessionId === undefined ? {} : { openAiSessionId }),
+        });
         const protocol = new ModernTasksProtocol(options.services, { actor: actorForRequestScope(options.actor, requestScope) });
         const taskResponse = await maybeHandleModernTasksWireRequest(protocol, requestMessage);
         if (taskResponse !== undefined) return Response.json(taskResponse, { headers: { 'cache-control': 'no-store' } });
