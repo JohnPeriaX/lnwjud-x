@@ -273,8 +273,10 @@ describe('cross-platform desktop packaging', () => {
   });
 
   it('pins and verifies the official Windows x64 runtime downloads used by packaging', async () => {
+    const desktopPackage = JSON.parse(await readFile(path.join(desktopRoot, 'package.json'), 'utf8')) as { scripts?: Record<string, string> };
     const prepareRipgrep = await readFile(path.join(desktopRoot, 'scripts', 'prepare-ripgrep.ps1'), 'utf8');
     const prepareRuntimeTools = await readFile(path.join(desktopRoot, 'scripts', 'prepare-runtime-tools.mjs'), 'utf8');
+    const prepareMediaRuntime = await readFile(path.join(desktopRoot, 'scripts', 'prepare-media-runtime.mjs'), 'utf8');
     const prepareTunnel = await readFile(path.join(desktopRoot, 'scripts', 'prepare-tunnel-client.mjs'), 'utf8');
     const runtimeDependencies = JSON.parse(await readFile(path.join(desktopRoot, 'src', 'main', 'runtime-dependencies.json'), 'utf8'));
     const captureRuntimeEvidence = await readFile(path.join(desktopRoot, 'scripts', 'capture-packaged-runtime-evidence.mjs'), 'utf8');
@@ -286,6 +288,25 @@ describe('cross-platform desktop packaging', () => {
     expect(runtimeDependencies.tunnelClient.provenanceAsset)
       .toBe(`tunnel-client-v${runtimeDependencies.tunnelClient.version}-provenance.sigstore.json`);
     expect(runtimeDependencies.ripgrep.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(runtimeDependencies.ffmpeg).toMatchObject({ provider: 'gyan.dev', version: '9.0.2' });
+    expect(runtimeDependencies.ffmpeg.baseUrl).toBe('https://www.gyan.dev/ffmpeg/builds');
+    expect(runtimeDependencies.ffmpeg.targets['win32-x64']).toMatchObject({
+      archive: 'ffmpeg-release-essentials.zip',
+      kind: 'zip',
+      ffmpegExecutable: 'ffmpeg.exe',
+      ffprobeExecutable: 'ffprobe.exe',
+    });
+    expect(runtimeDependencies.ffmpeg.targets['win32-x64'].archiveSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(prepareMediaRuntime).toContain("'ffmpeg.exe'");
+    expect(prepareMediaRuntime).toContain("'ffprobe.exe'");
+    expect(prepareMediaRuntime).toContain('archiveSha256');
+    expect(prepareMediaRuntime).toContain('BUNDLED_FFMPEG.json');
+    expect(desktopPackage.scripts?.['package:windows']).toContain('prepare-media-runtime.mjs');
+    expect(captureRuntimeEvidence).toContain('resources/media-runtime/ffmpeg.exe');
+    expect(captureRuntimeEvidence).toContain('resources/media-runtime/ffprobe.exe');
+    expect(captureRuntimeEvidence).toContain('resources/media-runtime/BUNDLED_FFMPEG.json');
+    expect(config).toContain('from: build/media-runtime');
+    expect(config).toContain('to: media-runtime');
     expect(runtimeDependencies.pdfProvider).toMatchObject({ platform: 'win32', arch: 'x64' });
     expect(runtimeDependencies.pdfProvider.version).toMatch(/^\d+\.\d+\.\d+-\d+$/);
     expect(runtimeDependencies.pdfProvider.popplerVersion).toBe(runtimeDependencies.pdfProvider.version.replace(/-\d+$/, ''));

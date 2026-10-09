@@ -27,6 +27,9 @@ const TARGETS = Object.freeze({
       ['windows-secret-migrator.sha256', 'resources/windows-secret-migrator/lnwjud-windows-secret-migrator.sha256'],
       ['rg.exe', 'resources/runtime-tools/ripgrep/rg.exe'],
       ['rg-manifest', 'resources/runtime-tools/ripgrep/BUNDLED_RIPGREP.json'],
+      ['ffmpeg.exe', 'resources/media-runtime/ffmpeg.exe'],
+      ['ffprobe.exe', 'resources/media-runtime/ffprobe.exe'],
+      ['ffmpeg-manifest', 'resources/media-runtime/BUNDLED_FFMPEG.json'],
       ['tunnel-client.exe', 'resources/tunnel-client/tunnel-client.exe'],
     ]),
   }),
@@ -161,7 +164,7 @@ function resolvePackagedPath(appOutDir, platform, relativePath) {
 }
 
 function isExecutablePath(relativePath) {
-  return ['lnwjud', 'lnwjud-mcp-stdio', 'rg', 'tunnel-client', 'lnwjud-macos-host', 'lnwjud-linux-host']
+  return ['lnwjud', 'lnwjud-mcp-stdio', 'rg', 'ffmpeg.exe', 'ffprobe.exe', 'tunnel-client', 'lnwjud-macos-host', 'lnwjud-linux-host']
     .includes(path.posix.basename(relativePath));
 }
 
@@ -170,7 +173,9 @@ function isNativeHostManifestPath(relativePath) {
 }
 
 function isRuntimeManifestPath(relativePath) {
-  return relativePath.endsWith('/BUNDLED_RIPGREP.json') || relativePath.endsWith('/BUNDLED_TUNNEL_CLIENT.json');
+  return relativePath.endsWith('/BUNDLED_RIPGREP.json')
+    || relativePath.endsWith('/BUNDLED_FFMPEG.json')
+    || relativePath.endsWith('/BUNDLED_TUNNEL_CLIENT.json');
 }
 
 async function verifyRuntimeManifest(filePath, platform, arch, relativePath) {
@@ -182,6 +187,25 @@ async function verifyRuntimeManifest(filePath, platform, arch, relativePath) {
   }
   if (manifest?.schemaVersion !== 1 || manifest.product !== 'lnwjud' || manifest.platform !== platform || manifest.arch !== arch) {
     throw new Error(`Packaged runtime manifest identity mismatch: ${relativePath}`);
+  }
+  if (relativePath.endsWith('/BUNDLED_FFMPEG.json')) {
+    if (platform !== 'win32' || manifest.runtime !== 'ffmpeg'
+      || manifest.source?.provider !== 'gyan.dev' || manifest.source?.version !== '9.0.2'
+      || typeof manifest.archiveSha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(manifest.archiveSha256)
+      || manifest.archive !== 'ffmpeg-release-essentials.zip'
+      || manifest.executables?.ffmpeg?.name !== 'ffmpeg.exe'
+      || manifest.executables?.ffprobe?.name !== 'ffprobe.exe'
+      || !/^[0-9a-f]{64}$/i.test(manifest.executables?.ffmpeg?.sha256 ?? '')
+      || !/^[0-9a-f]{64}$/i.test(manifest.executables?.ffprobe?.sha256 ?? '')) {
+      throw new Error(`Packaged FFmpeg evidence is incomplete: ${relativePath}`);
+    }
+    for (const [name, expectedSha256] of [['ffmpeg.exe', manifest.executables.ffmpeg.sha256], ['ffprobe.exe', manifest.executables.ffprobe.sha256]]) {
+      const executablePath = path.join(path.dirname(filePath), name);
+      await assertRegularCanonicalFile(executablePath, `Packaged FFmpeg executable: ${name}`);
+      const actualSha256 = await sha256File(executablePath);
+      if (actualSha256 !== expectedSha256.toLowerCase()) throw new Error(`Packaged FFmpeg hash mismatch: ${name}`);
+    }
+    return;
   }
   if (typeof manifest.version !== 'string' || !/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/.test(manifest.version)
     || typeof manifest.assetSha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(manifest.assetSha256)

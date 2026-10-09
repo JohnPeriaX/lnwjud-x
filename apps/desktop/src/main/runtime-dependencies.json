@@ -99,5 +99,20 @@
     "arch": "x64",
     "sourceUrl": "https://github.com/oschwartz10612/poppler-windows/releases/download/v26.09.0-0/Release-26.09.0-0.zip",
     "archiveSha256": "7a6f256a0ddf7536182246a5733331bf4677cbcc34f4663774947ad34556c8d0"
+  },
+  "ffmpeg": {
+    "repository": "FFmpeg/FFmpeg",
+    "provider": "gyan.dev",
+    "version": "9.0.2",
+    "baseUrl": "https://www.gyan.dev/ffmpeg/builds",
+    "targets": {
+      "win32-x64": {
+        "archive": "ffmpeg-release-essentials.zip",
+        "kind": "zip",
+        "archiveSha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
+        "ffmpegExecutable": "ffmpeg.exe",
+        "ffprobeExecutable": "ffprobe.exe"
+      }
+    }
   }
 }

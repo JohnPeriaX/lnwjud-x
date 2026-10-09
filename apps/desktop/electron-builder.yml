@@ -26,6 +26,8 @@ extraResources:
     to: tunnel-client
   - from: build/runtime-tools
     to: runtime-tools
+  - from: build/media-runtime
+    to: media-runtime
   - from: build/ecc-runtime
     to: ecc-runtime
   - from: ../../.agents/skills/lnwjud-scheduled-continuation
