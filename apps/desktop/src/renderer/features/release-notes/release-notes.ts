@@ -21,6 +21,28 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.1',
+    categories: [
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'chatgpt-session-isolation', titleKey: 'whatsNew.581.session.title', descriptionKey: 'whatsNew.581.session.description', badge: 'new', tags: ['ChatGPT', 'session', 'workspace', 'reconnect'] },
+          { id: 'concurrent-processes', titleKey: 'whatsNew.581.process.title', descriptionKey: 'whatsNew.581.process.description', badge: 'improved', tags: ['process', 'concurrency', 'ownership', 'PID'] },
+        ],
+      },
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'mutation-task-audit', titleKey: 'whatsNew.581.safety.title', descriptionKey: 'whatsNew.581.safety.description', badge: 'improved', tags: ['mutation', 'task', 'audit', 'permissions'] },
+          { id: 'media-read', titleKey: 'whatsNew.581.media.title', descriptionKey: 'whatsNew.581.media.description', badge: 'new', tags: ['media_read', 'image', 'video', 'FFmpeg'] },
+        ],
+      },
+    ],
+  },
+
+  {
     version: '5.8.0',
     categories: [
       {

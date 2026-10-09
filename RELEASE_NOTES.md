@@ -2,6 +2,19 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.8.1
+
+This release hardens the ChatGPT-to-local automation path across session identity, workspace isolation, process ownership, reconnect persistence, mutation conflict protection, task outcomes, audit attribution, and media access.
+
+- **ChatGPT session identity and workspace isolation:** each conversation gets a stable internal session context and a separate logical workspace binding across requests and reconnects. Authorization and existing workspace boundaries remain authoritative.
+- **Concurrent process ownership:** managed process handles are tied to actor, session and workspace, not raw OS PIDs. Multiple conversations can therefore run, inspect, interact with and terminate their own processes concurrently without cross-session leakage.
+- **Mutation conflict protection:** concurrent work in independent workspaces remains independent, while same-target mutations use the repository's explicit fence/conflict policy so writes cannot silently race each other.
+- **Task automation outcomes:** timeout, cancellation and retry behavior remain bounded and ownership-scoped, with timed-out results mapped to terminal failure rather than success or silent duplicate retry.
+- **Audit and observability:** activity traces retain server-computed permission decisions alongside actor/session/workspace/tool context, including deterministic denied-operation coverage.
+- **Media access and Windows packaging:** `media_read` supports images and bounded video metadata/frame inspection, with FFmpeg runtime preparation included in the Windows packaging path.
+
+**ภาษาไทย — สรุป:** v5.8.1 แยก session/workspace ของ ChatGPT ต่อบทสนทนา, รองรับ process หลายบทสนทนาพร้อมกันโดยยืนยัน owner จาก managed handle, ป้องกัน mutation ชนกัน, ตรวจ timeout/cancellation/retry เป็นผล terminal จริง, เก็บ permission decision ใน audit และเพิ่ม `media_read` สำหรับภาพ/วิดีโอพร้อม FFmpeg สำหรับ Windows
+
 ### What's new in v5.8.0
 
 This release is a substantial functional expansion over **v5.7.4**, whose main fixes were bounded high-risk approval/native-alert dialogs. The features below are based on the `v5.7.4..dev` changeset, not on plans alone.

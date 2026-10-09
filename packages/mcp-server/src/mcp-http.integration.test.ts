@@ -6,6 +6,7 @@ import { ActivityTracker } from './activity-tracker.js';
 import { ToolRegistry, type McpApplicationServices } from './tool-registry.js';
 import { BUNDLED_PONYTAIL_SKILL_ID } from './ponytail-runtime.js';
 import { LNWJUD_MCP_IDENTITY_PATH, startMcpHttp, type McpHttpServerHandle } from './http.js';
+import { ChatGptSessionStore } from './chatgpt-session-store.js';
 
 const TEST_PNG_640X480 = 'iVBORw0KGgoAAAANSUhEUgAAAoAAAAHgCAIAAAC6s0uzAAAF9klEQVR42u3VoQEAMAjAsDGJRvP/mXwBJjmhppHVDwDY9SUAAAMGAAMGAAwYAAwYADBgADBgAMCAAcCAAQADBgADBgADBgAMGAAMGAAwYAAwYADAgAHAgAEAAwYAAwYAAwYADBgADBgAMGAAMGAAwIABwIABAAMGAAMGAAMGAAwYAAwYADBgADBgAMCAAcCAAQADBgADBgADBgAMGAAMGAAwYAAwYADAgAHAgAEAAwYAAwYAAwYADBgADBgAMGAAMGAAwIABwIABAAMGAAMGAAMGAAwYAAwYADBgADBgAMCAAcCAAQADBgADBgADBgAMGAAMGAAwYAAwYADAgAHAgAEAAwYAAwYAAwYADBgADBgAMGAAMGAAwIABwIABAAMGAAMGAAMGAAwYAAwYADBgADBgAMCAAcCAAQADBgADBgADBgAMGAAMGAAwYAAwYADAgAHAgAEAAwYAAwYAAwYADBgADBgAMGAAMGAAwIABwIABAAMGAAMGAAMGAAwYAAwYADBgADBgAMCAAcCAAQADBgADBgAMGAAMGAAMGAAwYAAwYADAgAHAgAEAAwYAAwYADBgADBgADBgAMGAAMGAAwIABwIABAAMGAAMGAAwYAAwYAAwYADBgADBgAMCAAcCAAQADBgADBgAMGAAMGAAMGAAwYAAwYADAgAHAgAEAAwYAAwYADBgADBgADBgAMGAAMGAAwIABwIABAAMGAAMGAAwYAAwYAAwYADBgADBgAMCAAcCAAQADBgADBgAMGAAMGAAMGAAwYAAwYADAgAHAgAEAAwYAAwYADBgADBgADBgAMGAAMGAAwIABwIABAAMGAAMGAAwYAAwYAAwYADBgADBgAMCAAcCAAQADBgADBgAMGAAMGAAwYAAwYAAwYADAgAHAgAEAAwYAAwYADBgADBgAMGAAMGAAMGAAwIABwIABAAMGAAMGAAwYAAwYADBgADBgADBgAMCAAcCAAQADBgADBgAMGAAMGAAwYAAwYAAwYADAgAHAgAEAAwYAAwYADBgADBgAMGAAMGAAMGAAwIABwIABAAMGAAMGAAwYAAwYADBgADBgADBgAMCAAcCAAQADBgADBgAMGAAMGAAwYAAwYAAwYADAgAHAgAEAAwYAAwYADBgADBgAMGAAMGAAMGAAwIABwIABAAMGAAMGAAwYAAwYADBgADBgADBgAMCAAcCAAQADBgADBgAMGAAMGAAwYAAwYAAwYADAgAHAgAEAAwYAAwYADBgADBgAMGAAMGAAMGAAwIABwIABAAMGAAMGAAwYAAwYADBgADBgADBgAMCAAcCAAQADBgADBgAMGAAMGAAwYAAwYAAwYADAgAHAgAEAAwYAAwYADBgADBgAMGAAMGAAMGAAwIABwIABAAMGAAMGAAwYAO4Ng+cD/NAAns4AAAAASUVORK5CYII=';
 const expectedAdvertisedToolCount = new ToolRegistry({}, { clientId: 'count-test', clientName: 'count-test' }).list().length;
@@ -171,6 +172,115 @@ describe('MCP localhost HTTP transport', () => {
     const otherChat = await post(304, 'conversation-workspace-b', 'workspace-b');
     expect(otherChat.error).toBeUndefined();
     expect(otherChat.result).not.toMatchObject({ structuredContent: { error: { code: 'PERMISSION_DENIED' } } });
+  });
+
+  it('preserves a ChatGPT session and workspace binding when the HTTP server is recreated on the same tunnel-backed runtime', async () => {
+    await handle.close();
+    const sessionStore = new ChatGptSessionStore({ ttlMs: 60_000, maxSessions: 8 });
+    const makeHandle = (): Promise<McpHttpServerHandle> => startMcpHttp({
+      port: 0,
+      services: {
+        workspaceInfo: {
+          async info() { return ok({ id: 'workspace-a' }); },
+          async list() { return ok([{ id: 'workspace-a', kind: 'project' }]); },
+        },
+      },
+      actor: { clientId: 'reconnect-client', clientName: 'reconnect-client' },
+      chatGptSessionStore: sessionStore,
+    });
+
+    const firstHandle = await makeHandle();
+    const post = async (endpoint: URL, id: number, session: string, workspaceId: string): Promise<Record<string, unknown>> => {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'MCP-Protocol-Version': '2026-07-28',
+          'Mcp-Method': 'tools/call',
+          'Mcp-Name': 'process_list',
+          Origin: 'http://localhost',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id,
+          method: 'tools/call',
+          params: {
+            name: 'process_list',
+            arguments: { workspaceId },
+            _meta: {
+              'openai/session': session,
+              'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+              'io.modelcontextprotocol/clientCapabilities': {},
+            },
+          },
+        }),
+      });
+      expect(response.status).toBeLessThan(300);
+      return response.json() as Promise<Record<string, unknown>>;
+    };
+
+    try {
+      const first = await post(firstHandle.endpoint, 601, 'reconnect-chat', 'workspace-a');
+      expect(first.error).toBeUndefined();
+      await firstHandle.close();
+
+      handle = await makeHandle();
+      const reconnect = await post(handle.endpoint, 602, 'reconnect-chat', 'workspace-a');
+      expect(reconnect.error).toBeUndefined();
+      const crossed = await post(handle.endpoint, 603, 'reconnect-chat', 'workspace-b');
+      expect(crossed.result).toMatchObject({ isError: true, structuredContent: { error: { code: 'PERMISSION_DENIED' } } });
+    } finally {
+      await firstHandle.close().catch(() => undefined);
+    }
+  });
+
+  it('changes the internal session generation after TTL expiry and denies stale workspace/process ownership', async () => {
+    await handle.close();
+    let now = 10_000;
+    const sessionStore = new ChatGptSessionStore({ ttlMs: 100, maxSessions: 8, now: (): number => now });
+    handle = await startMcpHttp({
+      port: 0,
+      services: {},
+      actor: { clientId: 'ttl-client', clientName: 'ttl-client' },
+      chatGptSessionStore: sessionStore,
+    });
+    const post = async (id: number): Promise<void> => {
+      const response = await fetch(handle.endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'tools/call', 'Mcp-Name': 'workspace_list', Origin: 'http://localhost' },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'workspace_list', arguments: {}, _meta: { 'openai/session': 'ttl-chat', 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} } } }),
+      });
+      expect(response.status).toBeLessThan(300);
+    };
+
+    await post(701);
+    now += 101;
+    await post(702);
+    expect(sessionStore.stats()).toMatchObject({ activeSessions: 1, expirations: 1 });
+  });
+
+  it('allows a new ChatGPT conversation on the same open tunnel and fails only after the tunnel is closed', async () => {
+    const post = async (id: number, session: string): Promise<Response> => fetch(handle.endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'tools/call', 'Mcp-Name': 'workspace_list', Origin: 'http://localhost' },
+      body: JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'workspace_list', arguments: {}, _meta: { 'openai/session': session, 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} } } }),
+    });
+
+    expect((await post(801, 'chat-a')).status).toBeLessThan(300);
+    expect((await post(802, 'chat-b')).status).toBeLessThan(300);
+    await handle.close();
+    await expect(post(803, 'chat-c')).rejects.toThrow();
+    handle = await startMcpHttp({
+      port: 0,
+      services: {
+        workspaceInfo: {
+          async info() { return ok({ id: 'workspace-1' }); },
+          async list() { return ok([{ id: 'workspace-1', kind: 'project' }]); },
+        },
+      },
+      actor: { clientId: 'http-test', clientName: 'http-test' },
+      activityTracker,
+    });
   });
 
   it('tears down every modern per-request MCP server after successful requests', async () => {

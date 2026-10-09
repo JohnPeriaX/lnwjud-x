@@ -1,4 +1,4 @@
-import { appError, err, ok, type Result } from '@lnwjud/domain';
+import { appError, err, type Result } from '@lnwjud/domain';
 
 export interface MutationFenceOptions {
   readonly signal?: AbortSignal | undefined;

@@ -135,6 +135,7 @@ async function downloadIfNeeded(url, destination, expectedSha256, label) {
 
 async function verifyExecutableVersion(executable, expectedVersion, label) {
   const { spawn } = await import('node:child_process');
+  const { clearTimeout, setTimeout } = await import('node:timers');
   await new Promise((resolve, reject) => {
     const child = spawn(executable, ['-version'], { env: process.env, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     let output = '';

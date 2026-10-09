@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { ChatGptSessionStore } from './chatgpt-session-store.js';
 
 describe('ChatGptSessionStore', () => {
-  it('keeps one authenticated conversation on the same internal session across reconnects', () => {
+  it('keeps one authenticated conversation on the same internal session across reconnects', (): void => {
     let now = 1_000;
-    const store = new ChatGptSessionStore({ ttlMs: 100, maxSessions: 4, now: () => now });
+    const store = new ChatGptSessionStore({ ttlMs: 100, maxSessions: 4, now: (): number => now });
     const first = store.resolve('client-a', 'conversation-a');
     now += 25;
     const reconnect = store.resolve('client-a', 'conversation-a');
@@ -12,9 +12,9 @@ describe('ChatGptSessionStore', () => {
     expect(store.stats().activeSessions).toBe(1);
   });
 
-  it('expires a conversation into a new internal generation so stale workspace/process ownership cannot be reused', () => {
+  it('expires a conversation into a new internal generation so stale workspace/process ownership cannot be reused', (): void => {
     let now = 1_000;
-    const store = new ChatGptSessionStore({ ttlMs: 100, maxSessions: 4, now: () => now });
+    const store = new ChatGptSessionStore({ ttlMs: 100, maxSessions: 4, now: (): number => now });
     const first = store.resolve('client-a', 'conversation-a');
     const firstBinding = store.bindingFor({ clientId: 'client-a', clientName: 'test', sessionId: first });
     expect(firstBinding?.bind('workspace-a')).toBe(true);
@@ -28,9 +28,9 @@ describe('ChatGptSessionStore', () => {
     expect(store.stats()).toMatchObject({ activeSessions: 1, expirations: 1 });
   });
 
-  it('bounds retained conversations and evicts the oldest active session', () => {
+  it('bounds retained conversations and evicts the oldest active session', (): void => {
     let now = 1_000;
-    const store = new ChatGptSessionStore({ ttlMs: 10_000, maxSessions: 2, now: () => now });
+    const store = new ChatGptSessionStore({ ttlMs: 10_000, maxSessions: 2, now: (): number => now });
     const first = store.resolve('client-a', 'conversation-a');
     now += 1;
     const second = store.resolve('client-a', 'conversation-b');
@@ -42,8 +42,8 @@ describe('ChatGptSessionStore', () => {
     expect(store.bindingFor({ clientId: 'client-a', clientName: 'test', sessionId: second })).toBeDefined();
   });
 
-  it('isolates clients even when they present the same conversation identifier', () => {
-    const store = new ChatGptSessionStore({ ttlMs: 10_000, maxSessions: 4, now: () => 1_000 });
+  it('isolates clients even when they present the same conversation identifier', (): void => {
+    const store = new ChatGptSessionStore({ ttlMs: 10_000, maxSessions: 4, now: (): number => 1_000 });
     const first = store.resolve('client-a', 'conversation-a');
     const second = store.resolve('client-b', 'conversation-a');
     expect(second).not.toBe(first);

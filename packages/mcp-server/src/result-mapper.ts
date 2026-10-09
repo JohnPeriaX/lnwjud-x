@@ -219,10 +219,6 @@ function toStructuredContent(value: unknown): Readonly<Record<string, unknown>> 
   return value as Readonly<Record<string, unknown>>;
 }
 
-function extractImageContent(value: unknown): McpImageContent | undefined {
-  return extractImageContents(value)[0];
-}
-
 function extractImageContents(value: unknown): readonly McpImageContent[] {
   if (typeof value !== 'object' || value === null) return [];
   if (Array.isArray(value)) return value.flatMap((entry) => extractImageContents(entry));

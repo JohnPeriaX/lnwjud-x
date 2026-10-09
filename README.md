@@ -53,7 +53,18 @@
 
 ## Current published version: v5.7.4
 
-## Current source version: v5.8.0
+## Current source version: v5.8.1
+
+### What's new in v5.8.1
+
+**v5.8.1** hardens the end-to-end ChatGPT automation path from conversation identity through workspace/process isolation, mutation safety, task outcomes, audit attribution, and media access.
+
+- **ChatGPT session isolation:** each conversation keeps a stable internal session identity and its own logical workspace context across requests and reconnects, while authorization remains authoritative.
+- **Concurrent process ownership:** process handles are scoped to session, actor, and workspace, so multiple ChatGPT conversations can run and interact with different processes concurrently without raw OS PID collisions bypassing ownership.
+- **Mutation and task safety:** workspace mutation fences prevent conflicting writes; task timeout, cancellation and retry outcomes are terminally verified instead of being mistaken for success; server-computed permission decisions are retained in activity traces.
+- **Media access:** `media_read` can inspect supported images and bounded video metadata/frames, with the Windows FFmpeg runtime prepared as part of packaging.
+
+**ภาษาไทย — สรุป:** v5.8.1 แยก session ของ ChatGPT ต่อบทสนทนา, ผูก workspace และ process ตามเจ้าของจริง, ป้องกัน mutation ชนกัน, ตรวจ timeout/cancellation/retry และ permission decision จากผลจริง พร้อมเพิ่ม `media_read` สำหรับภาพและวิดีโอแบบจำกัดขอบเขต
 
 ### What's new in v5.8.0
 
@@ -85,18 +96,6 @@ Latest published release: **v5.7.4**. The download buttons above point directly 
 - **Other native alerts resist oversized error text:** variable Update, Tunnel, and shutdown error messages are bounded before they reach native dialogs.
 
 ภาษาไทย: v5.7.4 แก้กล่องยืนยันคำสั่งเสี่ยงสูงที่ยาวจนล้นจอ โดยยังดูคำสั่งฉบับเต็มผ่านพื้นที่เลื่อนได้เหมือนกันบน Windows, macOS และ Linux; ปุ่มยกเลิกเป็นค่าเริ่มต้น และยังจำกัด error text ที่ยาวผิดปกติใน native alert จุดอื่นด้วย
-
-### What's new in v5.7.3
-
-- **Engineering Harness verifies real release evidence:** package gates can consume fresh durable-shell artifacts, cross-platform gates bind to the exact commit, and Windows records Authenticode state. Configured production signing must be Valid, while community releases without a certificate may remain unsigned after SHA-256 and provenance checks.
-- **Durable Goal continuity is more reliable:** Ponytail ULTRA preserves loaded skill activation across transport-session rotation, and `finish_goal` reports unfinished plan, acceptance, gate, or blocker conditions instead of false stale-CAS conflicts when the revision is unchanged.
-- **Serena and external MCP child processes are safer:** a rejected tool call no longer forces a healthy process to respawn, and replacement waits until the previous process is verified stopped, reducing duplicate processes and resource leaks.
-- **Linux AppImage startup is more resilient:** the app can start when keyring/secure storage is temporarily unavailable while encrypted secret/checkpoint operations remain fail-closed; the static AppImage runtime also avoids a FUSE2 dependency.
-- **Work Log and Live Logs report severity truthfully:** RESULT event type is separated from INFO/WARN/ERROR severity, recoverable states no longer look like hard errors, filters are clearer, and Workspace/Session badges can copy full canonical IDs.
-- **Secure MCP Tunnel, Portable, and Recovery are safer:** fresh installs no longer auto-enable persistent reconnect, Recovery adds a 3-day option, bundled `tunnel-client` selection works after clearing a custom override, and stale runtime ownership is cleared only after lnwjud proves no external Tunnel is running.
-- **Managed-browser/native foreground coordination is hardened:** `activate_tab`, browser-scoped file upload with Active Project checks, cross-project foreground serialization, and optional postcondition evidence keep native input aligned with the intended tab and target state.
-
-ภาษาไทย: v5.7.3 เน้นแก้ความต่อเนื่องของ Durable Goal/Serena, Linux AppImage, Work Log, Secure MCP Tunnel และ Portable โดยเฉพาะการกลับมาใช้ bundled `tunnel-client` หลังลบ custom path, พร้อมเพิ่มหลักฐาน release แบบ exact-SHA/cross-platform และยังรองรับ community Windows release แบบ unsigned เมื่อไม่มี production certificate โดยต้องผ่าน SHA-256/provenance checks ครบ
 
 See the [Thai Engineering Harness guide](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for setup and workflow details.
 
