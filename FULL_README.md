@@ -262,7 +262,7 @@ For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was
 4. **Business Admin/Owner setup:** in Workspace Settings → Apps → Create, add the public `https://.../mcp` URL, select **OAuth**, complete Scan Tools, create the app, then **Publish** it. Ordinary workspace members do not need Developer mode and do not paste the Server URL again.
 5. **Member connection:** open the published custom lnwjud app in ChatGPT and press **Connect**. For the exact supported ChatGPT OAuth callback paths, the browser is handed once to a random short-lived `http://127.0.0.1:<ephemeral>/...` approval listener owned by the running lnwjud Desktop, then lnwjud completes DCR + Authorization Code + PKCE and redirects back to ChatGPT — **no manual code entry and no extra approval click**. The public ngrok endpoint cannot redeem that localhost ticket. OAuth clients outside the supported ChatGPT callback contract are rejected with `403 access_denied`.
 6. lnwjud remembers the trusted registered ChatGPT client and valid refresh grant in the host secure-storage provider. Ordinary app restarts or **Start Remote MCP** do not require another authorization. An explicit **Stop** disables auto-start but preserves the trusted OAuth relationship; use **Reconnect ChatGPT** only when you intentionally want to reset that relationship.
-7. Confirm the connection discovers **267 tools by default** (or **279** when Codex delegation plus Agent Swarm is explicitly enabled), then run a read-only smoke test before writes.
+7. Confirm the connection discovers **268 tools by default** (or **280** when Codex delegation plus Agent Swarm is explicitly enabled), then run a read-only smoke test before writes.
 
 The public ngrok URL is not the raw loopback MCP endpoint: requests must pass OAuth and bearer-token validation at the separate gateway. Do not publish `http://127.0.0.1:<port>/mcp` directly through a generic reverse proxy.
 
@@ -947,7 +947,7 @@ For workspace <workspace-id>, show the project snapshot, Git status, and the top
 When a first-party tool is enabled or disabled, standards-compliant MCP clients receive `notifications/tools/list_changed` and can refresh the live list without restarting lnwjud. ChatGPT app/action catalogs may additionally use a host-managed approved snapshot: use the ChatGPT action refresh/tool-scan flow that is actually available for the workspace. A browser F5 alone is **not** guaranteed to update an approved/frozen action snapshot, and lnwjud does not claim host synchronization without evidence.
 
 <!-- BEGIN GENERATED README TOOL REGISTRY -->
-## Complete MCP tool catalog (279 total definitions; 267 advertised by default; 279 with Codex delegation plus Agent Swarm enabled)
+## Complete MCP tool catalog (280 total definitions; 268 advertised by default; 280 with Codex delegation plus Agent Swarm enabled)
 
 This complete index is generated from `ToolRegistry.listAll()`, not copied from an older release document. The default `tools/list` surface advertises only operational or dependency-gated definitions; planned and feature-disabled definitions remain visible here without being advertised. Enabling Codex delegation plus Agent Swarm adds 12 opt-in definitions to the advertised surface.
 
@@ -1171,67 +1171,68 @@ This complete index is generated from `ToolRegistry.listAll()`, not copied from 
 | 216 | `dom_snapshot` | READ | default | operational | service_dispatch | Return a structured DOM snapshot. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
 | 217 | `layout_metadata` | READ | default | operational | service_dispatch | Return layout metadata for visual validation. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
 | 218 | `visual_context` | READ | default | operational | service_dispatch | Combine screenshot, DOM, layout, console, and network references. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
-| 219 | `inspect_workbook` | READ | default | operational | service_dispatch | Inspect workbook sheets, used ranges, and a bounded sample through Excel COM. |
-| 220 | `compare_workbook_layout` | READ | default | dependency_gated | service_dispatch | Compare two workbook sheet/layout samples through the local Excel/Office provider. |
-| 221 | `render_excel_preview` | READ | default | dependency_gated | service_dispatch | Render a bounded structured Excel preview from sheet names and sampled cell values through the local Excel/Office provider. |
-| 222 | `inspect_pdf` | READ | default | dependency_gated | truthful_unavailable | Inspect PDF page structure and text through the local PDF provider. |
-| 223 | `compare_pdf_pages` | READ | default | dependency_gated | truthful_unavailable | Compare two PDFs by bounded page/text metadata through the local PDF provider. |
-| 224 | `project_profile_get` | READ | default | operational | service_dispatch | Read the validated workspace project-intelligence profile. |
-| 225 | `project_profile_set` | WRITE | default | operational | deterministic_operation | Persist validated workspace project-intelligence conventions through the guarded file boundary. |
-| 226 | `handoff_context` | READ | default | operational | service_dispatch | Build a structured cross-agent handoff bundle from real workspace, Git, and context services. |
-| 227 | `benchmark_run` | EXECUTE | default | dependency_gated | service_dispatch | Preview or start the detected managed benchmark project command and retain bounded run evidence. |
-| 228 | `regression_report` | READ | default | operational | deterministic_operation | Return retained local benchmark run evidence and regression comparisons for the current runtime session. |
-| 229 | `sandbox_exec` | EXECUTE | default | dependency_gated | truthful_unavailable | Run an artifact-based Windows Sandbox job with networking disabled and read-only mapped input. |
-| 230 | `event_watch` | EXECUTE | default | dependency_gated | deterministic_operation | Watch an allowlisted user-mode ETW or Windows Event Log diagnostic stream. |
-| 231 | `crash_trace` | READ | default | dependency_gated | deterministic_operation | Return bounded crash and service-diagnostic context from allowlisted user-mode sources. |
-| 232 | `lsp_diagnostics` | READ | default | dependency_gated | truthful_unavailable | Read diagnostics from an owned language-server child process. |
-| 233 | `lsp_rename` | WRITE | default | dependency_gated | truthful_unavailable | Create a cross-file LSP rename edit plan before any workspace write. |
-| 234 | `debug_attach` | EXECUTE | default | dependency_gated | truthful_unavailable | Validate and register an owned loopback DAP endpoint for a workspace debug session; connection details remain session-scoped. |
-| 235 | `debug_step` | EXECUTE | default | dependency_gated | truthful_unavailable | Perform a bounded DAP request against a registered owned loopback debug session. |
-| 236 | `git_worktree_spawn` | WRITE | default | dependency_gated | deterministic_operation | Create a confined, ledger-owned Git worktree for isolated agent work with collision metadata. |
-| 237 | `git_worktree_remove` | DANGEROUS | default | dependency_gated | deterministic_operation | Remove a ledger-owned Git worktree after dry-run and standard-mode confirmation; trusted Full Bypass skips lnwjud approval. |
-| 238 | `db_inspect` | READ | default | dependency_gated | truthful_unavailable | Inspect a local database schema through a configured, read-only connection. |
-| 239 | `db_query` | READ | default | dependency_gated | truthful_unavailable | Run a bounded read-only local SQLite SELECT, PRAGMA, or WITH...SELECT query. |
-| 240 | `office_ppt` | WRITE | default | dependency_gated | service_dispatch | Read PowerPoint content or save a copy through the existing Office policy boundary. |
-| 241 | `office_status` | READ | default | operational | service_dispatch | Report truthful Office provider, app, action, dependency, and policy readiness without exposing credentials. |
-| 242 | `office_word` | WRITE | default | dependency_gated | service_dispatch | Read, create, edit, inspect, merge, convert, and validate Word documents through a verified Office provider. |
-| 243 | `office_excel` | WRITE | default | dependency_gated | service_dispatch | Automate structured Excel workbook reads, edits, formulas, sheets, formatting, exports, and validation through a verified provider. |
-| 244 | `office_powerpoint` | WRITE | default | dependency_gated | service_dispatch | Author, inspect, edit, export, and validate PowerPoint presentations through a verified provider. |
-| 245 | `office_outlook` | WRITE | default | dependency_gated | service_dispatch | Read Outlook mail, create and update drafts, and perform guarded mailbox mutations through a verified provider. |
-| 246 | `office_calendar` | WRITE | default | dependency_gated | service_dispatch | Read and manage Outlook/Microsoft 365 calendar events through a verified provider with guarded invite/cancel actions. |
-| 247 | `office_contacts` | WRITE | default | dependency_gated | service_dispatch | Read and manage Outlook/Microsoft 365 contacts through a verified provider. |
-| 248 | `office_tasks` | WRITE | default | dependency_gated | service_dispatch | Read and manage Outlook/Microsoft 365 tasks only when the configured provider exposes a compatible task API. |
-| 249 | `office_onenote` | WRITE | default | dependency_gated | truthful_unavailable | Read and manage OneNote through Microsoft Graph when OAuth and required scopes are configured. |
-| 250 | `office_onedrive` | WRITE | default | dependency_gated | truthful_unavailable | Manage OneDrive files through Microsoft Graph while respecting Active Project boundaries for local transfers. |
-| 251 | `office_sharepoint` | WRITE | default | dependency_gated | truthful_unavailable | Read and manage bounded SharePoint sites, lists, drives, and files through Microsoft Graph. |
-| 252 | `office_teams` | WRITE | default | dependency_gated | truthful_unavailable | Read and send guarded Microsoft Teams messages only through supported Microsoft Graph permissions. |
-| 253 | `office_access` | WRITE | default | dependency_gated | service_dispatch | Automate Microsoft Access only when a verified local Access provider is installed. |
-| 254 | `office_visio` | WRITE | default | dependency_gated | service_dispatch | Automate Microsoft Visio only when a verified local Visio provider is installed. |
-| 255 | `office_project` | WRITE | default | dependency_gated | service_dispatch | Automate Microsoft Project only when a verified local Project provider is installed. |
-| 256 | `office_publisher` | WRITE | default | dependency_gated | service_dispatch | Automate legacy Microsoft Publisher only when an installed automation provider is verified. |
-| 257 | `office_convert` | WRITE | default | dependency_gated | deterministic_operation | Convert supported Office formats through a verified provider and verify the produced artifact before reporting success. |
-| 258 | `office_batch` | WRITE | default | dependency_gated | deterministic_operation | Run a bounded ordered Office batch with per-step results, dry-run support, and fail-fast semantics; operations are not atomic across apps. |
-| 259 | `pdf_extract_tables` | READ | default | dependency_gated | truthful_unavailable | Extract bounded PDF text and tables through a local document provider. |
-| 260 | `docx_merge` | WRITE | default | dependency_gated | service_dispatch | Create a deterministic DOCX merge plan and write only after approval. |
-| 261 | `self_heal_plan` | READ | default | operational | service_dispatch | Propose safe, deterministic, reversible recovery steps without applying mutations. |
-| 262 | `self_heal_apply` | DANGEROUS | default | dependency_gated | service_dispatch | Apply a current reversible recovery plan without automatic destructive retries; standard mode requires confirmation and trusted Full Bypass skips lnwjud approval. |
-| 263 | `skills_import` | WRITE | default | operational | service_dispatch | Import a validated local SKILL.md into the selected workspace skill catalog through guarded file read/write operations. |
-| 264 | `ecc_status` | READ | default | operational | deterministic_operation | Report the pinned ECC provider, provenance, activation policy, and bundled security-scanner readiness. |
-| 265 | `ecc_catalog` | READ | default | operational | deterministic_operation | Search the pinned ECC artifact catalog without eagerly loading artifact bodies. |
-| 266 | `ecc_load` | READ | default | operational | truthful_unavailable | Load one selected bounded ECC text artifact by stable catalog ID. |
-| 267 | `ecc_configure` | WRITE | default | operational | truthful_unavailable | Persist selective ECC activation settings without granting imported artifacts extra runtime authority. |
-| 268 | `ecc_security_scan` | EXECUTE | default | dependency_gated | truthful_unavailable | Run the pinned bundled AgentShield scanner against ECC resources or a registered workspace with bounded JSON output. |
-| 269 | `ecc_memory_save` | WRITE | default | operational | service_dispatch | Create one unreviewed ecc.memory.v1 document without overwriting existing memory. |
-| 270 | `ecc_memory_search` | READ | default | operational | service_dispatch | Search active ECC Memory Vault entries with bounded local lexical retrieval. |
-| 271 | `ecc_memory_read` | READ | default | operational | service_dispatch | Read one ECC Memory Vault entry by stable memory id after completeness checks. |
-| 272 | `ecc_memory_doctor` | READ | default | operational | service_dispatch | Validate ECC Memory Vault documents, symlinks, duplicates, and schema health without rewriting them. |
-| 273 | `tool_batch` | EXECUTE | default | operational | service_dispatch | Execute multiple MCP tools with parallel, dependency-aware, timeout, cancellation, and partial-result handling. |
-| 274 | `automation_create` | WRITE | default | operational | service_dispatch | Create one owner- and workspace-scoped durable shell automation run beneath an existing leased Goal. The plan must be a bounded acyclic milestone graph with evidence-producing verification for every milestone. |
-| 275 | `automation_status` | READ | default | operational | service_dispatch | Read one durable automation run owned by the current actor in the requested workspace. |
-| 276 | `automation_events` | READ | default | operational | service_dispatch | Read a bounded page of durable automation events owned by the current actor in the requested workspace. |
-| 277 | `automation_run` | EXECUTE | default | operational | service_dispatch | Advance one leased durable automation run to its next deterministic dispatch, observation, or verification boundary. Repeat with the returned current revision; this operation never creates a scheduler. |
-| 278 | `automation_control` | DANGEROUS | default | operational | service_dispatch | Pause, resume, or cancel one leased durable automation run. Cancellation also applies the run cancellation policy to its root Goal. |
-| 279 | `automation_finalize` | WRITE | default | operational | service_dispatch | Finalize a fully verified durable automation run and confirm its root Goal reached terminal completion. This fails closed while native scheduled-task cleanup is pending. |
+| 219 | `media_read` | READ | default | dependency_gated | service_dispatch | Read image files as native MCP image content and inspect or sample video files into bounded frame images for multimodal agents. Uses workspace-scoped paths and local ffprobe/ffmpeg when available. |
+| 220 | `inspect_workbook` | READ | default | operational | service_dispatch | Inspect workbook sheets, used ranges, and a bounded sample through Excel COM. |
+| 221 | `compare_workbook_layout` | READ | default | dependency_gated | service_dispatch | Compare two workbook sheet/layout samples through the local Excel/Office provider. |
+| 222 | `render_excel_preview` | READ | default | dependency_gated | service_dispatch | Render a bounded structured Excel preview from sheet names and sampled cell values through the local Excel/Office provider. |
+| 223 | `inspect_pdf` | READ | default | dependency_gated | truthful_unavailable | Inspect PDF page structure and text through the local PDF provider. |
+| 224 | `compare_pdf_pages` | READ | default | dependency_gated | truthful_unavailable | Compare two PDFs by bounded page/text metadata through the local PDF provider. |
+| 225 | `project_profile_get` | READ | default | operational | service_dispatch | Read the validated workspace project-intelligence profile. |
+| 226 | `project_profile_set` | WRITE | default | operational | deterministic_operation | Persist validated workspace project-intelligence conventions through the guarded file boundary. |
+| 227 | `handoff_context` | READ | default | operational | service_dispatch | Build a structured cross-agent handoff bundle from real workspace, Git, and context services. |
+| 228 | `benchmark_run` | EXECUTE | default | dependency_gated | service_dispatch | Preview or start the detected managed benchmark project command and retain bounded run evidence. |
+| 229 | `regression_report` | READ | default | operational | deterministic_operation | Return retained local benchmark run evidence and regression comparisons for the current runtime session. |
+| 230 | `sandbox_exec` | EXECUTE | default | dependency_gated | truthful_unavailable | Run an artifact-based Windows Sandbox job with networking disabled and read-only mapped input. |
+| 231 | `event_watch` | EXECUTE | default | dependency_gated | deterministic_operation | Watch an allowlisted user-mode ETW or Windows Event Log diagnostic stream. |
+| 232 | `crash_trace` | READ | default | dependency_gated | deterministic_operation | Return bounded crash and service-diagnostic context from allowlisted user-mode sources. |
+| 233 | `lsp_diagnostics` | READ | default | dependency_gated | truthful_unavailable | Read diagnostics from an owned language-server child process. |
+| 234 | `lsp_rename` | WRITE | default | dependency_gated | truthful_unavailable | Create a cross-file LSP rename edit plan before any workspace write. |
+| 235 | `debug_attach` | EXECUTE | default | dependency_gated | truthful_unavailable | Validate and register an owned loopback DAP endpoint for a workspace debug session; connection details remain session-scoped. |
+| 236 | `debug_step` | EXECUTE | default | dependency_gated | truthful_unavailable | Perform a bounded DAP request against a registered owned loopback debug session. |
+| 237 | `git_worktree_spawn` | WRITE | default | dependency_gated | deterministic_operation | Create a confined, ledger-owned Git worktree for isolated agent work with collision metadata. |
+| 238 | `git_worktree_remove` | DANGEROUS | default | dependency_gated | deterministic_operation | Remove a ledger-owned Git worktree after dry-run and standard-mode confirmation; trusted Full Bypass skips lnwjud approval. |
+| 239 | `db_inspect` | READ | default | dependency_gated | truthful_unavailable | Inspect a local database schema through a configured, read-only connection. |
+| 240 | `db_query` | READ | default | dependency_gated | truthful_unavailable | Run a bounded read-only local SQLite SELECT, PRAGMA, or WITH...SELECT query. |
+| 241 | `office_ppt` | WRITE | default | dependency_gated | service_dispatch | Read PowerPoint content or save a copy through the existing Office policy boundary. |
+| 242 | `office_status` | READ | default | operational | service_dispatch | Report truthful Office provider, app, action, dependency, and policy readiness without exposing credentials. |
+| 243 | `office_word` | WRITE | default | dependency_gated | service_dispatch | Read, create, edit, inspect, merge, convert, and validate Word documents through a verified Office provider. |
+| 244 | `office_excel` | WRITE | default | dependency_gated | service_dispatch | Automate structured Excel workbook reads, edits, formulas, sheets, formatting, exports, and validation through a verified provider. |
+| 245 | `office_powerpoint` | WRITE | default | dependency_gated | service_dispatch | Author, inspect, edit, export, and validate PowerPoint presentations through a verified provider. |
+| 246 | `office_outlook` | WRITE | default | dependency_gated | service_dispatch | Read Outlook mail, create and update drafts, and perform guarded mailbox mutations through a verified provider. |
+| 247 | `office_calendar` | WRITE | default | dependency_gated | service_dispatch | Read and manage Outlook/Microsoft 365 calendar events through a verified provider with guarded invite/cancel actions. |
+| 248 | `office_contacts` | WRITE | default | dependency_gated | service_dispatch | Read and manage Outlook/Microsoft 365 contacts through a verified provider. |
+| 249 | `office_tasks` | WRITE | default | dependency_gated | service_dispatch | Read and manage Outlook/Microsoft 365 tasks only when the configured provider exposes a compatible task API. |
+| 250 | `office_onenote` | WRITE | default | dependency_gated | truthful_unavailable | Read and manage OneNote through Microsoft Graph when OAuth and required scopes are configured. |
+| 251 | `office_onedrive` | WRITE | default | dependency_gated | truthful_unavailable | Manage OneDrive files through Microsoft Graph while respecting Active Project boundaries for local transfers. |
+| 252 | `office_sharepoint` | WRITE | default | dependency_gated | truthful_unavailable | Read and manage bounded SharePoint sites, lists, drives, and files through Microsoft Graph. |
+| 253 | `office_teams` | WRITE | default | dependency_gated | truthful_unavailable | Read and send guarded Microsoft Teams messages only through supported Microsoft Graph permissions. |
+| 254 | `office_access` | WRITE | default | dependency_gated | service_dispatch | Automate Microsoft Access only when a verified local Access provider is installed. |
+| 255 | `office_visio` | WRITE | default | dependency_gated | service_dispatch | Automate Microsoft Visio only when a verified local Visio provider is installed. |
+| 256 | `office_project` | WRITE | default | dependency_gated | service_dispatch | Automate Microsoft Project only when a verified local Project provider is installed. |
+| 257 | `office_publisher` | WRITE | default | dependency_gated | service_dispatch | Automate legacy Microsoft Publisher only when an installed automation provider is verified. |
+| 258 | `office_convert` | WRITE | default | dependency_gated | deterministic_operation | Convert supported Office formats through a verified provider and verify the produced artifact before reporting success. |
+| 259 | `office_batch` | WRITE | default | dependency_gated | deterministic_operation | Run a bounded ordered Office batch with per-step results, dry-run support, and fail-fast semantics; operations are not atomic across apps. |
+| 260 | `pdf_extract_tables` | READ | default | dependency_gated | truthful_unavailable | Extract bounded PDF text and tables through a local document provider. |
+| 261 | `docx_merge` | WRITE | default | dependency_gated | service_dispatch | Create a deterministic DOCX merge plan and write only after approval. |
+| 262 | `self_heal_plan` | READ | default | operational | service_dispatch | Propose safe, deterministic, reversible recovery steps without applying mutations. |
+| 263 | `self_heal_apply` | DANGEROUS | default | dependency_gated | service_dispatch | Apply a current reversible recovery plan without automatic destructive retries; standard mode requires confirmation and trusted Full Bypass skips lnwjud approval. |
+| 264 | `skills_import` | WRITE | default | operational | service_dispatch | Import a validated local SKILL.md into the selected workspace skill catalog through guarded file read/write operations. |
+| 265 | `ecc_status` | READ | default | operational | deterministic_operation | Report the pinned ECC provider, provenance, activation policy, and bundled security-scanner readiness. |
+| 266 | `ecc_catalog` | READ | default | operational | deterministic_operation | Search the pinned ECC artifact catalog without eagerly loading artifact bodies. |
+| 267 | `ecc_load` | READ | default | operational | truthful_unavailable | Load one selected bounded ECC text artifact by stable catalog ID. |
+| 268 | `ecc_configure` | WRITE | default | operational | truthful_unavailable | Persist selective ECC activation settings without granting imported artifacts extra runtime authority. |
+| 269 | `ecc_security_scan` | EXECUTE | default | dependency_gated | truthful_unavailable | Run the pinned bundled AgentShield scanner against ECC resources or a registered workspace with bounded JSON output. |
+| 270 | `ecc_memory_save` | WRITE | default | operational | service_dispatch | Create one unreviewed ecc.memory.v1 document without overwriting existing memory. |
+| 271 | `ecc_memory_search` | READ | default | operational | service_dispatch | Search active ECC Memory Vault entries with bounded local lexical retrieval. |
+| 272 | `ecc_memory_read` | READ | default | operational | service_dispatch | Read one ECC Memory Vault entry by stable memory id after completeness checks. |
+| 273 | `ecc_memory_doctor` | READ | default | operational | service_dispatch | Validate ECC Memory Vault documents, symlinks, duplicates, and schema health without rewriting them. |
+| 274 | `tool_batch` | EXECUTE | default | operational | service_dispatch | Execute multiple MCP tools with parallel, dependency-aware, timeout, cancellation, and partial-result handling. |
+| 275 | `automation_create` | WRITE | default | operational | service_dispatch | Create one owner- and workspace-scoped durable shell automation run beneath an existing leased Goal. The plan must be a bounded acyclic milestone graph with evidence-producing verification for every milestone. |
+| 276 | `automation_status` | READ | default | operational | service_dispatch | Read one durable automation run owned by the current actor in the requested workspace. |
+| 277 | `automation_events` | READ | default | operational | service_dispatch | Read a bounded page of durable automation events owned by the current actor in the requested workspace. |
+| 278 | `automation_run` | EXECUTE | default | operational | service_dispatch | Advance one leased durable automation run to its next deterministic dispatch, observation, or verification boundary. Repeat with the returned current revision; this operation never creates a scheduler. |
+| 279 | `automation_control` | DANGEROUS | default | operational | service_dispatch | Pause, resume, or cancel one leased durable automation run. Cancellation also applies the run cancellation policy to its root Goal. |
+| 280 | `automation_finalize` | WRITE | default | operational | service_dispatch | Finalize a fully verified durable automation run and confirm its root Goal reached terminal completion. This fails closed while native scheduled-task cleanup is pending. |
 <!-- END GENERATED README TOOL REGISTRY -->
 
 ## Detailed capability guide

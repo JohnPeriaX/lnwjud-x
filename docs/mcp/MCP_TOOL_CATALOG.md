@@ -480,6 +480,18 @@ the result is `available: false` with a reason code. `tool_search` and
 permission metadata, and `authorizationUnchanged`; `tool_dynamic_filter` is the
 bounded top-K facade. Local rerank is opt-in and falls back locally.
 
+## 44d. media_read
+
+`media_read` adds Codex-style multimodal file access to the MCP boundary. Images
+are read through the guarded workspace file service and returned as native MCP
+`image` content, so the consuming model can actually inspect the pixels instead
+of receiving a base64 blob as text. Video files are workspace-scoped and use
+local `ffprobe` for bounded metadata plus `ffmpeg` for one-frame or evenly spaced
+frame sampling. `sample_count` is capped at eight and frame output is bounded by
+`max_bytes`; video never gets uploaded implicitly or persisted as extracted
+frames. Set `LNWJUD_FFPROBE_PATH` / `LNWJUD_FFMPEG_PATH` when the executables are
+not on PATH.
+
 ## 45. skills_list
 
 Permission: READ; read-only skill discovery.

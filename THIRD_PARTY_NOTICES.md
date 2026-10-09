@@ -28,6 +28,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 lnwjud preserves the pinned AgentShield package metadata as the source of truth and normalizes the packaged AgentShield CLI version at its owned wrapper boundary. This avoids exposing a conflicting upstream hard-coded CLI version string while keeping the original bundled runtime intact and separately hashed in provenance.
 
+## FFmpeg Windows media runtime
+
+Windows packaged builds include FFmpeg 9.0.2 essentials binaries from gyan.dev for `media_read` video metadata and frame extraction. The bundled component is licensed under GPL-3.0-or-later. The corresponding `LICENSE` and `README.txt` files are shipped alongside `ffmpeg.exe` and `ffprobe.exe` under `resources/media-runtime`.
+
+Source: https://www.gyan.dev/ffmpeg/builds/
+
 ## Integration boundary
 
 ECC content is imported as a pinned provider and activated selectively. Imported rules, hooks, workflows, MCP templates, memories, and instincts do not override lnwjud permissions, durable-goal ownership, mutation policy, or runtime security boundaries. Executable ECC hooks/workflows and MCP templates are not auto-started by discovery.
