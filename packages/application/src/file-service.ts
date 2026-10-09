@@ -31,6 +31,7 @@ import { isFilesystemRoot, isWithin, WorkspacePathGuard, type ResolvedWorkspaceP
 import type { CheckpointServicePort } from './checkpoint-service.js';
 import { createGuardedWriteValidator } from './guarded-write.js';
 import { runMutationTransaction } from './mutation-transaction.js';
+import { applicationMutationFence, fileMutationKey, workspaceMutationKey } from './mutation-fence.js';
 import { resolveSharedWorkspace, resolveWorkspaceForPath } from './workspace-locator.js';
 
 export interface FileActor {
@@ -357,22 +358,28 @@ export class FileService {
     const permission = this.decide(workspace.id, 'write_file', 'WRITE', resolved.value.relativePath, false, applicationApproved, authorization);
     if (!permission.ok) return permission;
 
-    let checkpointId: string | undefined;
-    if (existing.value && resolved.value.outsideWorkspace !== true) {
-      const checkpoint = await this.createCheckpoint(actor, workspace.id, [resolved.value.relativePath]);
-      if (isAborted(signal)) return cancelledFileMutation();
-      if (!checkpoint.ok) return checkpoint;
-      checkpointId = checkpoint.value.id;
-    }
-    if (isAborted(signal)) return cancelledFileMutation();
-    const validateDestination = createGuardedWriteValidator(this.guard, workspace, request.path, resolved.value, authorization);
-    const writeResult = await this.writer.write(resolved.value.realPath ?? resolved.value.absolutePath, request.content, { validateDestination });
-    if (!writeResult.ok) return writeResult;
-    return ok({
-      path: resultPath(resolved.value),
-      bytesWritten: Buffer.byteLength(request.content, 'utf8'),
-      ...(checkpointId === undefined ? {} : { checkpointId }),
-    });
+    return applicationMutationFence.run(
+      [workspaceMutationKey(workspace.id), fileMutationKey(resolved.value.realPath ?? resolved.value.absolutePath)],
+      async (): Promise<Result<WriteFileResult>> => {
+        let checkpointId: string | undefined;
+        if (existing.value && resolved.value.outsideWorkspace !== true) {
+          const checkpoint = await this.createCheckpoint(actor, workspace.id, [resolved.value.relativePath]);
+          if (isAborted(signal)) return cancelledFileMutation();
+          if (!checkpoint.ok) return checkpoint;
+          checkpointId = checkpoint.value.id;
+        }
+        if (isAborted(signal)) return cancelledFileMutation();
+        const validateDestination = createGuardedWriteValidator(this.guard, workspace, request.path, resolved.value, authorization);
+        const writeResult = await this.writer.write(resolved.value.realPath ?? resolved.value.absolutePath, request.content, { validateDestination });
+        if (!writeResult.ok) return writeResult;
+        return ok({
+          path: resultPath(resolved.value),
+          bytesWritten: Buffer.byteLength(request.content, 'utf8'),
+          ...(checkpointId === undefined ? {} : { checkpointId }),
+        });
+      },
+      { signal },
+    );
   }
 
   public async applyPatch(actor: FileActor, workspaceId: string | undefined, request: ApplyPatchRequest, signal?: AbortSignal, authorization?: InvocationAuthorization): Promise<Result<ApplyPatchResult>> {
@@ -441,43 +448,49 @@ export class FileService {
     if (existingTargets > 0 && !applicationApproved) {
       return err(appError('PERMISSION_REQUIRED', 'Replacing existing file content with apply_patch requires explicit user confirmation; prefer edit_file for narrow repairs'));
     }
-    let checkpointId: string | undefined;
-    if (checkpointPaths.length > 0) {
-      const checkpoint = await this.createCheckpoint(actor, workspace.id, checkpointPaths);
-      if (isAborted(signal)) return cancelledFileMutation();
-      if (!checkpoint.ok) return checkpoint;
-      checkpointId = checkpoint.value.id;
-    }
-    const transaction = await runMutationTransaction(resolvedFiles.map((resolved) => ({
-      label: resolved.path,
-      commit: (): Promise<Result<void>> => this.writer.write(resolved.absolutePath, resolved.patch.content, {
-        validateDestination: resolved.validateDestination,
-      }),
-      rollback: async (): Promise<Result<void>> => {
-        if (resolved.rollbackContent !== null) {
-          return this.writer.write(resolved.absolutePath, resolved.rollbackContent, {
+    return applicationMutationFence.run(
+      [workspaceMutationKey(workspace.id), ...resolvedFiles.map((resolved) => fileMutationKey(resolved.absolutePath))],
+      async (): Promise<Result<ApplyPatchResult>> => {
+        let checkpointId: string | undefined;
+        if (checkpointPaths.length > 0) {
+          const checkpoint = await this.createCheckpoint(actor, workspace.id, checkpointPaths);
+          if (isAborted(signal)) return cancelledFileMutation();
+          if (!checkpoint.ok) return checkpoint;
+          checkpointId = checkpoint.value.id;
+        }
+        const transaction = await runMutationTransaction(resolvedFiles.map((resolved) => ({
+          label: resolved.path,
+          commit: (): Promise<Result<void>> => this.writer.write(resolved.absolutePath, resolved.patch.content, {
             validateDestination: resolved.validateDestination,
-          });
-        }
-        const valid = await resolved.validateDestination();
-        if (!valid.ok) return valid;
-        try {
-          await unlink(resolved.absolutePath);
-          return ok(undefined);
-        } catch (error: unknown) {
-          if (nodeErrorCode(error) === 'ENOENT') return ok(undefined);
-          return err(mapNodeFsError(error, 'Automatic rollback could not remove a newly created patch target'));
-        }
+          }),
+          rollback: async (): Promise<Result<void>> => {
+            if (resolved.rollbackContent !== null) {
+              return this.writer.write(resolved.absolutePath, resolved.rollbackContent, {
+                validateDestination: resolved.validateDestination,
+              });
+            }
+            const valid = await resolved.validateDestination();
+            if (!valid.ok) return valid;
+            try {
+              await unlink(resolved.absolutePath);
+              return ok(undefined);
+            } catch (error: unknown) {
+              if (nodeErrorCode(error) === 'ENOENT') return ok(undefined);
+              return err(mapNodeFsError(error, 'Automatic rollback could not remove a newly created patch target'));
+            }
+          },
+        })), {
+          shouldAbort: (): boolean => isAborted(signal),
+          abortedResult: cancelledFileMutation,
+        });
+        if (!transaction.ok) return transaction;
+        return ok({
+          paths: resolvedFiles.map((resolved) => resolved.path),
+          ...(checkpointId === undefined ? {} : { checkpointId }),
+        });
       },
-    })), {
-      shouldAbort: (): boolean => isAborted(signal),
-      abortedResult: cancelledFileMutation,
-    });
-    if (!transaction.ok) return transaction;
-    return ok({
-      paths: resolvedFiles.map((resolved) => resolved.path),
-      ...(checkpointId === undefined ? {} : { checkpointId }),
-    });
+      { signal },
+    );
   }
 
   public async editFile(actor: FileActor, workspaceId: string | undefined, request: EditFileRequest, signal?: AbortSignal, authorization?: InvocationAuthorization): Promise<Result<EditFileResult>> {
@@ -497,40 +510,46 @@ export class FileService {
       return err(appError('PERMISSION_REQUIRED', 'Editing a protected critical file requires explicit user confirmation'));
     }
     const absolutePath = resolved.value.realPath ?? resolved.value.absolutePath;
-    let content: string;
-    try {
-      const data = await readFsFile(absolutePath);
-      if (data.byteLength > MAX_FILE_WRITE_BYTES) return err(appError('FILE_TOO_LARGE', 'File exceeds the maximum edit size'));
-      if (data.subarray(0, 8192).includes(0)) return err(appError('BINARY_FILE', 'Binary files cannot be edited as text'));
-      content = data.toString('utf8');
-    } catch (error: unknown) {
-      return err(mapNodeFsError(error, 'File could not be read for editing'));
-    }
-    if (isAborted(signal)) return cancelledFileMutation();
-    const occurrences = countOccurrences(content, request.oldText);
-    if (occurrences !== expectedOccurrences) {
-      return err(exactEditConflict(content, request.oldText, expectedOccurrences, occurrences));
-    }
-    const nextContent = content.split(request.oldText).join(request.newText);
-    if (Buffer.byteLength(nextContent, 'utf8') > MAX_FILE_WRITE_BYTES) return err(appError('FILE_TOO_LARGE', 'Edited file exceeds the maximum write size'));
-    const permission = this.decide(workspace.id, 'edit_file', 'WRITE', resolved.value.relativePath, false, applicationApproved, authorization);
-    if (!permission.ok) return permission;
-    let checkpointId: string | undefined;
-    if (resolved.value.outsideWorkspace !== true) {
-      const checkpoint = await this.createCheckpoint(actor, workspace.id, [resolved.value.relativePath]);
-      if (!checkpoint.ok) return checkpoint;
-      checkpointId = checkpoint.value.id;
-    }
-    if (isAborted(signal)) return cancelledFileMutation();
-    const validateDestination = createGuardedWriteValidator(this.guard, workspace, request.path, resolved.value, authorization);
-    const writeResult = await this.writer.write(absolutePath, nextContent, { validateDestination });
-    if (!writeResult.ok) return writeResult;
-    return ok({
-      path: resultPath(resolved.value),
-      replacements: occurrences,
-      bytesWritten: Buffer.byteLength(nextContent, 'utf8'),
-      ...(checkpointId === undefined ? {} : { checkpointId }),
-    });
+    return applicationMutationFence.run(
+      [workspaceMutationKey(workspace.id), fileMutationKey(absolutePath)],
+      async (): Promise<Result<EditFileResult>> => {
+        let content: string;
+        try {
+          const data = await readFsFile(absolutePath);
+          if (data.byteLength > MAX_FILE_WRITE_BYTES) return err(appError('FILE_TOO_LARGE', 'File exceeds the maximum edit size'));
+          if (data.subarray(0, 8192).includes(0)) return err(appError('BINARY_FILE', 'Binary files cannot be edited as text'));
+          content = data.toString('utf8');
+        } catch (error: unknown) {
+          return err(mapNodeFsError(error, 'File could not be read for editing'));
+        }
+        if (isAborted(signal)) return cancelledFileMutation();
+        const occurrences = countOccurrences(content, request.oldText);
+        if (occurrences !== expectedOccurrences) {
+          return err(exactEditConflict(content, request.oldText, expectedOccurrences, occurrences));
+        }
+        const nextContent = content.split(request.oldText).join(request.newText);
+        if (Buffer.byteLength(nextContent, 'utf8') > MAX_FILE_WRITE_BYTES) return err(appError('FILE_TOO_LARGE', 'Edited file exceeds the maximum write size'));
+        const permission = this.decide(workspace.id, 'edit_file', 'WRITE', resolved.value.relativePath, false, applicationApproved, authorization);
+        if (!permission.ok) return permission;
+        let checkpointId: string | undefined;
+        if (resolved.value.outsideWorkspace !== true) {
+          const checkpoint = await this.createCheckpoint(actor, workspace.id, [resolved.value.relativePath]);
+          if (!checkpoint.ok) return checkpoint;
+          checkpointId = checkpoint.value.id;
+        }
+        if (isAborted(signal)) return cancelledFileMutation();
+        const validateDestination = createGuardedWriteValidator(this.guard, workspace, request.path, resolved.value, authorization);
+        const writeResult = await this.writer.write(absolutePath, nextContent, { validateDestination });
+        if (!writeResult.ok) return writeResult;
+        return ok({
+          path: resultPath(resolved.value),
+          replacements: occurrences,
+          bytesWritten: Buffer.byteLength(nextContent, 'utf8'),
+          ...(checkpointId === undefined ? {} : { checkpointId }),
+        });
+      },
+      { signal },
+    );
   }
 
   public async moveFile(actor: FileActor, workspaceId: string | undefined, request: MoveFileRequest, signal?: AbortSignal, authorization?: InvocationAuthorization): Promise<Result<void>> {
@@ -538,24 +557,30 @@ export class FileService {
     if (!prepared.ok) return prepared;
     if (isAborted(signal)) return cancelledFileMutation();
     const { sourceAbs, destinationAbs, isDirectory } = prepared.value;
-    const parent = await ensureParentDirectory(destinationAbs);
-    if (isAborted(signal)) return cancelledFileMutation();
-    if (!parent.ok) return parent;
-    try {
-      await rename(sourceAbs, destinationAbs);
-    } catch (error: unknown) {
-      if (nodeErrorCode(error) !== 'EXDEV') return err(mapNodeFsError(error, 'File move failed'));
-      try {
+    return applicationMutationFence.run(
+      [workspaceMutationKey(workspaceId ?? ''), fileMutationKey(sourceAbs), fileMutationKey(destinationAbs)],
+      async (): Promise<Result<void>> => {
+        const parent = await ensureParentDirectory(destinationAbs);
         if (isAborted(signal)) return cancelledFileMutation();
-        if (isDirectory) await cp(sourceAbs, destinationAbs, { recursive: true, errorOnExist: true, force: false });
-        else await copyFile(sourceAbs, destinationAbs, fsConstants.COPYFILE_EXCL);
-        if (isAborted(signal)) return cancelledFileMutation();
-        await rm(sourceAbs, { recursive: isDirectory, force: false });
-      } catch (copyError: unknown) {
-        return err(mapNodeFsError(copyError, 'File move failed'));
-      }
-    }
-    return ok(undefined);
+        if (!parent.ok) return parent;
+        try {
+          await rename(sourceAbs, destinationAbs);
+        } catch (error: unknown) {
+          if (nodeErrorCode(error) !== 'EXDEV') return err(mapNodeFsError(error, 'File move failed'));
+          try {
+            if (isAborted(signal)) return cancelledFileMutation();
+            if (isDirectory) await cp(sourceAbs, destinationAbs, { recursive: true, errorOnExist: true, force: false });
+            else await copyFile(sourceAbs, destinationAbs, fsConstants.COPYFILE_EXCL);
+            if (isAborted(signal)) return cancelledFileMutation();
+            await rm(sourceAbs, { recursive: isDirectory, force: false });
+          } catch (copyError: unknown) {
+            return err(mapNodeFsError(copyError, 'File move failed'));
+          }
+        }
+        return ok(undefined);
+      },
+      { signal },
+    );
   }
 
   public async copyFile(actor: FileActor, workspaceId: string | undefined, request: CopyFileRequest, signal?: AbortSignal, authorization?: InvocationAuthorization): Promise<Result<CopyFileResult>> {
@@ -563,16 +588,22 @@ export class FileService {
     if (!prepared.ok) return prepared;
     if (isAborted(signal)) return cancelledFileMutation();
     const { sourceAbs, destinationAbs, isDirectory, sourceRelative, destinationRelative } = prepared.value;
-    const parent = await ensureParentDirectory(destinationAbs);
-    if (isAborted(signal)) return cancelledFileMutation();
-    if (!parent.ok) return parent;
-    try {
-      if (isDirectory) await cp(sourceAbs, destinationAbs, { recursive: true, errorOnExist: true, force: false });
-      else await copyFile(sourceAbs, destinationAbs, fsConstants.COPYFILE_EXCL);
-    } catch (error: unknown) {
-      return err(mapNodeFsError(error, 'File copy failed'));
-    }
-    return ok({ sourcePath: sourceRelative, destinationPath: destinationRelative });
+    return applicationMutationFence.run(
+      [workspaceMutationKey(workspaceId ?? ''), fileMutationKey(sourceAbs), fileMutationKey(destinationAbs)],
+      async (): Promise<Result<CopyFileResult>> => {
+        const parent = await ensureParentDirectory(destinationAbs);
+        if (isAborted(signal)) return cancelledFileMutation();
+        if (!parent.ok) return parent;
+        try {
+          if (isDirectory) await cp(sourceAbs, destinationAbs, { recursive: true, errorOnExist: true, force: false });
+          else await copyFile(sourceAbs, destinationAbs, fsConstants.COPYFILE_EXCL);
+        } catch (error: unknown) {
+          return err(mapNodeFsError(error, 'File copy failed'));
+        }
+        return ok({ sourcePath: sourceRelative, destinationPath: destinationRelative });
+      },
+      { signal },
+    );
   }
 
   /**
@@ -694,8 +725,11 @@ export class FileService {
     );
     if (!permission.ok) return permission;
     const targetPath = resolved.value.realPath ?? resolved.value.absolutePath;
-    try {
-      const target = await lstat(targetPath);
+    return applicationMutationFence.run(
+      [workspaceMutationKey(workspaceResult.value.id), fileMutationKey(targetPath)],
+      async (): Promise<Result<DeleteFileResult>> => {
+        try {
+          const target = await lstat(targetPath);
       if (isAborted(signal)) return cancelledFileMutation();
       if (target.isDirectory()) {
         const entries = await readdir(targetPath);
@@ -724,9 +758,12 @@ export class FileService {
       if (target.isDirectory()) await rmdir(targetPath);
       else await unlink(targetPath);
       return ok({ path: resultPath(resolved.value), recoverable: checkpointId !== undefined, ...(checkpointId === undefined ? {} : { checkpointId }) });
-    } catch (error: unknown) {
-      return err(mapNodeFsError(error, 'File deletion failed'));
-    }
+        } catch (error: unknown) {
+          return err(mapNodeFsError(error, 'File deletion failed'));
+        }
+      },
+      { signal },
+    );
   }
 
   private async moveToRecoveryTrash(
@@ -818,13 +855,20 @@ export class FileService {
     if (destination.value.exists && kind === 'deleted') return err(appError('INVALID_INPUT', 'Restore target already exists; refusing to overwrite it'));
     const permission = this.decide(workspaceId, 'restore_deleted_file', 'WRITE', destination.value.relativePath, false, applicationApproved, authorization);
     if (!permission.ok) return permission;
-    const parent = await ensureParentDirectory(destination.value.absolutePath);
-    if (!parent.ok) return parent;
-    if (isAborted(signal)) return cancelledFileMutation();
-    try {
-      const payload = await lstat(payloadPath);
+    return applicationMutationFence.run(
+      [workspaceMutationKey(workspaceId), fileMutationKey(destination.value.realPath ?? destination.value.absolutePath)],
+      async (): Promise<Result<RestoreDeletedFileResult>> => {
+        const currentTarget = await this.inspectExistingFile(destination.value.realPath ?? destination.value.absolutePath);
+        if (!currentTarget.ok) return currentTarget;
+        if (kind === 'deleted' && currentTarget.value !== false) return err(appError('INVALID_INPUT', 'Restore target already exists; refusing to overwrite it'));
+        if (kind === 'replacement_backup' && currentTarget.value !== true) return err(appError('INVALID_INPUT', 'Replacement restore target must be an existing file'));
+        const parent = await ensureParentDirectory(destination.value.absolutePath);
+        if (!parent.ok) return parent;
+        if (isAborted(signal)) return cancelledFileMutation();
+        try {
+          const payload = await lstat(payloadPath);
       if (payload.isDirectory() !== metadata.isDirectory) return err(appError('INVALID_INPUT', 'Recovery payload type does not match metadata'));
-      if (destination.value.exists && kind === 'replacement_backup') {
+      if (kind === 'replacement_backup') {
         if (payload.isDirectory()) return err(appError('INVALID_INPUT', 'Replacement backups must contain a file'));
         const destinationPath = destination.value.realPath ?? destination.value.absolutePath;
         const destinationType = await this.inspectExistingFile(destinationPath);
@@ -850,9 +894,12 @@ export class FileService {
       }
       await rm(recoveryBase, { recursive: true, force: true });
       return ok({ recoveryId: request.recoveryId, path: destination.value.relativePath });
-    } catch (error: unknown) {
-      return err(mapNodeFsError(error, 'Recovery restore failed'));
-    }
+        } catch (error: unknown) {
+          return err(mapNodeFsError(error, 'Recovery restore failed'));
+        }
+      },
+      { signal },
+    );
   }
 
   public async purgeAllRecoveryItems(): Promise<number> {

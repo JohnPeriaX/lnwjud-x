@@ -21,6 +21,7 @@ import {
 import { WorkspacePathGuard, type Workspace, type WorkspaceRepository } from '@lnwjud/workspace';
 import { isProvablyReadOnlyGitInvocation, prohibitedAgentGitInvocationReason } from '@lnwjud/shared';
 import type { FileActor } from './file-service.js';
+import { applicationMutationFence, repositoryMutationKey } from './mutation-fence.js';
 import { isAbsoluteFsPath, resolveWorkspaceForPath } from './workspace-locator.js';
 
 export interface GitRunRequest {
@@ -105,7 +106,14 @@ export class GitService {
     }
     const cwd = await this.resolveCwd(request.workspaceId, request.cwd, authorization);
     if (!cwd.ok) return cwd;
-    return this.adapter.run(cwd.value, request.args, request.timeoutMs, signal);
+    if (isProvablyReadOnlyGitInvocation(request.args)) {
+      return this.adapter.run(cwd.value, request.args, request.timeoutMs, signal);
+    }
+    return applicationMutationFence.run(
+      [repositoryMutationKey(cwd.value), ...(request.workspaceId === undefined ? [] : [repositoryMutationKey(request.workspaceId)])],
+      () => this.adapter.run(cwd.value, request.args, request.timeoutMs, signal),
+      { signal },
+    );
   }
 
   private async resolveCwd(workspaceId: string | undefined, requestedCwd: string | undefined, authorization?: InvocationAuthorization): Promise<Result<string>> {
