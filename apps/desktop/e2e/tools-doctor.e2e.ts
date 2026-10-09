@@ -52,6 +52,132 @@ test.describe('Tools catalog and Doctor real Electron acceptance', () => {
     } finally { await closeDesktop(app); }
   });
 
+  test('Settings, Tools and Doctor filters respond to keyboard and selection', async () => {
+    const app = await launchDesktop();
+    try {
+      await openTools(app.page);
+      await app.page.locator('.tool-card-open').first().click();
+      await expect(app.page.getByRole('dialog')).toBeVisible();
+      await app.page.locator('.tool-modal-close').click();
+      await expect(app.page.getByRole('dialog')).toHaveCount(0);
+
+      // Settings selectors are portal-backed, styled like filters, and intentionally lack a search input.
+      await app.page.getByRole('button', { name: /^(ตั้งค่า|Settings)$/ }).click();
+      const firstSettingsSelect = app.page.locator('#locale-select');
+      await expect(firstSettingsSelect).toBeVisible();
+      await firstSettingsSelect.click();
+      const settingsPopup = app.page.locator('body > .ui-combobox-popover');
+      await expect(settingsPopup).toBeVisible();
+      await expect(settingsPopup.locator('input')).toHaveCount(0);
+      // Short lists stay close to the trigger width rather than opening a giant popup.
+      const shortMenu = await settingsPopup.boundingBox();
+      const shortTrigger = await firstSettingsSelect.boundingBox();
+      expect(shortMenu).not.toBeNull();
+      expect(shortMenu!.width).toBeLessThanOrEqual(Math.max(260, (shortTrigger?.width ?? 0) + 24));
+      await settingsPopup.locator('[role="option"]').first().press('Escape');
+      await expect(settingsPopup).toHaveCount(0);
+      const nav = app.page.locator('.settings-subnav .settings-nav-item');
+      for (let index = 0; index < await nav.count(); index++) {
+        await nav.nth(index).click();
+        const enabled = app.page.locator('.settings-select-control .ui-combobox-trigger:not(:disabled)');
+        if (await enabled.count() === 0) continue;
+        await enabled.first().click();
+        const popup = app.page.locator('body > .ui-combobox-popover');
+        await expect(popup).toBeVisible();
+        await expect(popup.locator('input')).toHaveCount(0);
+        await popup.locator('[role="option"]').first().press('Escape');
+        await expect(popup).toHaveCount(0);
+      }
+      await app.page.getByRole('button', { name: /^(เครื่องมือ|Tools)$/ }).click();
+
+      const toolbar = app.page.locator('.tool-filters');
+      await toolbar.locator('.ui-combobox-trigger').last().click();
+      const popup = app.page.locator('body > .ui-combobox-popover');
+      await expect(popup.getByRole('option').first()).toBeVisible();
+      await popup.locator('input').fill('ALLOW');
+      await popup.locator('input').press('Escape');
+      await expect(popup).toHaveCount(0);
+
+      await app.page.getByRole('button', { name: 'Doctor', exact: true }).click();
+      const tabs = app.page.getByRole('tablist', { name: /หมวดการวินิจฉัย|Diagnostic views/ });
+      await tabs.getByRole('tab', { name: /ประวัติ MCP|Calls/ }).click();
+      const goal = app.page.getByRole('button', { name: 'Goal', exact: true });
+      await expect(goal).toBeVisible();
+      await goal.click();
+      await expect(app.page.locator('body > .ui-combobox-popover')).toBeVisible();
+      await app.page.locator('body > .ui-combobox-popover input').press('Escape');
+      const tool = app.page.locator('.diagnostics-filters .ui-combobox-trigger').nth(1);
+      await tool.click();
+      const toolChoices = app.page.locator('body > .ui-combobox-popover [role="option"]');
+      await expect(toolChoices.first()).toBeVisible();
+      await expect.poll(() => toolChoices.count(), { timeout: 15_000 }).toBeGreaterThan(5);
+      await app.page.setViewportSize({ width: 420, height: 420 });
+      const triggerBox = await tool.boundingBox();
+      const popupBox = await popup.boundingBox();
+      expect(triggerBox).not.toBeNull();
+      expect(popupBox).not.toBeNull();
+      expect(popupBox!.y).toBeGreaterThanOrEqual(triggerBox!.y + triggerBox!.height - 2);
+      expect(popupBox!.height).toBeLessThanOrEqual(310);
+      await expect.poll(() => popup.locator('.ui-combobox-options').evaluate((list) => list.scrollHeight > list.clientHeight)).toBe(true);
+      await app.page.setViewportSize({ width: 420, height: 720 });
+      // Rows may wrap but must never collapse or overlap in the scrollable options list.
+      const optionLayout = await toolChoices.evaluateAll((nodes) => nodes.map((node) => {
+        const rect = node.getBoundingClientRect();
+        const text = node.querySelector<HTMLElement>('.ui-combobox-option-label');
+        return { top: rect.top, bottom: rect.bottom, height: rect.height,
+          truncated: Boolean(text && text.scrollHeight > text.clientHeight + 1) };
+      }));
+      expect(optionLayout.length).toBeGreaterThan(5);
+      expect(optionLayout.every((item) => item.height >= 36)).toBe(true);
+      expect(optionLayout.slice(1).every((item, index) => item.top >= optionLayout[index]!.bottom)).toBe(true);
+      const clipped = optionLayout.findIndex((item) => item.truncated);
+      if (clipped !== -1) {
+        const choice = toolChoices.nth(clipped);
+        const fullName = await choice.getAttribute('aria-label');
+        await choice.scrollIntoViewIfNeeded();
+        await choice.hover();
+        await expect(app.page.getByRole('tooltip')).toHaveText(fullName!);
+      }
+      await app.page.locator('body > .ui-combobox-popover input').press('Escape');
+      await app.page.setViewportSize({ width: 1280, height: 800 });
+      await tabs.getByRole('tab', { name: /ประวัติ MCP|Calls/ }).press('ArrowRight');
+      await expect(tabs.getByRole('tab', { name: /ผลงาน|Results/ })).toHaveAttribute('aria-selected', 'true');
+      // Results are selected by a named Goal from the system, not manually memorized UUIDs.
+      await expect(app.page.locator('.diagnostics-result-filters .ui-combobox-trigger')).toBeVisible();
+      await expect(app.page.locator('.diagnostics-result-filters input[maxlength="128"]')).toHaveCount(0);
+      await expect(app.page.locator('.diagnostics-result-filters .ui-action').last()).toBeDisabled();
+
+      await app.page.getByRole('button', { name: /^(ตั้งค่า|Settings)$/ }).click();
+      const locale = app.page.locator('#locale-select');
+      await locale.click();
+      const languagePopup = app.page.locator('body > .ui-combobox-popover');
+      await expect(languagePopup.locator('input')).toHaveCount(0);
+      await languagePopup.getByRole('option', { name: /English/ }).click();
+      await expect(locale).toHaveAttribute('data-value', 'en');
+      // Check the localized content actually changed, not just an internal value.
+      await expect(app.page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
+    } finally { await closeDesktop(app); }
+  });
+
+  test('Workflow required input is shown inline and focused before backend preparation', async () => {
+    const app = await launchDesktop();
+    try {
+      await dismissFirstRunTip(app.page);
+      await app.page.getByRole('button', { name: /^(เวิร์กโฟลว์|Workflows)$/ }).click();
+      await expect(app.page.locator('.workflow-card')).toHaveCount(6);
+      await app.page.locator('.workflow-card').filter({ hasText: /รีวิวโค้ด|Code Review/ }).click();
+      await app.page.locator('.workflow-primary-action').first().click();
+      const required = app.page.locator('#workflow-baseRef');
+      await expect(required).toHaveAttribute('aria-invalid', 'true');
+      await expect(required).toBeFocused();
+      await expect(app.page.locator('#workflow-baseRef-error')).toBeVisible();
+      await expect(app.page.locator('.workflow-operation-error')).toHaveCount(0);
+      await required.fill('HEAD');
+      await expect(required).not.toHaveAttribute('aria-invalid', 'true');
+      await expect(app.page.locator('#workflow-baseRef-error')).toHaveCount(0);
+    } finally { await closeDesktop(app); }
+  });
+
   test('missing LSP dependency is needs_setup and explains the real requirement', async () => {
     const app = await launchDesktop();
     try {

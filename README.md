@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Cross-platform local AI-agent runtime and MCP gateway</strong><br />
-  <em>279 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 267 are advertised by default and all 279 when Codex delegation plus Agent Swarm is enabled.</em>
+  <em>285 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 273 are advertised by default and all 285 when Codex delegation plus Agent Swarm is enabled.</em>
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D4" />
   <img alt="Node" src="https://img.shields.io/badge/Node.js-24.x-339933" />
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-279%20tools-6f42c1" />
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-285%20tools-6f42c1" />
 </p>
 
 <h2 align="center">Download lnwjud</h2>
@@ -53,7 +53,29 @@
 
 ## Current published version: v5.7.4
 
-## Current source version: v5.7.4
+## Current source version: v5.8.0
+
+### What's new in v5.8.0
+
+**v5.7.4** primarily fixed oversized native approval dialogs. **v5.8.0** adds six review-first workflows, richer Doctor evidence, CSV/XLSX data tasks, Git explorer upgrades, a consistent Desktop UI, more reliable Secure MCP Tunnel startup, and controlled dependency maintenance.
+
+- **Six bilingual workflows:** Project Check, Code Review, Release Readiness, Connection Check, Data Audit, and Template Report. Required inputs are validated before preparing a draft; a preview never silently launches a Goal, scheduler, or AI worker.
+- **MCP Call History:** retained audit-backed calls with bounded pagination, tool/Goal filters, outcomes, and server p50/p95 when samples exist. Transport/Tunnel timing is still `unknown` where no trusted sample exists; only Goals with attributable calls appear in the Goal filter.
+- **Goal Results and checkpoints:** inspect meaningful progress, completed steps, recorded checks, actual mutation receipts and verifiable file artifacts. Result filters exclude Goals without evidence; verification is not inferred from a Goal's completed status.
+- **Process Resources:** display measured Windows working-set RAM and lifetime-average CPU for verified Goal-owned child processes; separately show the Desktop main process. Refresh while viewing, suppress Goals without measured resources, and never substitute zero for unavailable measurements.
+- **Context Economy observability:** show real transport-scoped MCP HTTP ledger hits and context bytes, explicitly not per-Goal totals. Shared services are not cancelled with a Goal; owned-task cancellation stays permission- and identity-checked.
+- **Safer restore and audit visibility:** result and restore flows preserve workspace scope, exact checkpoint/Goal revision checks, verified current file hashes, and explicit user confirmation.
+- **CSV/XLSX data workflows:** typed audit and comparison of tabular data plus template-based report creation with readback. Preserve source files by default; native Office actions remain dependent on platform/provider support.
+- **Git explorer and diffs:** show individual untracked files in new folders, not merely folder counts. Expand/collapse the tree, search and filter files, retain code/diff navigation, and show safe text/image previews or bounded binary metadata.
+- **Desktop controls and typography:** shared inputs, filters, buttons and responsive searchable dropdowns across Settings/Tools/Doctor/Git; menus anchor **below their fields only**, reserve outer scrolling room and scroll internally for long lists. Options wrap when long, compact options remain compact. Restore Prompt/previous Git text sizing and improve validation/loading feedback.
+- **Command Prism status visual:** replace the plain golden orb with a faceted prism, using actual MCP states (gold = ready, blue = working, red = stopped/offline). A reserved neutral gray visual does not claim a new backend state. Workflow cards receive matching restrained line icons.
+- **Modal and layout fixes:** correct shared-button CSS precedence so close glyphs stay visible in What's New, Tool Detail, and the guided Tunnel screen. Increase close targets, preserve keyboard access, and separate search fields from actions.
+- **Work Log and Doctor UX:** default Work Log to all workspaces; improve workspace/session filters, loading states, long labels, goal descriptions and meaningful empty states. Doctor Goal selectors show only entries that have relevant results for each tab.
+- **Secure MCP Tunnel reliability:** do not reconnect over a matching managed runtime before a 45-second elapsed readiness grace period. Keep Tunnel identity, ownership protection, health polling and retry backoff; this avoids premature repeated `connect` calls but does not guarantee a fixed startup time.
+- **Bundled native runtime:** update the verified target-native `tunnel-client` to **0.0.16** and preserve native payload preparation for installation on supported platforms.
+- **Dependency updates and delivery checks:** use one managed dependency-update PR with conditional branch cleanup rather than duplicate updates. Keep functional tests and exact-commit target-native CI/build gates; Windows community artifacts can remain unsigned when no signing certificate exists, with SHA-256/provenance checks required.
+
+**ภาษาไทย — ต่างจาก 5.7.4:** เพิ่มเทมเพลต 6 แบบ, ประวัติ MCP และผลงาน Goal ที่มีหลักฐาน, RAM/CPU จริงของโปรเซสที่ตรวจเจ้าของได้, Context Economy แบบรวมระดับ Transport, ตรวจ CSV/XLSX, Git tree/preview ที่ครบขึ้น, UI และ dropdown กลาง, กากบาท Modal ขนาดชัดเจน, Work Log ที่กรองง่ายขึ้น, แก้ Tunnel reconnect ก่อนพร้อม และอัปเดต tunnel-client 0.0.16 พร้อมการทดสอบ/แพ็กเกจตาม SHA จริง ค่าไม่ทราบจะไม่แสดงเป็น 0 หรืออ้างว่าสำเร็จโดยไม่มีข้อมูล
 
 Latest published release: **v5.7.4**. The download buttons above point directly to the v5.7.4 assets. The release was published after the exact tagged main commit passed the target-native release gates.
 
@@ -75,17 +97,6 @@ Latest published release: **v5.7.4**. The download buttons above point directly 
 - **Managed-browser/native foreground coordination is hardened:** `activate_tab`, browser-scoped file upload with Active Project checks, cross-project foreground serialization, and optional postcondition evidence keep native input aligned with the intended tab and target state.
 
 ภาษาไทย: v5.7.3 เน้นแก้ความต่อเนื่องของ Durable Goal/Serena, Linux AppImage, Work Log, Secure MCP Tunnel และ Portable โดยเฉพาะการกลับมาใช้ bundled `tunnel-client` หลังลบ custom path, พร้อมเพิ่มหลักฐาน release แบบ exact-SHA/cross-platform และยังรองรับ community Windows release แบบ unsigned เมื่อไม่มี production certificate โดยต้องผ่าน SHA-256/provenance checks ครบ
-
-### What's new in v5.7.2
-
-- **Git image diff previews:** the Git page can show before/after images at the real `HEAD → Index` and `Index → Working Tree` scopes, including added/deleted images. Preview payloads are bounded to 4 MB per side, with Fit/Actual Size controls and a clear fallback when Chromium cannot decode a particular image format.
-- **Engineering Harness settings persist correctly:** the preload bridge now preserves Harness settings, workspace overrides, and diagnostics, so an enabled Harness no longer appears Off after restarting the app while the saved value is still enabled.
-- **Engineering tools are discoverable and Goal-aware:** Engineering Harness primitives are exposed through the tool catalog and bind to the active Goal/lease correctly.
-- **Safer rich-text typing:** CDP typing uses native `Input.insertText` for ProseMirror/contenteditable targets and verifies that the DOM actually changed instead of reporting a silent no-op as success.
-- **Durable Goal progress stays fresh for Watcher:** lnwjud now instructs every connected worker to checkpoint immediately at step/task/blocker/commit/push/CI/package milestones and at least every 10 minutes during sustained work without a natural milestone, while stale superseded Goals should be reconciled instead of remaining active.
-- **Secure MCP Tunnel avoids false Windows Error state:** a temporary PowerShell failure while inventorying local tunnel-client processes/listeners is retried as a transient runtime check instead of permanently flipping an otherwise healthy Tunnel to Error; duplicate/unverifiable process identity checks remain fail-closed.
-
-ภาษาไทย: v5.7.2 เพิ่มตัวอย่างรูปก่อน/หลังในหน้า Git, แก้ Engineering Harness ให้จำสถานะเปิดหลังรีสตาร์ต, เปิดเครื่องมือ Engineering ใน catalog ให้ถูกต้อง, ตรวจผลการพิมพ์ ProseMirror/ContentEditable จริงก่อนรายงานว่าสำเร็จ, กำหนดให้ Durable Goal อัปเดต checkpoint ตาม milestone/อย่างน้อยทุก 10 นาทีระหว่างงานต่อเนื่อง เพื่อให้ lnwjud Watcher แสดงสถานะล่าสุดพร้อมปิด Goal ที่ถูกแทนที่ไม่ให้ค้างเป็นงาน active และแก้ Secure MCP Tunnel บน Windows ไม่ให้สถานะหลุดเป็น Error เพียงเพราะคำสั่ง PowerShell ตรวจ process/listener ล้มเหลวชั่วคราว โดยยังคง fail closed เมื่อยืนยัน process ซ้ำหรือ identity ไม่ได้
 
 See the [Thai Engineering Harness guide](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for setup and workflow details.
 
@@ -136,7 +147,7 @@ For the Thai setup and workflow guide, see [docs/USAGE_TH.md](docs/USAGE_TH.md#8
 
 ## What can lnwjud do?
 
-lnwjud exposes **279 tool definitions** through one local runtime and MCP gateway. The default advertised set is 267; all 279 are available when Codex delegation plus Agent Swarm is enabled.
+lnwjud exposes **285 tool definitions** through one local runtime and MCP gateway. The default advertised set is 273; all 285 are available when Codex delegation plus Agent Swarm is enabled.
 
 | Area | Examples |
 | --- | --- |

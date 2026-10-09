@@ -305,6 +305,13 @@ export class DurableShellTaskStore {
   }
 
   /** Trusted read-only host probe scoped to the durable goal's workspace. */
+  public async isOwnedGoalTask(clientId: string, workspaceId: string, taskId: string): Promise<boolean> {
+    const metadata = await this.readMetadata(taskId);
+    if (!metadata.ok) return false;
+    const owner = metadataOwner(metadata.value);
+    return owner.clientId === clientId && owner.workspaceId === workspaceId;
+  }
+
   public async snapshotForGoalLiveness(taskId: string, workspaceId: string): Promise<Result<Record<string, unknown>>> {
     const metadata = await this.readMetadata(taskId);
     if (!metadata.ok) return metadata;
@@ -313,7 +320,9 @@ export class DurableShellTaskStore {
     }
     const reconciled = await this.reconcile(metadata.value);
     await this.releaseTerminalReservation(reconciled);
-    return ok({ ...await this.snapshotFromMetadata(reconciled), ...(reconciled.command_fingerprint === undefined ? {} : { command_fingerprint: reconciled.command_fingerprint }) });
+    // Goal liveness/resource probes need identity and state, not entire retained
+    // stdout/stderr. Avoid rereading large logs on each 15-second sample.
+    return ok({ ...await this.snapshotFromMetadata(reconciled, undefined, false), ...(reconciled.command_fingerprint === undefined ? {} : { command_fingerprint: reconciled.command_fingerprint }) });
   }
 
   /** Trusted exact lookup for a reserved automation task. Legacy/no-digest rows fail closed. */

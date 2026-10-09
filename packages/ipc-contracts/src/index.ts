@@ -1,5 +1,8 @@
+import type { WorkflowPrepareRequest, WorkflowTemplate, WorkflowDraft, CallHistoryRequest, CallHistoryPage, TaskResultSummary, ResourceSnapshotRequest, ResourceSnapshot, RestoreTaskCheckpointRequest, RestoreTaskCheckpointResult, CancelOwnedGoalTaskRequest, CancelOwnedGoalTaskResult } from './workflow-contracts.js';
+export type * from './workflow-contracts.js';
+
 export const APP_NAME = 'lnwjud';
-export const APP_VERSION = '5.7.4';
+export const APP_VERSION = '5.8.0';
 
 export const ipcChannels = {
   listWorkspaces: 'lnwjud:list-workspaces',
@@ -49,11 +52,20 @@ export const ipcChannels = {
   setWorkspacePonytailMode: 'lnwjud:set-workspace-ponytail-mode',
   setGoalPonytailMode: 'lnwjud:set-goal-ponytail-mode',
   chooseTunnelClientPath: 'lnwjud:choose-tunnel-client-path',
+  chooseWorkflowDataFile: 'lnwjud:choose-workflow-data-file',
   configureTunnelProfile: 'lnwjud:configure-tunnel-profile',
   openExternalSetupPage: 'lnwjud:open-external-setup-page',
   launchManagedBrowser: 'lnwjud:launch-managed-browser',
   installPdfProvider: 'lnwjud:install-pdf-provider',
   runDoctor: 'lnwjud:run-doctor',
+  listWorkflowTemplates: 'lnwjud:list-workflow-templates',
+  prepareWorkflow: 'lnwjud:prepare-workflow',
+  getCallHistory: 'lnwjud:get-call-history',
+  getDoctorGoals: 'lnwjud:get-doctor-goals',
+  getTaskResult: 'lnwjud:get-task-result',
+  restoreTaskCheckpoint: 'lnwjud:restore-task-checkpoint',
+  cancelOwnedGoalTask: 'lnwjud:cancel-owned-goal-task',
+  getResourceSnapshot: 'lnwjud:get-resource-snapshot',
   getToolCatalog: 'lnwjud:get-tool-catalog',
   recheckToolCatalog: 'lnwjud:recheck-tool-catalog',
   setToolAvailability: 'lnwjud:set-tool-availability',
@@ -116,6 +128,14 @@ export interface PonytailGoalPolicySummary {
   readonly effectiveSource: PonytailPolicySource;
   readonly editable: boolean;
   readonly editBlockedReason: 'live_lease' | 'live_continuation' | 'live_mutation' | null;
+}
+
+export interface DoctorGoalOption {
+  readonly goalId: string;
+  readonly goalKey: string;
+  readonly objective: string;
+  readonly status: 'active' | 'completed' | 'failed' | 'blocked' | 'cancelled';
+  readonly updatedAt: string;
 }
 
 export interface PonytailPolicyContext {
@@ -747,7 +767,15 @@ export interface GitImagePreview {
   readonly byteLength: number;
 }
 
+export interface GitFilePreviewInfo {
+  readonly kind: 'text' | 'image' | 'binary' | 'too_large' | 'missing';
+  readonly sizeBytes: number | null;
+  readonly extension: string;
+  readonly mimeType: string | null;
+}
+
 export interface GetGitDiffResponse {
+  readonly preview?: GitFilePreviewInfo;
   readonly path: string;
   readonly patch: string;
   readonly oldContent?: string;
@@ -1178,11 +1206,20 @@ export interface IpcRequestMap {
   readonly [ipcChannels.setWorkspacePonytailMode]: SetWorkspacePonytailModeRequest;
   readonly [ipcChannels.setGoalPonytailMode]: SetGoalPonytailModeRequest;
   readonly [ipcChannels.chooseTunnelClientPath]: undefined;
+  readonly [ipcChannels.chooseWorkflowDataFile]: undefined;
   readonly [ipcChannels.configureTunnelProfile]: ConfigureTunnelProfileRequest;
   readonly [ipcChannels.openExternalSetupPage]: OpenExternalSetupPageRequest;
   readonly [ipcChannels.launchManagedBrowser]: undefined;
   readonly [ipcChannels.installPdfProvider]: undefined;
   readonly [ipcChannels.runDoctor]: undefined;
+  readonly [ipcChannels.listWorkflowTemplates]: { readonly workspaceId: string };
+  readonly [ipcChannels.prepareWorkflow]: WorkflowPrepareRequest;
+  readonly [ipcChannels.getCallHistory]: CallHistoryRequest;
+  readonly [ipcChannels.getDoctorGoals]: { readonly workspaceId: string; readonly view?: 'calls' | 'results' };
+  readonly [ipcChannels.getTaskResult]: { readonly workspaceId: string; readonly goalId: string };
+  readonly [ipcChannels.restoreTaskCheckpoint]: RestoreTaskCheckpointRequest;
+  readonly [ipcChannels.cancelOwnedGoalTask]: CancelOwnedGoalTaskRequest;
+  readonly [ipcChannels.getResourceSnapshot]: ResourceSnapshotRequest;
   readonly [ipcChannels.getToolCatalog]: GetToolCatalogRequest;
   readonly [ipcChannels.recheckToolCatalog]: RecheckToolCatalogRequest;
   readonly [ipcChannels.setToolAvailability]: SetToolAvailabilityRequest;
@@ -1254,11 +1291,20 @@ export interface IpcResponseMap {
   readonly [ipcChannels.setWorkspacePonytailMode]: PonytailPolicyContext;
   readonly [ipcChannels.setGoalPonytailMode]: PonytailPolicyContext;
   readonly [ipcChannels.chooseTunnelClientPath]: { readonly clientPath: string | null };
+  readonly [ipcChannels.chooseWorkflowDataFile]: { readonly filePath: string | null };
   readonly [ipcChannels.configureTunnelProfile]: { readonly configured: boolean; readonly profilePath: string };
   readonly [ipcChannels.openExternalSetupPage]: { readonly opened: true };
   readonly [ipcChannels.launchManagedBrowser]: ManagedBrowserStatus;
   readonly [ipcChannels.installPdfProvider]: PdfProviderInstallResult;
   readonly [ipcChannels.runDoctor]: DoctorReport;
+  readonly [ipcChannels.listWorkflowTemplates]: readonly WorkflowTemplate[];
+  readonly [ipcChannels.prepareWorkflow]: WorkflowDraft;
+  readonly [ipcChannels.getCallHistory]: CallHistoryPage;
+  readonly [ipcChannels.getDoctorGoals]: readonly DoctorGoalOption[];
+  readonly [ipcChannels.getTaskResult]: TaskResultSummary;
+  readonly [ipcChannels.restoreTaskCheckpoint]: RestoreTaskCheckpointResult;
+  readonly [ipcChannels.cancelOwnedGoalTask]: CancelOwnedGoalTaskResult;
+  readonly [ipcChannels.getResourceSnapshot]: ResourceSnapshot;
   readonly [ipcChannels.getToolCatalog]: ToolCatalogSnapshot;
   readonly [ipcChannels.recheckToolCatalog]: { readonly catalog: ToolCatalogSnapshot; readonly doctor: DoctorReport };
   readonly [ipcChannels.setToolAvailability]: SetToolAvailabilityResult;
@@ -1332,11 +1378,20 @@ export interface LnwjudApi {
   setWorkspacePonytailMode(request: SetWorkspacePonytailModeRequest): Promise<IpcResponseMap[typeof ipcChannels.setWorkspacePonytailMode]>;
   setGoalPonytailMode(request: SetGoalPonytailModeRequest): Promise<IpcResponseMap[typeof ipcChannels.setGoalPonytailMode]>;
   chooseTunnelClientPath(): Promise<IpcResponseMap[typeof ipcChannels.chooseTunnelClientPath]>;
+  chooseWorkflowDataFile(): Promise<IpcResponseMap[typeof ipcChannels.chooseWorkflowDataFile]>;
   configureTunnelProfile(request: ConfigureTunnelProfileRequest): Promise<IpcResponseMap[typeof ipcChannels.configureTunnelProfile]>;
   openExternalSetupPage(request: OpenExternalSetupPageRequest): Promise<IpcResponseMap[typeof ipcChannels.openExternalSetupPage]>;
   launchManagedBrowser(): Promise<IpcResponseMap[typeof ipcChannels.launchManagedBrowser]>;
   installPdfProvider(): Promise<IpcResponseMap[typeof ipcChannels.installPdfProvider]>;
   runDoctor(): Promise<IpcResponseMap[typeof ipcChannels.runDoctor]>;
+  listWorkflowTemplates(request: { readonly workspaceId: string }): Promise<readonly WorkflowTemplate[]>;
+  prepareWorkflow(request: WorkflowPrepareRequest): Promise<WorkflowDraft>;
+  getCallHistory(request: CallHistoryRequest): Promise<CallHistoryPage>;
+  getDoctorGoals(request: { readonly workspaceId: string; readonly view?: 'calls' | 'results' }): Promise<readonly DoctorGoalOption[]>;
+  getTaskResult(request: { readonly workspaceId: string; readonly goalId: string }): Promise<TaskResultSummary>;
+  restoreTaskCheckpoint(request: RestoreTaskCheckpointRequest): Promise<RestoreTaskCheckpointResult>;
+  cancelOwnedGoalTask(request: CancelOwnedGoalTaskRequest): Promise<CancelOwnedGoalTaskResult>;
+  getResourceSnapshot(request: ResourceSnapshotRequest): Promise<ResourceSnapshot>;
   getToolCatalog(request: GetToolCatalogRequest): Promise<IpcResponseMap[typeof ipcChannels.getToolCatalog]>;
   recheckToolCatalog(request: RecheckToolCatalogRequest): Promise<IpcResponseMap[typeof ipcChannels.recheckToolCatalog]>;
   setToolAvailability(request: SetToolAvailabilityRequest): Promise<IpcResponseMap[typeof ipcChannels.setToolAvailability]>;

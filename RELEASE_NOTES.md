@@ -2,6 +2,29 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.8.0
+
+This release is a substantial functional expansion over **v5.7.4**, whose main fixes were bounded high-risk approval/native-alert dialogs. The features below are based on the `v5.7.4..dev` changeset, not on plans alone.
+
+- **Six bilingual, review-first task templates:** Project Check, Code Review, Release Readiness, Connection Check, Data Audit and Template Report. Inputs are validated and drafts can be copied to a connected AI; previewing does not schedule or start a Goal.
+- **Persistent MCP call observability:** SQLite-backed call correlation, bounded keyset paging, tool/Goal filters and server p50/p95 where samples exist. Unmeasured Tunnel spans and transport identity remain unknown, never fabricated. Goal dropdowns omit Goals without attributable calls.
+- **Task Results backed by evidence:** checkpoints, actual completed plan steps, recorded engineering checks, mutation receipts, file hashes and artifact verification. Results dropdowns omit Goals without meaningful evidence; completion does not by itself certify correctness.
+- **Safe Goal mutations:** checkpoint restoration and owned-task cancellation require workspace, identity, revision/hash and explicit confirmation checks. A shared service or unknown PID is not treated as owned.
+- **Resource sampling:** Windows process working-set memory and lifetime-average CPU for verified owned children, with PID/start-time checks. Desktop main-process metrics are labeled separately and not counted as Goal usage; unavailable values remain unavailable, Goal filters hide unmeasured entries, and tab-scoped refresh is bounded.
+- **Context Economy totals:** recorded context bytes and ledger hits are exposed from the running MCP HTTP transport without being presented as per-Goal or per-workspace totals.
+- **CSV/XLSX auditing and reports:** typed data analysis, cell comparison and new template-based reports with readback, preserving sources by default. Native advanced Office actions remain provider/host-specific.
+- **Git explorer improvements:** recursive untracked-file visibility, searchable/collapsible directory tree, working tree/index/HEAD navigation, familiar Prompt-style text, and safe text/image previews with bounded binary-file metadata.
+- **Cross-screen Desktop UI:** consolidate shared fields/buttons/filters, improve Settings select consistency, and anchor searchable dropdowns exclusively **below** their fields (outer scroll room plus bounded internal scroll). Restore preferred font sizing and refine Tools/Doctor spacing, empty results and loading feedback.
+- **Command Prism Agent status and Workflow cards:** replace the generic circle with a faceted prism using real states: gold for ready, blue for working, red for stopped/offline, and a reserved neutral gray state with no fabricated lifecycle; add restrained workflow card icons.
+- **Modal close glyphs:** override the shared action font-size cascade with a more specific selector so What's New and Tool Detail close symbols render at 25px with 44px targets; apply the same close sizing to guided Tunnel setup.
+- **Work Log:** start with all workspaces and improve filtering/search feedback.
+- **Persistent Secure MCP Tunnel startup:** avoid repeated connection attempts while the same managed runtime is still starting; use a bounded 45-second real elapsed-time readiness grace before recovery while retaining owner checks and backoff. Connection speed still depends on the tunnel service/network.
+- **Bundled `tunnel-client` 0.0.16:** native target preparation and package verification with pinned dependency evidence.
+- **Runtime dependency automation:** one managed update PR and conditional branch cleanup instead of duplicate automated updates.
+- **Release safety:** behavior-based regression tests for workflow/IPC/Git/resource/tunnel paths and target-native CI across Windows/macOS/Linux. Preserve SHA-256/provenance and signer-state evidence; Windows community builds remain unsigned without a certificate.
+
+**ภาษาไทย — สรุปความต่างจาก v5.7.4:** v5.8.0 เพิ่ม Workflow 6 แบบ, Doctor ที่กรอง Goal จากหลักฐานจริง, ประวัติ MCP/ผลลัพธ์ตาม Goal, RAM และ CPU ของโปรเซสที่ตรวจสอบเจ้าของได้, Context Economy ระดับ Transport, งาน CSV/XLSX, Git tree/preview, ปรับ UI และปุ่มปิด Modal, Work Log, ป้องกัน Tunnel reconnect ก่อนพร้อม, อัปเดต tunnel-client 0.0.16 และระบบตรวจ Release/Dependency PR ตามหลักฐานจริง ค่าไม่มีข้อมูลยังคงเป็น unknown ไม่ใช่ 0
+
 ### What's new in v5.7.4
 
 - **High-risk approval details stay on screen across Windows, macOS, and Linux:** the complete command appears in a bounded lnwjud window with its own scrollable detail area. Cancel is focused by default, and closing the window or pressing Escape cancels the request.
