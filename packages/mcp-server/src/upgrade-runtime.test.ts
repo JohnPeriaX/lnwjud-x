@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { ok } from '@lnwjud/domain';
@@ -24,6 +24,28 @@ describe('upgrade runtime', () => {
     expect(UPGRADE_TOOL_CATALOG.some((entry) => entry.name === 'dev_context')).toBe(true);
     expect(UPGRADE_TOOL_CATALOG.some((entry) => entry.name === 'handoff_context')).toBe(true);
     expect(UPGRADE_TOOL_CATALOG.some((entry) => entry.name === 'context_economy_stats')).toBe(true);
+  });
+
+  it('reads media from an explicitly supplied absolute path without workspaceId', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-media-path-'));
+    const imagePath = path.join(root, 'external.png');
+    try {
+      await writeFile(imagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+      const runtime = new UpgradeRuntimeService({
+        file: {
+          async readFile() {
+            return ok({ encoding: 'base64', content: 'iVBORw0KGgo=', mimeType: 'image/png', byteLength: 8 });
+          },
+        } as McpApplicationServices['file'],
+      }, actor);
+
+      await expect(runtime.execute('media_read', { path: imagePath, action: 'inspect' })).resolves.toMatchObject({
+        ok: true,
+        value: { mediaType: 'image', path: imagePath, mimeType: 'image/png', encoding: 'base64' },
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   // Keep this catalog/registry smoke deterministic: verify operational tools

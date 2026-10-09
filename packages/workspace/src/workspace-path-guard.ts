@@ -18,6 +18,8 @@ export interface WorkspacePathGuardOptions {
   readonly platform?: NodeJS.Platform;
   /** Explicit read-only roots that may be inspected by absolute path outside the Active Workspace. */
   readonly externalReadRoots?: readonly string[];
+  /** Allow an explicitly supplied absolute host path for read-only operations without requiring a configured root. */
+  readonly allowExplicitAbsoluteRead?: boolean;
 }
 
 export class WorkspacePathGuard {
@@ -46,7 +48,9 @@ export class WorkspacePathGuard {
       : resolveHostPath(hostPathApi(this.platform).join(rootResult.value, inputPath), this.platform)!;
     const fullBypassOutside = explicitAbsolutePath && isFullBypassAuthorization(authorization);
     const outsideWorkspace = !isHostPathWithin(rootResult.value, absolutePath, this.platform);
-    if (outsideWorkspace && !fullBypassOutside && (!explicitAbsolutePath || (this.options.externalReadRoots?.length ?? 0) === 0)) {
+    const allowExplicitOutsideRead = explicitAbsolutePath
+      && (this.options.allowExplicitAbsoluteRead === true || (this.options.externalReadRoots?.length ?? 0) > 0);
+    if (outsideWorkspace && !fullBypassOutside && !allowExplicitOutsideRead) {
       return err(appError('PATH_OUTSIDE_WORKSPACE', 'Path is outside the workspace'));
     }
 
@@ -58,14 +62,19 @@ export class WorkspacePathGuard {
       if (ancestorResult.ok) {
         const ancestorRealPath = await realpath(ancestorResult.value.path);
         const ancestorOutsideWorkspace = !isHostPathWithin(rootResult.value, ancestorRealPath, this.platform);
-        if (ancestorOutsideWorkspace && !fullBypassOutside && !(explicitAbsolutePath && await this.isWithinExternalReadRoot(ancestorRealPath))) {
+        if (ancestorOutsideWorkspace
+          && !fullBypassOutside
+          && !(explicitAbsolutePath && this.options.allowExplicitAbsoluteRead === true)
+          && !(explicitAbsolutePath && await this.isWithinExternalReadRoot(ancestorRealPath))) {
           return err(appError('PATH_OUTSIDE_WORKSPACE', 'Path is outside the workspace'));
         }
       }
       return err(appError('FILE_NOT_FOUND', 'File was not found'));
     }
     const realTargetOutsideWorkspace = !isHostPathWithin(rootResult.value, realTarget, this.platform);
-    const allowOutside = fullBypassOutside || (explicitAbsolutePath && await this.isWithinExternalReadRoot(realTarget));
+    const allowOutside = fullBypassOutside
+      || (explicitAbsolutePath && this.options.allowExplicitAbsoluteRead === true)
+      || (explicitAbsolutePath && await this.isWithinExternalReadRoot(realTarget));
     if (realTargetOutsideWorkspace && !allowOutside) {
       return err(appError('PATH_OUTSIDE_WORKSPACE', 'Path is outside the workspace'));
     }

@@ -508,12 +508,17 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
     platform: process.platform,
   });
   const recoveryTrashRoot = path.join(dataPath, 'recovery-trash');
-  const pathGuard = new WorkspacePathGuard(new SecretPolicy(), { unrestricted, trustedWorkspaceAccess: true });
+  const pathGuard = new WorkspacePathGuard(new SecretPolicy(), {
+    unrestricted,
+    trustedWorkspaceAccess: true,
+    allowExplicitAbsoluteRead: true,
+  });
   const fileService = new FileService(workspaceRepository, pathGuard, undefined, {
     checkpointService,
     profileProvider: activePermissionProfile,
     unrestricted,
     trustedWorkspaceAccess: true,
+    allowExplicitAbsoluteRead: true,
     allowDeleteWithoutConfirmation: (): boolean => desktopFullBypassEnabled() || allowAiDeleteProvider(),
     protectCriticalFiles: (): boolean => !desktopFullBypassEnabled() && destructivePolicyProvider().protectCriticalFiles,
     recoverableDelete: (): boolean => destructivePolicyProvider().recoverableDelete,

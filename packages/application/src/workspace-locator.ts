@@ -12,6 +12,7 @@ export async function resolveWorkspaceForPath(
   authorization?: InvocationAuthorization,
   platform: NodeJS.Platform = process.platform,
   externalReadRoots: readonly string[] = [],
+  allowExplicitAbsoluteRead = false,
 ): Promise<Result<Workspace>> {
   if (workspaceId !== undefined && workspaceId.trim().length > 0) {
     const workspace = await workspaces.get(workspaceId);
@@ -19,6 +20,7 @@ export async function resolveWorkspaceForPath(
     if (isAbsoluteFsPath(inputPath, platform)
       && !workspaceContains(workspace, inputPath, platform)
       && externalReadRoots.length === 0
+      && !allowExplicitAbsoluteRead
       && !isFullBypassAuthorization(authorization)) {
       return err(appError('PATH_OUTSIDE_WORKSPACE', 'Path is outside the workspace'));
     }
@@ -35,7 +37,7 @@ export async function resolveWorkspaceForPath(
   const listed = await workspaces.list();
   const matches = listed.filter((workspace) => workspaceContains(workspace, inputPath, platform));
   if (matches.length === 0) {
-    if (isFullBypassAuthorization(authorization) && listed[0] !== undefined) return ok(listed[0]);
+    if ((allowExplicitAbsoluteRead || isFullBypassAuthorization(authorization)) && listed[0] !== undefined) return ok(listed[0]);
     return err(appError('PATH_OUTSIDE_WORKSPACE', 'Path is not inside a registered workspace'));
   }
   matches.sort((left, right) => longestRoot(right).length - longestRoot(left).length);

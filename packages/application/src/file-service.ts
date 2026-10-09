@@ -76,6 +76,8 @@ export interface FileServiceDependencies {
   readonly trustedWorkspaceAccess?: boolean;
   /** Explicit read-only roots that may be inspected by absolute path outside the Active Workspace. */
   readonly externalReadRoots?: readonly string[];
+  /** Allow explicitly supplied absolute paths for read-only operations. */
+  readonly allowExplicitAbsoluteRead?: boolean;
   /** When true, filesystem deletion may proceed without per-call userConfirmed. Hard workspace-root blocks remain. */
   readonly allowDeleteWithoutConfirmation?: () => boolean;
   /** Protected critical paths still require explicit human confirmation. */
@@ -217,6 +219,7 @@ export class FileService {
   private readonly unrestricted: boolean;
   private readonly trustedWorkspaceAccess: boolean;
   private readonly externalReadRoots: readonly string[];
+  private readonly allowExplicitAbsoluteRead: boolean;
   private readonly allowDeleteWithoutConfirmation: () => boolean;
   private readonly protectCriticalFiles: () => boolean;
   private readonly recoverableDelete: () => boolean;
@@ -237,6 +240,7 @@ export class FileService {
     this.unrestricted = dependencies.unrestricted === true;
     this.trustedWorkspaceAccess = dependencies.trustedWorkspaceAccess === true;
     this.externalReadRoots = [...(dependencies.externalReadRoots ?? [])];
+    this.allowExplicitAbsoluteRead = dependencies.allowExplicitAbsoluteRead === true;
     this.allowDeleteWithoutConfirmation = dependencies.allowDeleteWithoutConfirmation ?? ((): boolean => false);
     this.protectCriticalFiles = dependencies.protectCriticalFiles ?? ((): boolean => true);
     this.recoverableDelete = dependencies.recoverableDelete ?? ((): boolean => true);
@@ -255,7 +259,7 @@ export class FileService {
     authorization?: InvocationAuthorization,
   ): Promise<Result<ReadFileResult>> {
     void actor;
-    const workspaceResult = await resolveWorkspaceForPath(this.workspaces, workspaceId, request.path, authorization, process.platform, this.externalReadRoots);
+    const workspaceResult = await resolveWorkspaceForPath(this.workspaces, workspaceId, request.path, authorization, process.platform, this.externalReadRoots, this.allowExplicitAbsoluteRead);
     if (!workspaceResult.ok) return workspaceResult;
     const workspace = workspaceResult.value;
     const resolved = await this.guard.resolveForRead(workspace, request.path, authorization);
@@ -299,14 +303,14 @@ export class FileService {
     }
     const firstPath = request.files[0]?.path;
     if (typeof firstPath !== 'string') return err(appError('INVALID_INPUT', 'At least one file is required'));
-    const workspaceResult = await resolveWorkspaceForPath(this.workspaces, workspaceId, firstPath, authorization, process.platform, this.externalReadRoots);
+    const workspaceResult = await resolveWorkspaceForPath(this.workspaces, workspaceId, firstPath, authorization, process.platform, this.externalReadRoots, this.allowExplicitAbsoluteRead);
     if (!workspaceResult.ok) return workspaceResult;
     const trustedWorkspace = this.isTrustedWorkspace(workspaceResult.value);
 
     const files: ReadFileResult[] = [];
     let totalBytes = 0;
     for (const fileRequest of request.files) {
-      const fileWorkspace = await resolveWorkspaceForPath(this.workspaces, workspaceId, fileRequest.path, authorization, process.platform, this.externalReadRoots);
+      const fileWorkspace = await resolveWorkspaceForPath(this.workspaces, workspaceId, fileRequest.path, authorization, process.platform, this.externalReadRoots, this.allowExplicitAbsoluteRead);
       if (!fileWorkspace.ok) return fileWorkspace;
       if (fileWorkspace.value.id !== workspaceResult.value.id) {
         return err(appError('PATH_OUTSIDE_WORKSPACE', 'All files must be in the same workspace'));

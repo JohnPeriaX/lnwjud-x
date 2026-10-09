@@ -164,6 +164,7 @@ export function createStdioMcpRuntime(
     unrestricted: effectiveUnrestricted,
     trustedWorkspaceAccess: !strictRoots,
     externalReadRoots,
+    allowExplicitAbsoluteRead: !strictRoots,
   });
   const fileService = new FileService(workspaceRepository, pathGuard, undefined, {
     checkpointService,
@@ -171,6 +172,7 @@ export function createStdioMcpRuntime(
     unrestricted: effectiveUnrestricted,
     trustedWorkspaceAccess: !strictRoots,
     externalReadRoots,
+    allowExplicitAbsoluteRead: !strictRoots,
     allowDeleteWithoutConfirmation: allowAiDeleteProvider,
     protectCriticalFiles: (): boolean => !fullBypassAll && destructivePolicyProvider().protectCriticalFiles,
     recoverableDelete: (): boolean => destructivePolicyProvider().recoverableDelete,

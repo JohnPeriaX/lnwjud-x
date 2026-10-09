@@ -77,6 +77,23 @@ describe('FileService', () => {
     expect(deniedResult).toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
   });
 
+  it('reads an explicitly supplied absolute path without requiring it to be in the workspace', async () => {
+    const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-files-workspace-'));
+    const externalRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-files-explicit-'));
+    temporaryRoots.push(workspaceRoot, externalRoot);
+    const workspace = await realpath(workspaceRoot);
+    const external = await realpath(externalRoot);
+    const fixture: Workspace = { id: 'workspace-1', displayName: 'Fixture', rootPath: workspace, realRootPath: workspace, createdAt: new Date(0).toISOString() };
+    const externalFile = path.join(external, 'notes.txt');
+    await writeFile(externalFile, 'outside workspace', 'utf8');
+
+    const guard = new WorkspacePathGuard(undefined, { allowExplicitAbsoluteRead: true });
+    const service = new FileService(repository(fixture), guard, undefined, { allowExplicitAbsoluteRead: true });
+    const result = await service.readFile({ clientId: 'test', clientName: 'test' }, fixture.id, { path: externalFile });
+
+    expect(result).toMatchObject({ ok: true, value: { content: 'outside workspace', encoding: 'utf8' } });
+  });
+
   it('allows secret and binary reads for an explicitly trusted registered workspace on any drive', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-files-trusted-'));
     temporaryRoots.push(root);
