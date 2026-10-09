@@ -31,6 +31,7 @@ export interface ProcessManagerPort {
   list?(): readonly ManagedProcess[];
   status(processId: string): Result<ManagedProcess>;
   logs(processId: string, query: LogQuery): Result<ProcessLogResult>;
+  interact(processId: string, input: string, timeoutMs?: number): Promise<Result<ProcessLogResult>>;
   stop(processId: string, autoRetry?: boolean): Promise<Result<void>>;
 }
 
@@ -186,6 +187,12 @@ export class ProcessService {
     const ownership = this.authorizeHandle(actor, workspaceId, processId);
     if (!ownership.ok) return ownership;
     return this.processManager.logs(processId, query);
+  }
+
+  public async interact(actor: FileActor, workspaceId: string, processId: string, input: string, timeoutMs = 8000): Promise<Result<ProcessLogResult>> {
+    const ownership = this.authorizeHandle(actor, workspaceId, processId);
+    if (!ownership.ok) return ownership;
+    return this.processManager.interact(processId, input, timeoutMs);
   }
 
   public async stop(actor: FileActor, workspaceId: string, processId: string, userConfirmed = false, authorization?: InvocationAuthorization): Promise<Result<void>> {

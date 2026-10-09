@@ -56,6 +56,28 @@ describe('ProcessManager', () => {
     if (stopped.ok) expect(stopped.value.pid).toBeUndefined();
   });
 
+  it('sends interactive input to a long-lived child and returns newly produced output', async () => {
+    const manager = new ProcessManager();
+    const started = await manager.start({
+      executable: process.execPath,
+      args: ['-e', "process.stdin.setEncoding('utf8'); process.stdin.on('data', data => process.stdout.write('echo:' + data))"],
+      cwd: process.cwd(),
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    try {
+      const result = await manager.interact(started.value.processId, 'interactive-marker', 2_000);
+      expect(result).toMatchObject({ ok: true, value: { entries: [expect.objectContaining({ text: expect.stringContaining('echo:interactive-marker') })] } });
+    } finally {
+      await manager.stop(started.value.processId);
+    }
+  });
+
+  it('rejects interactive input for an unknown process handle', async () => {
+    await expect(new ProcessManager().interact('not-owned', 'hello')).resolves.toMatchObject({ ok: false, error: { code: 'PROCESS_NOT_FOUND' } });
+  });
+
   it('times out a running child and stops only an owned process handle', async () => {
     const manager = new ProcessManager();
     const started = await manager.start({

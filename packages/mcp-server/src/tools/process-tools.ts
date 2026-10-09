@@ -1,6 +1,6 @@
 import type { CommandSpec } from '@lnwjud/domain';
 import { defineTool, missingService, type McpToolContext, type McpToolDefinition } from './tool-types.js';
-import { processHandleSchema, processLogsSchema, processStartSchema, processStopSchema, projectCommandSchema } from './schemas.js';
+import { processHandleSchema, processInteractSchema, processLogsSchema, processStartSchema, processStopSchema, projectCommandSchema } from './schemas.js';
 
 type ProjectCommandKind = 'dev' | 'test' | 'lint' | 'typecheck' | 'build';
 
@@ -54,6 +54,16 @@ export function processTools(context: McpToolContext): McpToolDefinition[] {
           ...(input.tailLines === undefined ? {} : { tailLines: input.tailLines }),
           ...(input.sinceSequence === undefined ? {} : { sinceSequence: input.sinceSequence }),
         }),
+    }),
+    defineTool({
+      name: 'interact_with_process',
+      description: 'Send input to an owned managed process and wait briefly for newly produced stdout/stderr. DCM-style interactive workflow for REPLs, shells, SSH sessions, database consoles, and development servers. Ownership is enforced by lnwjud processId, not a raw OS PID.',
+      permission: 'EXECUTE',
+      annotations: { readOnlyHint: false, destructiveHint: false },
+      inputSchema: processInteractSchema,
+      handler: async (input) => context.services.process === undefined
+        ? missingService()
+        : context.services.process.interact(context.actor, input.workspaceId, input.processId, input.input, input.timeoutMs),
     }),
     defineTool({
       name: 'process_stop',

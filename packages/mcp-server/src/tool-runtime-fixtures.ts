@@ -91,6 +91,7 @@ export const CORE_TOOL_RUNTIME_FIXTURES = {
   process_list: service({ workspaceId }, 'process.list'),
   process_status: service({ workspaceId, processId: 'process-1' }, 'process.status'),
   process_logs: service({ workspaceId, processId: 'process-1' }, 'process.logs'),
+  interact_with_process: service({ workspaceId, processId: 'process-1', input: 'help\n', timeoutMs: 1000 }, 'process.interact'),
   process_stop: service({ workspaceId, processId: 'process-1', userConfirmed: true }, 'process.stop'),
   project_dev: service({ workspaceId, userConfirmed: true }, 'process.startProjectCommand'),
   project_test: service({ workspaceId, userConfirmed: true }, 'process.startProjectCommand'),

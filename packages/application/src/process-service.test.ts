@@ -270,6 +270,7 @@ describe('ProcessService', () => {
       list(): readonly ManagedProcess[] { return [handle]; },
       status(): Result<ManagedProcess> { return ok(handle); },
       logs(): Result<ProcessLogResult> { return ok({ entries: [], truncated: false, nextSequence: 0 }); },
+      async interact(): Promise<Result<ProcessLogResult>> { return ok({ entries: [], truncated: false, nextSequence: 0 }); },
       async stop(): Promise<Result<void>> { stops += 1; return ok(undefined); },
     };
     const service = new ProcessService(repository(workspace), { processManager: manager });
@@ -305,6 +306,7 @@ describe('ProcessService', () => {
       list(): readonly ManagedProcess[] { return [handle]; },
       status(): Result<ManagedProcess> { return ok(handle); },
       logs(): Result<ProcessLogResult> { return ok({ entries: [], truncated: false, nextSequence: 0 }); },
+      async interact(): Promise<Result<ProcessLogResult>> { return ok({ entries: [], truncated: false, nextSequence: 0 }); },
       async stop(): Promise<Result<void>> { stops += 1; return ok(undefined); },
     };
     const service = new ProcessService(repository(workspace), { processManager: manager });
@@ -341,6 +343,68 @@ describe('ProcessService', () => {
     expect(service.statusForGoalLiveness('another-workspace', started.value.processId)).toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } });
   });
 
+  it('isolates concurrent process handles between ChatGPT sessions, including interactive input, even when host PIDs collide', async () => {
+    const workspace = await createWorkspace();
+    const processes = new Map<string, ManagedProcess>([
+      ['process-session-a', { ...processHandle('process-session-a'), pid: 4242 }],
+      ['process-session-b', { ...processHandle('process-session-b'), pid: 4242 }],
+    ]);
+    const interactCalls: Array<{ processId: string; input: string }> = [];
+    const stopped: string[] = [];
+    let nextProcessId = 'process-session-a';
+    const manager: NonNullable<ProcessServiceDependencies['processManager']> = {
+      async start(): Promise<Result<ManagedProcess>> {
+        const process = processes.get(nextProcessId);
+        if (process === undefined) throw new Error(`Missing process fixture ${nextProcessId}`);
+        nextProcessId = 'process-session-b';
+        return ok(process);
+      },
+      list(): readonly ManagedProcess[] { return [...processes.values()]; },
+      status(processId): Result<ManagedProcess> {
+        const process = processes.get(processId);
+        return process === undefined ? { ok: false, error: { code: 'PROCESS_NOT_FOUND', message: 'missing' } } as Result<ManagedProcess> : ok(process);
+      },
+      logs(processId): Result<ProcessLogResult> {
+        const process = processes.get(processId);
+        return process === undefined
+          ? { ok: false, error: { code: 'PROCESS_NOT_FOUND', message: 'missing' } } as Result<ProcessLogResult>
+          : ok({ entries: [{ sequence: 1, stream: 'stdout', text: `logs:${processId}` }], truncated: false, nextSequence: 2 });
+      },
+      async interact(processId, input): Promise<Result<ProcessLogResult>> {
+        interactCalls.push({ processId, input });
+        return ok({ entries: [{ sequence: 1, stream: 'stdout', text: `interactive:${processId}:${input}` }], truncated: false, nextSequence: 2 });
+      },
+      async stop(processId): Promise<Result<void>> {
+        stopped.push(processId);
+        return ok(undefined);
+      },
+    };
+    const service = new ProcessService(repository(workspace), { processManager: manager });
+    const chatA = { clientId: 'client-1', clientName: 'test', sessionId: 'chat-a' };
+    const chatB = { clientId: 'client-1', clientName: 'test', sessionId: 'chat-b' };
+
+    const processA = await service.start(chatA, workspace.id, { executable: 'pnpm', args: ['dev'], userConfirmed: true });
+    const processB = await service.start(chatB, workspace.id, { executable: 'pnpm', args: ['dev'], userConfirmed: true });
+    expect(processA).toMatchObject({ ok: true, value: { processId: 'process-session-a', pid: 4242 } });
+    expect(processB).toMatchObject({ ok: true, value: { processId: 'process-session-b', pid: 4242 } });
+
+    await expect(service.logs(chatA, workspace.id, 'process-session-a', {})).resolves.toMatchObject({ ok: true, value: { entries: [{ text: 'logs:process-session-a' }] } });
+    await expect(service.logs(chatB, workspace.id, 'process-session-b', {})).resolves.toMatchObject({ ok: true, value: { entries: [{ text: 'logs:process-session-b' }] } });
+    await expect(service.interact(chatA, workspace.id, 'process-session-a', 'alpha')).resolves.toMatchObject({ ok: true, value: { entries: [{ text: 'interactive:process-session-a:alpha' }] } });
+    await expect(service.interact(chatB, workspace.id, 'process-session-b', 'beta')).resolves.toMatchObject({ ok: true, value: { entries: [{ text: 'interactive:process-session-b:beta' }] } });
+
+    await expect(service.status(chatB, workspace.id, 'process-session-a')).resolves.toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } });
+    await expect(service.logs(chatB, workspace.id, 'process-session-a', {})).resolves.toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } });
+    await expect(service.interact(chatB, workspace.id, 'process-session-a', 'should-not-leak')).resolves.toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } });
+    await expect(service.stop(chatB, workspace.id, 'process-session-a')).resolves.toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } });
+    await expect(service.stop(chatA, workspace.id, 'process-session-a', true)).resolves.toMatchObject({ ok: true });
+    expect(interactCalls).toEqual([
+      { processId: 'process-session-a', input: 'alpha' },
+      { processId: 'process-session-b', input: 'beta' },
+    ]);
+    expect(stopped).toEqual(['process-session-a']);
+  });
+
   it('cancels a tracked process across MCP sessions while enforcing stable client/workspace ownership', async () => {
     const workspace = await createWorkspace();
     let current = processHandle('process-goal-cancel');
@@ -350,6 +414,7 @@ describe('ProcessService', () => {
       list(): readonly ManagedProcess[] { return [current]; },
       status(): Result<ManagedProcess> { return ok(current); },
       logs(): Result<ProcessLogResult> { return ok({ entries: [], truncated: false, nextSequence: 0 }); },
+      async interact(): Promise<Result<ProcessLogResult>> { return ok({ entries: [], truncated: false, nextSequence: 0 }); },
       async stop(processId, autoRetry): Promise<Result<void>> {
         stopCalls.push({ processId, autoRetry });
         current = { ...current, state: 'stopped', finishedAt: new Date(1).toISOString(), exitCode: -1 };
@@ -385,6 +450,7 @@ function fakeManager(calls: ManagedProcessStart[], observedSignals: Array<AbortS
     list(): readonly ManagedProcess[] { return [processHandle()]; },
     status(): Result<ManagedProcess> { return ok(processHandle()); },
     logs(): Result<ProcessLogResult> { return ok({ entries: [], truncated: false, nextSequence: 0 }); },
+      async interact(): Promise<Result<ProcessLogResult>> { return ok({ entries: [], truncated: false, nextSequence: 0 }); },
     async stop(): Promise<Result<void>> { return ok(undefined); },
   };
 }

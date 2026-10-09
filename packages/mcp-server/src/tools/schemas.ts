@@ -119,6 +119,7 @@ export const processHandleSchema = z.object({ workspaceId: workspaceIdSchema, pr
 export const processStopSchema = processHandleSchema.extend({ userConfirmed: z.boolean().optional() }).strict();
 export const projectCommandSchema = z.object({ workspaceId: workspaceIdSchema, userConfirmed: z.boolean().optional() }).strict();
 export const processLogsSchema = processHandleSchema.extend({ tailLines: z.number().int().min(1).max(10_000).optional(), sinceSequence: z.number().int().min(0).optional() }).strict();
+export const processInteractSchema = processHandleSchema.extend({ input: z.string().min(1).max(32_768), timeoutMs: z.number().int().min(1).max(60_000).optional() }).strict();
 export const codexStatusSchema = z.object({}).strict();
 export const codexRunSchema = z.object({ workspaceId: workspaceIdSchema, instruction: z.string().min(1).refine((value) => Buffer.byteLength(value, 'utf8') <= MAX_INSTRUCTION_BYTES, 'Instruction is too large'), userConfirmed: z.boolean().optional() }).strict();
 export const codexTaskHandleSchema = z.object({ workspaceId: workspaceIdSchema, codexTaskId: z.string().trim().min(1).max(128) }).strict();

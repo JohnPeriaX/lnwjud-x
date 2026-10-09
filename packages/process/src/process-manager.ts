@@ -157,6 +157,32 @@ export class ProcessManager {
     return ok(record.logs.read(query));
   }
 
+  /** Send interactive input to an owned process and wait briefly for new output. */
+  public async interact(processId: string, input: string, timeoutMs = 8000): Promise<Result<ProcessLogResult>> {
+    const record = this.records.get(processId);
+    if (record === undefined) return err(appError('PROCESS_NOT_FOUND', 'Process was not found'));
+    if (typeof input !== 'string' || input.length === 0) return err(appError('INVALID_INPUT', 'Process input is required'));
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 60_000) return err(appError('INVALID_INPUT', 'Interactive wait timeout is invalid'));
+    if (isTerminal(record.state) || record.child.stdin === null || record.child.stdin.destroyed) {
+      return err(appError('CONFLICT', 'Process is not accepting interactive input', true));
+    }
+
+    const sinceSequence = record.logs.read({}).nextSequence;
+    try {
+      record.child.stdin.write(input.endsWith('\\n') ? input : `${input}\\n`);
+    } catch {
+      return err(appError('CONFLICT', 'Process input could not be delivered', true));
+    }
+
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const output = record.logs.read({ sinceSequence });
+      if (output.entries.length > 0 || isTerminal(record.state)) return ok(output);
+      await delay(25);
+    }
+    return ok(record.logs.read({ sinceSequence }));
+  }
+
   public async stop(processId: string, autoRetry = false): Promise<Result<void>> {
     const record = this.records.get(processId);
     if (record === undefined) return err(appError('PROCESS_NOT_FOUND', 'Process was not found'));
