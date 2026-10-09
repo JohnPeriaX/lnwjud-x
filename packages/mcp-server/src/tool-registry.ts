@@ -94,6 +94,28 @@ export interface McpContinuationState {
   readonly workspaceFullScan: ContinuationStore<ScanContinuation>;
 }
 
+/** Server-owned binding between one MCP conversation session and its selected workspace. */
+export interface ConversationWorkspaceBinding {
+  get(): string | undefined;
+  bind(workspaceId: string): boolean;
+}
+
+const chatgptConversationWorkspaceBindings = new Map<string, string>();
+
+function defaultConversationWorkspaceBinding(actor: FileActor): ConversationWorkspaceBinding | undefined {
+  if (!actor.sessionId?.startsWith('chatgpt-')) return undefined;
+  const key = `${actor.clientId}\0${actor.sessionId}`;
+  return {
+    get: (): string | undefined => chatgptConversationWorkspaceBindings.get(key),
+    bind: (workspaceId: string): boolean => {
+      const existing = chatgptConversationWorkspaceBindings.get(key);
+      if (existing !== undefined) return existing === workspaceId;
+      chatgptConversationWorkspaceBindings.set(key, workspaceId);
+      return true;
+    },
+  };
+}
+
 export function createMcpContinuationState(): McpContinuationState {
   return {
     filePage: new ContinuationStore<FilePageContinuation>(),
@@ -142,6 +164,8 @@ export interface ToolRegistryOptions {
   readonly activeWorkspaceScopeProvider?: () => WorkspaceScope | null | Promise<WorkspaceScope | null>;
   /** Host-owned active project set; first entry is the primary/default project. */
   readonly activeWorkspaceScopesProvider?: () => readonly WorkspaceScope[] | Promise<readonly WorkspaceScope[]>;
+  /** Server-owned conversation-to-workspace binding shared across request-scoped registries. */
+  readonly conversationWorkspaceBinding?: ConversationWorkspaceBinding;
   /** @deprecated Compatibility alias for activeWorkspaceScopeProvider. */
   readonly activeProjectProvider?: () => WorkspaceScope | null;
   /** Host-owned exact-action approval boundary, such as a native desktop confirmation dialog. */
@@ -219,6 +243,7 @@ export class ToolRegistry {
   private readonly ponytailActivation: PonytailActivationLedger;
   private readonly activeWorkspaceScopeProvider: () => Promise<WorkspaceScope | null>;
   private readonly activeWorkspaceScopesProvider: (() => Promise<readonly WorkspaceScope[]>) | undefined;
+  private readonly conversationWorkspaceBinding: ConversationWorkspaceBinding | undefined;
   private readonly enforceActiveWorkspaceScope: boolean;
   private readonly hostMutationApprovalProvider: ToolRegistryOptions['hostMutationApprovalProvider'];
   private readonly activityWorkspaceResolver: (cwd: string) => Promise<string | undefined>;
@@ -242,6 +267,7 @@ export class ToolRegistry {
     this.ponytailActivation = options.ponytailActivationLedger ?? new PonytailActivationLedger();
     this.activeWorkspaceScopeProvider = normalizeActiveWorkspaceScopeProvider(options);
     this.activeWorkspaceScopesProvider = normalizeActiveWorkspaceScopesProvider(options);
+    this.conversationWorkspaceBinding = options.conversationWorkspaceBinding ?? defaultConversationWorkspaceBinding(actor);
     this.enforceActiveWorkspaceScope = options.activeWorkspaceScopesProvider !== undefined || options.activeWorkspaceScopeProvider !== undefined || options.activeProjectProvider !== undefined;
     this.hostMutationApprovalProvider = options.hostMutationApprovalProvider;
     this.activityWorkspaceResolver = normalizeActivityWorkspaceResolver(services, actor);
@@ -488,7 +514,13 @@ export class ToolRegistry {
         && parsedInput.goalId === undefined
         ? { ...parsedInput, goalId: goalLease.goalId }
         : parsedInput;
-      const activeRoutedInput = await this.routeInputToActiveWorkspace(goalBoundInput);
+      const conversationWorkspaceInput = this.enforceConversationWorkspaceBinding(goalBoundInput);
+      if (!conversationWorkspaceInput.ok) {
+        const response = mapError(conversationWorkspaceInput.error);
+        await this.activity.end(callId, conversationWorkspaceInput.error.code, Date.now() - started, conversationWorkspaceInput.error.message);
+        return response;
+      }
+      const activeRoutedInput = await this.routeInputToActiveWorkspace(conversationWorkspaceInput.value);
       const prohibitedReason = fullBypass ? undefined : prohibitedInvocationReason(tool.name, activeRoutedInput);
       if (prohibitedReason !== undefined) {
         const response = mapError(appError('PERMISSION_DENIED', prohibitedReason));
@@ -962,6 +994,23 @@ export class ToolRegistry {
       this.shellTaskTargets.delete(oldestTaskId);
       this.shellTaskWorkspaces.delete(oldestTaskId);
     }
+  }
+
+  private enforceConversationWorkspaceBinding(input: unknown): Result<unknown> {
+    if (this.conversationWorkspaceBinding === undefined || !isRecord(input)) return ok(input);
+    const workspaceId = readExplicitWorkspaceId(input);
+    if (workspaceId === undefined) return ok(input);
+    const boundWorkspaceId = this.conversationWorkspaceBinding.get();
+    if (boundWorkspaceId === undefined) {
+      if (this.conversationWorkspaceBinding.bind(workspaceId)) return ok(input);
+      const racedWorkspaceId = this.conversationWorkspaceBinding.get();
+      if (racedWorkspaceId === workspaceId) return ok(input);
+      return err(appError('PERMISSION_DENIED', 'This ChatGPT conversation is already bound to a different workspace'));
+    }
+    if (boundWorkspaceId !== workspaceId) {
+      return err(appError('PERMISSION_DENIED', 'This ChatGPT conversation is bound to a different workspace'));
+    }
+    return ok(input);
   }
 
   private async routeInputToActiveWorkspace(input: unknown): Promise<unknown> {
@@ -1622,7 +1671,7 @@ function summarizeMutationForApproval(toolName: string, input: unknown, activeWo
       lines.push(`launchCount = ${taskIds.length}`);
       if (taskIds.length > 0) lines.push(`taskIds = ${JSON.stringify(taskIds)}`);
     }
-    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.8.0 enforces read-only child sandboxes.');
+    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.8.1 enforces read-only child sandboxes.');
     return boundedApprovalSummary(lines);
   }
   const projectKind = projectCommandKind(toolName);

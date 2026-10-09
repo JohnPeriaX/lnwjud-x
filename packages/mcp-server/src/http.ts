@@ -194,6 +194,12 @@ function readOpenAiSessionId(requestMessage: JSONRPCMessage): string | undefined
   return openAiSessionIdFromMeta((requestMessage.params as Record<string, unknown>)._meta);
 }
 
+function annotateServerRequestWithOpenAiSession(request: Request, openAiSessionId: string): Request {
+  const headers = new Headers(request.headers);
+  headers.set('x-lnwjud-server-openai-session', openAiSessionId);
+  return new Request(request, { headers });
+}
+
 async function transformModernJsonResponse(
   protocol: ModernTasksProtocol,
   requestMessage: JSONRPCMessage,
@@ -283,10 +289,11 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
   const modernContextEconomy = options.contextEconomy ?? new ContextEconomyRuntime();
   const endpointFallbackSessionId = randomUUID();
   const modernServersByRequest = new WeakMap<Request, McpServer>();
-  const openAiSessionByRequest = new WeakMap<Request, string>();
+  const serverOpenAiSessionByRequest = new WeakMap<Request, string>();
   const activeModernServers = new Set<McpServer>();
 
   const factory = (request?: Request): McpServer => {
+    const openAiSessionId = request === undefined ? undefined : serverOpenAiSessionByRequest.get(request);
     const server = createMcpServer({
       ...options,
       runBudgetGuard,
@@ -299,9 +306,9 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
       requestScope: createHttpRequestScope({
         ...(request === undefined ? {} : { request }),
         fallbackSessionId: endpointFallbackSessionId,
-        ...(request === undefined || openAiSessionByRequest.get(request) === undefined
+        ...(openAiSessionId === undefined
           ? {}
-          : { openAiSessionId: openAiSessionByRequest.get(request) as string }),
+          : { openAiSessionId }),
       }),
     });
     if (request !== undefined) {
@@ -392,9 +399,12 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
           }
         }
         const openAiSessionId = readOpenAiSessionId(requestMessage);
-        if (openAiSessionId !== undefined) openAiSessionByRequest.set(request, openAiSessionId);
+        const serverRequest = openAiSessionId === undefined
+          ? request
+          : annotateServerRequestWithOpenAiSession(request, openAiSessionId);
+        if (openAiSessionId !== undefined) serverOpenAiSessionByRequest.set(serverRequest, openAiSessionId);
         const requestScope = createHttpRequestScope({
-          request,
+          request: serverRequest,
           fallbackSessionId: endpointFallbackSessionId,
           ...(openAiSessionId === undefined ? {} : { openAiSessionId }),
         });
@@ -402,11 +412,11 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
         const taskResponse = await maybeHandleModernTasksWireRequest(protocol, requestMessage);
         if (taskResponse !== undefined) return Response.json(taskResponse, { headers: { 'cache-control': 'no-store' } });
         try {
-          const result = await modernHandler.fetch(request, requestOptions);
+          const result = await modernHandler.fetch(serverRequest, requestOptions);
           const transformed = await transformModernJsonResponse(protocol, requestMessage, result);
-          return finalizeModernResponse(transformed, takeActiveModernServer(request));
+          return finalizeModernResponse(transformed, takeActiveModernServer(serverRequest));
         } catch (error: unknown) {
-          const server = takeActiveModernServer(request);
+          const server = takeActiveModernServer(serverRequest);
           if (server !== undefined) await closeModernMcpServer(server);
           throw error;
         }

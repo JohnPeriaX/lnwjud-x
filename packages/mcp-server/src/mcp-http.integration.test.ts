@@ -72,6 +72,107 @@ describe('MCP localhost HTTP transport', () => {
     }
   });
 
+  it('routes OpenAI conversation metadata to distinct session identities on a new chat without changing the tunnel endpoint', async () => {
+    const events: Array<{ toolName: string; phase: string; sessionId?: string }> = [];
+    const unsubscribe = activityTracker.subscribe((event) => {
+      events.push({ toolName: event.toolName, phase: event.phase, sessionId: event.sessionId });
+    });
+
+    const post = async (id: number, method: string, params: Record<string, unknown>): Promise<Record<string, unknown>> => {
+      const response = await fetch(handle.endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'MCP-Protocol-Version': '2026-07-28',
+          'Mcp-Method': method,
+          ...(method === 'tools/call' ? { 'Mcp-Name': String(params.name ?? '') } : {}),
+          Origin: 'http://localhost',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+      });
+      expect(response.status).toBeLessThan(300);
+      return response.json() as Promise<Record<string, unknown>>;
+    };
+
+    try {
+      const first = await post(202, 'tools/call', {
+        name: 'workspace_list',
+        arguments: {},
+        _meta: {
+          'openai/session': 'conversation-a',
+          'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+          'io.modelcontextprotocol/clientCapabilities': {},
+        },
+      });
+      expect(first.error).toBeUndefined();
+
+      const second = await post(203, 'tools/call', {
+        name: 'workspace_list',
+        arguments: {},
+        _meta: {
+          'openai/session': 'conversation-b',
+          'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+          'io.modelcontextprotocol/clientCapabilities': {},
+        },
+      });
+      expect(second.error).toBeUndefined();
+
+      const completed = events.filter((event) => event.toolName === 'workspace_list' && event.phase === 'completed');
+      expect(completed).toHaveLength(2);
+      expect(completed[0]?.sessionId).toMatch(/^chatgpt-/);
+      expect(completed[1]?.sessionId).toMatch(/^chatgpt-/);
+      expect(completed[0]?.sessionId).not.toBe(completed[1]?.sessionId);
+      expect(workspaceListCalls).toBe(2);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('keeps a ChatGPT conversation bound to its first workspace across request-scoped server recreation', async () => {
+    const post = async (id: number, session: string, workspaceId: string): Promise<Record<string, unknown>> => {
+      const response = await fetch(handle.endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'MCP-Protocol-Version': '2026-07-28',
+          'Mcp-Method': 'tools/call',
+          'Mcp-Name': 'process_list',
+          Origin: 'http://localhost',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id,
+          method: 'tools/call',
+          params: {
+            name: 'process_list',
+            arguments: { workspaceId },
+            _meta: {
+              'openai/session': session,
+              'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+              'io.modelcontextprotocol/clientCapabilities': {},
+            },
+          },
+        }),
+      });
+      expect(response.status).toBeLessThan(300);
+      return response.json() as Promise<Record<string, unknown>>;
+    };
+
+    const first = await post(301, 'conversation-workspace-a', 'workspace-a');
+    expect(first.error).toBeUndefined();
+
+    const sameChat = await post(302, 'conversation-workspace-a', 'workspace-a');
+    expect(sameChat.error).toBeUndefined();
+
+    const crossedWorkspace = await post(303, 'conversation-workspace-a', 'workspace-b');
+    expect(crossedWorkspace.error).toBeUndefined();
+    expect(crossedWorkspace.result).toMatchObject({ isError: true, structuredContent: { error: { code: 'PERMISSION_DENIED' } } });
+
+    const otherChat = await post(304, 'conversation-workspace-b', 'workspace-b');
+    expect(otherChat.error).toBeUndefined();
+    expect(otherChat.result).not.toMatchObject({ structuredContent: { error: { code: 'PERMISSION_DENIED' } } });
+  });
+
   it('tears down every modern per-request MCP server after successful requests', async () => {
     await handle.close();
     const listeners = new Set<(snapshot: ToolAvailabilitySnapshot) => void>();
