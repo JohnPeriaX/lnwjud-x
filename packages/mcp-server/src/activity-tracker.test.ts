@@ -219,6 +219,22 @@ describe('ActivityTracker', () => {
     expect(events).toEqual([expect.objectContaining({ phase: 'started', sessionId: 'session-a' }), expect.objectContaining({ phase: 'completed', sessionId: 'session-a' })]);
   });
 
+  it('carries the server-computed permission decision into the completed audit event', async () => {
+    const events: ActivitySinkEvent[] = [];
+    const tracker = new ActivityTracker({ async record(event): Promise<void> { events.push(event); } });
+    const callId = await tracker.begin('delete_file', { workspaceId: 'ws-1', path: 'secret.txt' }, { sessionId: 'session-a' });
+    tracker.updatePermissionDecision(callId, 'DENY');
+    await tracker.end(callId, 'PERMISSION_DENIED', 2, 'MCP tool delete_file is denied by the active permission profile');
+    expect(events.at(-1)).toMatchObject({
+      phase: 'completed',
+      resultCode: 'PERMISSION_DENIED',
+      workspaceId: 'ws-1',
+      sessionId: 'session-a',
+      permissionDecision: 'DENY',
+    });
+    expect(JSON.stringify(events)).not.toContain('secret-token');
+  });
+
   it('preserves complete sanitized collection arguments while compact snapshots stay small', async () => {
     const fileInputs = [
       'src/alpha.ts',

@@ -460,7 +460,10 @@ export class ToolRegistry {
     const callId = await this.activity.begin(
       name,
       activityInput,
-      { ...(traceContext ?? {}), ...(this.sessionId === undefined ? {} : { sessionId: this.sessionId }) },
+      {
+        ...(traceContext ?? {}),
+        ...((this.sessionId ?? this.actor.sessionId) === undefined ? {} : { sessionId: this.sessionId ?? this.actor.sessionId }),
+      },
       authorizationMode,
     );
     const started = Date.now();
@@ -609,6 +612,7 @@ export class ToolRegistry {
         target: tool.name,
         destructive: isDestructiveMutation(mutationDecision),
       });
+      this.activity.updatePermissionDecision(callId, permissionDecision);
       const chatConfirmationRequired = permissionDecision !== 'DENY'
         && !policyAllowsScopedDestructive
         && (permissionDecision === 'ASK' || hostApprovalRequired);

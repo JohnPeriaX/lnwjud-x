@@ -94,8 +94,9 @@ describe('AuditService', () => {
       phase: 'completed',
       targetSummary: 'src\\app.ts',
       targetDetail: { detailRef: null, itemCount: 1, preview: ['src\\app.ts'], legacyIncomplete: false },
-      resultCode: 'FILE_NOT_FOUND',
-      resultMessage: 'File or directory was not found',
+      resultCode: 'PERMISSION_DENIED',
+      resultMessage: 'File access is denied',
+      permissionDecision: 'DENY',
       durationMs: 8,
     });
 
@@ -104,8 +105,8 @@ describe('AuditService', () => {
       workspaceId: 'workspace-1',
       sessionId: 'session-1',
       targetSummary: 'src\\app.ts',
-      resultCode: 'FILE_NOT_FOUND',
-      metadata: { toolName: 'read_file', callId: 'call-1', phase: 'completed', errorMessage: 'File or directory was not found' },
+      resultCode: 'PERMISSION_DENIED',
+      metadata: { toolName: 'read_file', callId: 'call-1', phase: 'completed', errorMessage: 'File access is denied', permissionDecision: 'DENY' },
     });
   });
 

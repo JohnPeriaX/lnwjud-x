@@ -423,14 +423,23 @@ describe('MCP tool registry', () => {
     }
   });
 
-  it('blocks dangerous capability execution under the safe profile before reaching the backend', async () => {
+  it('blocks dangerous capability execution under the safe profile before reaching the backend and audits the denial', async () => {
     let executed = false;
-    const registry = new ToolRegistry({ capabilities: { async execute(): Promise<ReturnType<typeof ok>> { executed = true; return ok({ executed: true }); } } }, actor, {
+    const events: ActivitySinkEvent[] = [];
+    const registry = new ToolRegistry({ capabilities: { async execute(): Promise<ReturnType<typeof ok>> { executed = true; return ok({ executed: true }); } } }, { ...actor, sessionId: 'session-denied' }, {
       profileProvider: (): typeof permissionProfiles.safe => permissionProfiles.safe,
+      activity: { async record(event: ActivitySinkEvent): Promise<void> { events.push(event); } },
     });
     const response = await registry.invoke('dom_cdp', { action: 'type', tab_id: 'tab-1', parameters: { selector: 'input', text: 'unsafe' } });
     expect(response).toMatchObject({ isError: true, structuredContent: { error: { code: 'PERMISSION_DENIED' } } });
     expect(executed).toBe(false);
+    expect(events.at(-1)).toMatchObject({
+      phase: 'completed',
+      toolName: 'dom_cdp',
+      sessionId: 'session-denied',
+      resultCode: 'PERMISSION_DENIED',
+      permissionDecision: 'DENY',
+    });
   });
 
   it('uses action-level permission for mixed tools so Safe can read without allowing mutations', async () => {

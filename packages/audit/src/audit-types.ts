@@ -164,4 +164,6 @@ export interface McpToolAuditInput {
   readonly traceId?: string;
   readonly traceParent?: string;
   readonly authorizationMode?: 'standard' | 'full_bypass';
+  /** Server-computed permission decision; never caller supplied. */
+  readonly permissionDecision?: 'ALLOW' | 'ASK' | 'DENY';
 }

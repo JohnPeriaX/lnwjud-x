@@ -28,6 +28,8 @@ export interface ActivitySinkEvent {
   readonly traceState?: string;
   readonly baggage?: string;
   readonly authorizationMode?: 'standard' | 'full_bypass';
+  /** Server-computed permission decision; never copied from tool input. */
+  readonly permissionDecision?: 'ALLOW' | 'ASK' | 'DENY';
 }
 
 export interface TraceContext {
@@ -92,6 +94,7 @@ export interface InFlightToolCall {
   readonly traceState?: string;
   readonly baggage?: string;
   readonly authorizationMode?: 'standard' | 'full_bypass';
+  readonly permissionDecision?: 'ALLOW' | 'ASK' | 'DENY';
 }
 
 export class ActivityTracker {
@@ -244,6 +247,14 @@ export class ActivityTracker {
     this.activityRevision += 1;
   }
 
+  /** Records the server-computed permission decision after policy evaluation. */
+  public updatePermissionDecision(callId: string, permissionDecision: 'ALLOW' | 'ASK' | 'DENY'): void {
+    const existing = this.inflight.get(callId);
+    if (existing === undefined || existing.permissionDecision === permissionDecision) return;
+    // Permission attribution enriches an existing call; it is not a new activity lifecycle event.
+    this.inflight.set(callId, { ...existing, permissionDecision });
+  }
+
   public async end(
     callId: string,
     resultCode: string,
@@ -284,6 +295,7 @@ export class ActivityTracker {
       ...(existing?.traceState === undefined ? {} : { traceState: existing.traceState }),
       ...(existing?.baggage === undefined ? {} : { baggage: existing.baggage }),
       ...(existing?.authorizationMode === undefined ? {} : { authorizationMode: existing.authorizationMode }),
+      ...(existing?.permissionDecision === undefined ? {} : { permissionDecision: existing.permissionDecision }),
       ...(resultMessage === undefined || resultMessage.length === 0 ? {} : { resultMessage }),
     }, resultDetail);
   }
