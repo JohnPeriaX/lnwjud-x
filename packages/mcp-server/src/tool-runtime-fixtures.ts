@@ -363,6 +363,7 @@ export const PHASE_34_TO_46_TOOL_RUNTIME_FIXTURES = {
   dom_snapshot: service({ tab_id: 'tab-1' }, 'capabilities.dom_cdp'),
   layout_metadata: service({ tab_id: 'tab-1' }, 'capabilities.dom_cdp'),
   visual_context: service({ tab_id: 'tab-1' }, 'capabilities.dom_cdp'),
+  media_read: service({ workspaceId, path: '.test-assets/media-read.png', action: 'inspect' }, 'file.readFile'),
   inspect_workbook: service({ workspaceId, file_path: 'package.json' }, 'capabilities.office'),
   compare_workbook_layout: service({ workspaceId, baseline_path: 'package.json', actual_path: 'package.json' }, 'capabilities.office'),
   render_excel_preview: service({ workspaceId, file_path: 'package.json' }, 'capabilities.office'),

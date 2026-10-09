@@ -29,13 +29,13 @@ export function mapResult<T>(result: Result<T>): McpToolResponse {
   const passthrough = extractMcpToolResponse(result.value);
   if (passthrough !== undefined) return passthrough;
 
-  const image = extractImageContent(result.value);
-  const metadataValue = image === undefined ? result.value : stripImagePayloads(result.value);
+  const images = extractImageContents(result.value);
+  const metadataValue = images.length === 0 ? result.value : stripImagePayloads(result.value);
   const structuredContent = toStructuredContent(metadataValue);
   return {
-    content: image === undefined
+    content: images.length === 0
       ? [{ type: 'text', text: toText(metadataValue) }]
-      : [image, { type: 'text', text: toText(metadataValue) }],
+      : [...images, { type: 'text', text: toText(metadataValue) }],
     ...(structuredContent === undefined ? {} : { structuredContent }),
   };
 }
@@ -220,16 +220,21 @@ function toStructuredContent(value: unknown): Readonly<Record<string, unknown>> 
 }
 
 function extractImageContent(value: unknown): McpImageContent | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
-  const record = value as Record<string, unknown>;
+  return extractImageContents(value)[0];
+}
 
+function extractImageContents(value: unknown): readonly McpImageContent[] {
+  if (typeof value !== 'object' || value === null) return [];
+  if (Array.isArray(value)) return value.flatMap((entry) => extractImageContents(entry));
+  const record = value as Record<string, unknown>;
   if (record.encoding === 'base64' && typeof record.content === 'string' && typeof record.mimeType === 'string' && record.mimeType.startsWith('image/')) {
-    return { type: 'image', data: record.content, mimeType: record.mimeType };
+    return [{ type: 'image', data: record.content, mimeType: record.mimeType }];
   }
   if (typeof record.data_base64 === 'string' && typeof record.mime_type === 'string' && record.mime_type.startsWith('image/')) {
-    return { type: 'image', data: record.data_base64, mimeType: record.mime_type };
+    return [{ type: 'image', data: record.data_base64, mimeType: record.mime_type }];
   }
-  return extractImageContent(record.image);
+  if (Array.isArray(record.images)) return record.images.flatMap((entry) => extractImageContents(entry));
+  return record.image === undefined ? [] : extractImageContents(record.image);
 }
 
 function stripImagePayloads(value: unknown): unknown {
@@ -252,6 +257,21 @@ function stripImagePayloads(value: unknown): unknown {
   const sanitized: Record<string, unknown> = {};
   for (const [key, nested] of Object.entries(record)) {
     if ((omitContent && key === 'content') || (omitDataBase64 && key === 'data_base64') || (omitMcpImageData && key === 'data')) continue;
+    if (key === 'images' && Array.isArray(nested)) {
+      sanitized[key] = nested.map((entry) => stripVideoFrameMetadata(entry));
+      continue;
+    }
+    sanitized[key] = stripImagePayloads(nested);
+  }
+  return sanitized;
+}
+
+function stripVideoFrameMetadata(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return stripImagePayloads(value);
+  const record = value as Record<string, unknown>;
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, nested] of Object.entries(record)) {
+    if (key === 'encoding' || key === 'content' || key === 'mimeType' || key === 'byteLength' || key === 'data' || key === 'data_base64' || key === 'mime_type') continue;
     sanitized[key] = stripImagePayloads(nested);
   }
   return sanitized;

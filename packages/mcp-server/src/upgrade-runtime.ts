@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { open, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -622,6 +623,8 @@ export class UpgradeRuntimeService {
       case 'path_context':
       case 'startup_context':
         return this.diagnosticInsight(name, input, signal, authorization);
+      case 'media_read':
+        return this.mediaRead(input, signal, authorization);
       case 'capture_screenshot':
       case 'compare_screenshot':
       case 'dom_snapshot':
@@ -2235,6 +2238,115 @@ export class UpgradeRuntimeService {
     return screenshot.ok ? ok({ tool: name, status: 'ready', available: true, ready: true, executed: true, tabs: tabs.value, body: body.value, screenshot: screenshot.value, unavailableStreams: ['console', 'network'] }) : screenshot;
   }
 
+  private async mediaRead(input: Record<string, unknown>, signal?: AbortSignal, authorization?: InvocationAuthorization): Promise<Result<unknown>> {
+    const workspaceId = readString(input, 'workspaceId');
+    const requestedPath = readString(input, 'path') ?? readString(input, 'file_path');
+    if (requestedPath === undefined) {
+      return err(appError('INVALID_INPUT', 'media_read requires path/file_path'));
+    }
+    if (this.services.file === undefined) {
+      return ok(truthfulUnavailable('media_read', 'needs_setup', ['workspace file service']));
+    }
+
+    const explicitAbsolutePath = isAbsoluteHostPath(requestedPath, process.platform);
+    if (!explicitAbsolutePath && workspaceId === undefined) {
+      return err(appError('INVALID_INPUT', 'workspaceId is required for relative media paths; absolute paths may be supplied directly'));
+    }
+
+    let root: string | undefined;
+    if (!explicitAbsolutePath) {
+      if (this.services.workspaceInfo === undefined) {
+        return ok(truthfulUnavailable('media_read', 'needs_setup', ['registered workspace information']));
+      }
+      const workspace = await this.services.workspaceInfo.info(this.actor, workspaceId!);
+      if (!workspace.ok) return workspace;
+      const workspaceRecord = asRecord(workspace.value);
+      root = typeof workspaceRecord.rootPath === 'string'
+        ? workspaceRecord.rootPath
+        : typeof workspaceRecord.realRootPath === 'string' ? workspaceRecord.realRootPath : undefined;
+      if (root === undefined) return err(appError('INTERNAL_ERROR', 'Workspace root path is unavailable', true));
+    }
+
+    const action = readString(input, 'action') ?? 'inspect';
+    const maxBytes = boundedInteger(input.max_bytes, 12 * 1024 * 1024, 1, 32 * 1024 * 1024);
+    const relativeCandidate = explicitAbsolutePath ? requestedPath : path.resolve(root!, requestedPath);
+    let targetPath: string;
+    try {
+      const realRoot = explicitAbsolutePath ? undefined : await pathRealpath(root!);
+      const realTarget = await pathRealpath(relativeCandidate);
+      if (!explicitAbsolutePath && !isPathInside(realRoot!, realTarget)) {
+        return err(appError('PERMISSION_DENIED', 'media_read path must remain inside the registered workspace', false));
+      }
+      targetPath = realTarget;
+    } catch (error) {
+      return err(appError('FILE_NOT_FOUND', `Media path is unavailable: ${error instanceof Error ? error.message : 'unknown error'}`, false));
+    }
+
+    const lowerPath = targetPath.toLowerCase();
+    const imageLike = /\.(png|jpe?g|webp|gif|bmp|tiff?|avif)$/i.test(lowerPath);
+    const videoLike = /\.(mp4|m4v|mov|webm|mkv|avi|wmv|flv|mpeg|mpg)$/i.test(lowerPath);
+    if (!imageLike && !videoLike) {
+      return err(appError('INVALID_INPUT', 'media_read supports common image and video file formats only', false));
+    }
+
+    if (imageLike) {
+      if (action !== 'inspect' && action !== 'frame') {
+        return err(appError('INVALID_INPUT', 'Image media supports action=inspect only', false));
+      }
+      const loaded = await this.services.file.readFile(this.actor, workspaceId, { path: requestedPath }, authorization);
+      if (!loaded.ok) return loaded;
+      const payload = asRecord(loaded.value);
+      const encoding = payload.encoding;
+      const content = payload.content;
+      const mimeType = typeof payload.mimeType === 'string' ? payload.mimeType : inferImageMime(targetPath);
+      if (encoding !== 'base64' || typeof content !== 'string') {
+        return err(appError('INTERNAL_ERROR', 'Image provider did not return a base64 payload', true));
+      }
+      return ok({
+        tool: 'media_read', status: 'ready', available: true, ready: true, executed: true,
+        mediaType: 'image', path: requestedPath, mimeType, encoding: 'base64', content,
+        byteLength: typeof payload.byteLength === 'number' ? payload.byteLength : undefined,
+      });
+    }
+
+    const metadata = await probeVideo(targetPath, signal, maxBytes);
+    if (!metadata.ok) return metadata;
+    const duration = typeof metadata.value.durationSeconds === 'number' ? metadata.value.durationSeconds : 0;
+    if (action === 'inspect') {
+      return ok({ tool: 'media_read', status: 'ready', available: true, ready: true, executed: true, mediaType: 'video', path: requestedPath, metadata: metadata.value });
+    }
+    if (action !== 'frame' && action !== 'sample') {
+      return err(appError('INVALID_INPUT', 'Video media supports action=inspect, frame, or sample', false));
+    }
+
+    const requestedCount = boundedInteger(input.sample_count, action === 'frame' ? 1 : 4, 1, 8);
+    const explicitTimestamp = typeof input.timestamp_seconds === 'number' ? input.timestamp_seconds : undefined;
+    const timestamps = action === 'frame'
+      ? [Math.max(0, Math.min(explicitTimestamp ?? 0, Math.max(0, duration - 0.05)))]
+      : Array.from({ length: requestedCount }, (_, index) => {
+        if (duration <= 0) return 0;
+        return Math.max(0, Math.min(duration - 0.05, duration * ((index + 1) / (requestedCount + 1))));
+      });
+    const images: Array<Record<string, unknown>> = [];
+    for (const timestamp of timestamps) {
+      if (signal?.aborted) return err(appError('PROCESS_TIMEOUT', 'Video frame sampling was cancelled', true));
+      const frame = await extractVideoFrame(targetPath, timestamp, maxBytes, signal);
+      if (!frame.ok) return frame;
+      images.push({
+        encoding: 'base64',
+        content: frame.value.data,
+        mimeType: 'image/jpeg',
+        timestampSeconds: timestamp,
+        byteLength: frame.value.bytes,
+      });
+    }
+    return ok({
+      tool: 'media_read', status: 'ready', available: true, ready: true, executed: true,
+      mediaType: 'video', path: requestedPath, metadata: metadata.value,
+      frameCount: images.length, images,
+    });
+  }
+
   private async visualInsight(name: string, input: Record<string, unknown>, signal?: AbortSignal, authorization?: InvocationAuthorization): Promise<Result<unknown>> {
     if (name === 'compare_screenshot') {
       const baseline = readString(input, 'baseline_base64') ?? readString(input, 'left_base64');
@@ -2449,6 +2561,176 @@ export class UpgradeRuntimeService {
     }
   }
 
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
+}
+
+async function pathRealpath(value: string): Promise<string> {
+  const { realpath } = await import('node:fs/promises');
+  return realpath(value);
+}
+
+function isPathInside(root: string, target: string): boolean {
+  const normalizedRoot = path.resolve(root).replace(/[\\/]+$/u, '').toLowerCase();
+  const normalizedTarget = path.resolve(target).toLowerCase();
+  return normalizedTarget === normalizedRoot || normalizedTarget.startsWith(`${normalizedRoot}${path.sep}`);
+}
+
+function inferImageMime(filePath: string): string {
+  const extension = path.extname(filePath).toLowerCase();
+  return extension === '.jpg' || extension === '.jpeg' ? 'image/jpeg'
+    : extension === '.webp' ? 'image/webp'
+      : extension === '.gif' ? 'image/gif'
+        : extension === '.bmp' ? 'image/bmp'
+          : extension === '.avif' ? 'image/avif'
+            : 'image/png';
+}
+
+interface VideoProbe {
+  readonly durationSeconds: number;
+  readonly width?: number;
+  readonly height?: number;
+  readonly fps?: number;
+  readonly codec?: string;
+  readonly videoCodec?: string;
+  readonly audioCodec?: string;
+  readonly format?: string;
+  readonly sizeBytes?: number;
+}
+
+function resolveBundledMediaExecutable(kind: 'ffmpeg' | 'ffprobe'): string {
+  const executableName = process.platform === 'win32' ? `${kind}.exe` : kind;
+  const explicitPath = (kind === 'ffmpeg' ? process.env.LNWJUD_FFMPEG_PATH : process.env.LNWJUD_FFPROBE_PATH)?.trim();
+  if (explicitPath) return explicitPath;
+
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const candidates = [
+    resourcesPath ? path.join(resourcesPath, 'media-runtime', executableName) : undefined,
+    path.join(process.cwd(), 'apps', 'desktop', 'build', 'media-runtime', executableName),
+    path.join(process.cwd(), 'build', 'media-runtime', executableName),
+  ].filter((candidate): candidate is string => typeof candidate === 'string');
+  return candidates.find((candidate) => {
+    try {
+      return existsSync(candidate);
+    } catch {
+      return false;
+    }
+  }) ?? executableName;
+}
+
+async function probeVideo(filePath: string, signal: AbortSignal | undefined, maxBytes: number): Promise<Result<VideoProbe>> {
+  const executable = resolveBundledMediaExecutable('ffprobe');
+  const result = await runBoundedProcess(executable, [
+    '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', filePath,
+  ], signal, 30_000, Math.min(maxBytes, 2 * 1024 * 1024), process.platform);
+  if (!result.ok) {
+    return result.error.code === 'PROCESS_NOT_FOUND'
+      ? err(appError('EXECUTABLE_NOT_FOUND', 'Video inspection requires ffprobe. Set LNWJUD_FFPROBE_PATH or install ffmpeg/ffprobe.', true))
+      : result;
+  }
+  try {
+    const parsed: unknown = JSON.parse(result.value.stdout);
+    if (!isRecord(parsed)) throw new Error('invalid ffprobe response');
+    const streams = Array.isArray(parsed.streams) ? parsed.streams.filter(isRecord) : [];
+    const video = streams.find((stream) => stream.codec_type === 'video');
+    const audio = streams.find((stream) => stream.codec_type === 'audio');
+    const format = isRecord(parsed.format) ? parsed.format : {};
+    const duration = Number(format.duration ?? video?.duration ?? 0);
+    const fpsText = typeof video?.r_frame_rate === 'string' ? video.r_frame_rate : undefined;
+    const fps = fpsText !== undefined && /^\d+\/\d+$/.test(fpsText)
+      ? Number(fpsText.split('/')[0]) / Math.max(1, Number(fpsText.split('/')[1]))
+      : undefined;
+    return ok({
+      durationSeconds: Number.isFinite(duration) ? Math.max(0, duration) : 0,
+      ...(typeof video?.width === 'number' ? { width: video.width } : {}),
+      ...(typeof video?.height === 'number' ? { height: video.height } : {}),
+      ...(fps !== undefined && Number.isFinite(fps) ? { fps } : {}),
+      ...(typeof video?.codec_name === 'string' ? { videoCodec: video.codec_name, codec: video.codec_name } : {}),
+      ...(typeof audio?.codec_name === 'string' ? { audioCodec: audio.codec_name } : {}),
+      ...(typeof format.format_name === 'string' ? { format: format.format_name } : {}),
+      ...(typeof format.size === 'string' && Number.isFinite(Number(format.size)) ? { sizeBytes: Number(format.size) } : {}),
+    });
+  } catch {
+    return err(appError('INTERNAL_ERROR', 'ffprobe returned invalid video metadata', true));
+  }
+}
+
+async function extractVideoFrame(filePath: string, timestampSeconds: number, maxBytes: number, signal?: AbortSignal): Promise<Result<{ readonly data: string; readonly bytes: number }>> {
+  const executable = resolveBundledMediaExecutable('ffmpeg');
+  const result = await runBoundedBinaryProcess(executable, [
+    '-hide_banner', '-loglevel', 'error', '-ss', timestampSeconds.toFixed(3), '-i', filePath,
+    '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'mjpeg', '-q:v', '5', 'pipe:1',
+  ], signal, 60_000, maxBytes, process.platform);
+  if (!result.ok) {
+    return result.error.code === 'PROCESS_NOT_FOUND'
+      ? err(appError('EXECUTABLE_NOT_FOUND', 'Video frame extraction requires ffmpeg. Set LNWJUD_FFMPEG_PATH or install ffmpeg.', true))
+      : result;
+  }
+  return ok({ data: result.value.toString('base64'), bytes: result.value.byteLength });
+}
+
+function runBoundedBinaryProcess(
+  executable: string,
+  args: readonly string[],
+  signal: AbortSignal | undefined,
+  timeoutMs: number,
+  maxBytes: number,
+  platform: NodeJS.Platform,
+): Promise<Result<Buffer>> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve(err(appError('PROCESS_TIMEOUT', `${executable} was cancelled`, true)));
+      return;
+    }
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(executable, [...args], { windowsHide: true, shell: false, detached: platform !== 'win32', env: sanitizedDiagnosticEnvironment() });
+    } catch {
+      resolve(err(appError('PROCESS_NOT_FOUND', `${executable} could not be started`, true)));
+      return;
+    }
+    const chunks: Buffer[] = [];
+    let total = 0;
+    let settled = false;
+    const finish = (result: Result<Buffer>): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      resolve(result);
+    };
+    const terminate = async (message: string): Promise<void> => {
+      if (settled) return;
+      const pid = child.pid;
+      try {
+        if (Number.isInteger(pid) && (pid ?? 0) > 0) await createProcessTreeTerminator(platform).stop(child, pid as number);
+        finish(err(appError('PROCESS_TIMEOUT', message, true)));
+      } catch {
+        finish(err(appError('PROCESS_TIMEOUT', `${message}; process termination could not be verified`, true)));
+      }
+    };
+    const onAbort = (): void => { void terminate(`${executable} was cancelled`); };
+    const timer = setTimeout(() => { void terminate(`${executable} timed out`); }, timeoutMs);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    child.stdout?.on('data', (chunk: Buffer) => {
+      total += chunk.byteLength;
+      if (total <= maxBytes) chunks.push(chunk);
+      else void terminate(`${executable} exceeded the ${maxBytes} byte output limit`);
+    });
+    child.stderr?.on('data', () => undefined);
+    child.once('error', () => finish(err(appError('PROCESS_NOT_FOUND', `${executable} is unavailable`, true))));
+    child.once('close', (code) => {
+      if (settled) return;
+      if ((code ?? -1) !== 0) {
+        finish(err(appError('INTERNAL_ERROR', `${executable} failed with exit code ${code ?? -1}`, true)));
+        return;
+      }
+      finish(ok(Buffer.concat(chunks)));
+    });
+    child.stdin?.end();
+  });
 }
 
 function runBoundedProcess(

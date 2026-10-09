@@ -93,6 +93,9 @@ export function createRuntimeSuccessServices(calls: string[]): McpApplicationSer
               ? '---\nname: smoke-skill\ndescription: Smoke skill\n---\n\n# Smoke\n'
               : paged && startLine === 1 ? 'one\ntwo' : paged ? 'two' : 'export const smoke = true;\n';
         const endLine = paged ? 2 : startLine + Math.max(0, content.split(/\r?\n/).filter(Boolean).length - 1);
+        if (/\.(png|jpe?g|webp)$/i.test(filePath)) {
+          return { path: filePath, content: 'aGVsbG8=', startLine, endLine, encoding: 'base64', mimeType: 'image/png', byteLength: 5 };
+        }
         return { path: filePath, content, startLine, endLine, encoding: 'utf8', mimeType: 'text/plain', byteLength: Buffer.byteLength(content) };
       }
       if (method === 'readFiles') return { files: [] };

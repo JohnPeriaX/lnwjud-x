@@ -34,6 +34,30 @@ describe('mapResult image payloads', () => {
     });
   });
 
+  it('maps bounded video frame samples to multiple MCP image parts without duplicating frame bytes in metadata', () => {
+    const response = mapResult({
+      ok: true as const,
+      value: {
+        tool: 'media_read',
+        mediaType: 'video',
+        frameCount: 2,
+        images: [
+          { encoding: 'base64', content: PNG_1X1, mimeType: 'image/png', timestampSeconds: 1 },
+          { encoding: 'base64', content: PNG_1X1, mimeType: 'image/png', timestampSeconds: 2 },
+        ],
+      },
+    });
+
+    expect(response.content.slice(0, 2)).toEqual([
+      { type: 'image', data: PNG_1X1, mimeType: 'image/png' },
+      { type: 'image', data: PNG_1X1, mimeType: 'image/png' },
+    ]);
+    expect(response.content[2]).toEqual({
+      type: 'text',
+      text: JSON.stringify({ tool: 'media_read', mediaType: 'video', frameCount: 2, images: [{ timestampSeconds: 1 }, { timestampSeconds: 2 }] }),
+    });
+  });
+
   it('includes MCP image content for native vision and Set-of-Marks payloads without base64 duplication', () => {
     const direct = mapResult({
       ok: true as const,
