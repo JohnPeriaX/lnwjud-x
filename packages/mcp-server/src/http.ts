@@ -29,6 +29,7 @@ import { ContextEconomyRuntime } from './context-economy.js';
 import { RunBudgetGuard } from './run-budget.js';
 import { PonytailActivationLedger } from './ponytail-runtime.js';
 import { createOriginPolicy, type OriginPolicy } from './origin-policy.js';
+import { ChatGptSessionStore } from './chatgpt-session-store.js';
 import { APP_NAME, APP_VERSION } from '@lnwjud/shared';
 
 export const MAX_MCP_HTTP_BODY_BYTES = 1_048_576;
@@ -41,6 +42,11 @@ export interface McpHttpServerOptions extends McpServerOptions {
   readonly maxBodyBytes?: number;
   readonly originPolicy?: OriginPolicy;
   readonly allowedHostnames?: readonly string[];
+  /** Shared bounded ChatGPT conversation state for reconnects across request-scoped servers. */
+  readonly chatGptSessionStore?: ChatGptSessionStore;
+  readonly chatGptSessionTtlMs?: number;
+  readonly chatGptMaxSessions?: number;
+  readonly chatGptSessionNow?: () => number;
 }
 
 export interface McpHttpServerAddress {
@@ -287,6 +293,11 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
   const ponytailActivationLedger = options.ponytailActivationLedger ?? new PonytailActivationLedger();
   const continuationState = options.continuationState ?? createMcpContinuationState();
   const modernContextEconomy = options.contextEconomy ?? new ContextEconomyRuntime();
+  const chatGptSessionStore = options.chatGptSessionStore ?? new ChatGptSessionStore({
+    ...(options.chatGptSessionTtlMs === undefined ? {} : { ttlMs: options.chatGptSessionTtlMs }),
+    ...(options.chatGptMaxSessions === undefined ? {} : { maxSessions: options.chatGptMaxSessions }),
+    ...(options.chatGptSessionNow === undefined ? {} : { now: options.chatGptSessionNow }),
+  });
   const endpointFallbackSessionId = randomUUID();
   const modernServersByRequest = new WeakMap<Request, McpServer>();
   const serverOpenAiSessionByRequest = new WeakMap<Request, string>();
@@ -294,6 +305,17 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
 
   const factory = (request?: Request): McpServer => {
     const openAiSessionId = request === undefined ? undefined : serverOpenAiSessionByRequest.get(request);
+    const resolvedSessionId = openAiSessionId === undefined
+      ? undefined
+      : chatGptSessionStore.resolve(options.actor.clientId, openAiSessionId);
+    const requestScope = createHttpRequestScope({
+      ...(request === undefined ? {} : { request }),
+      fallbackSessionId: endpointFallbackSessionId,
+      ...(openAiSessionId === undefined ? {} : { openAiSessionId }),
+      ...(resolvedSessionId === undefined ? {} : { resolvedSessionId }),
+    });
+    const requestActor = actorForRequestScope(options.actor, requestScope);
+    const conversationWorkspaceBinding = chatGptSessionStore.bindingFor(requestActor);
     const server = createMcpServer({
       ...options,
       runBudgetGuard,
@@ -303,13 +325,8 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
       continuationState,
       contextEconomy: modernContextEconomy,
       legacyTasksProtocol: false,
-      requestScope: createHttpRequestScope({
-        ...(request === undefined ? {} : { request }),
-        fallbackSessionId: endpointFallbackSessionId,
-        ...(openAiSessionId === undefined
-          ? {}
-          : { openAiSessionId }),
-      }),
+      requestScope,
+      ...(conversationWorkspaceBinding === undefined ? {} : { conversationWorkspaceBinding }),
     });
     if (request !== undefined) {
       modernServersByRequest.set(request, server);
@@ -403,10 +420,14 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
           ? request
           : annotateServerRequestWithOpenAiSession(request, openAiSessionId);
         if (openAiSessionId !== undefined) serverOpenAiSessionByRequest.set(serverRequest, openAiSessionId);
+        const resolvedSessionId = openAiSessionId === undefined
+          ? undefined
+          : chatGptSessionStore.resolve(options.actor.clientId, openAiSessionId);
         const requestScope = createHttpRequestScope({
           request: serverRequest,
           fallbackSessionId: endpointFallbackSessionId,
           ...(openAiSessionId === undefined ? {} : { openAiSessionId }),
+          ...(resolvedSessionId === undefined ? {} : { resolvedSessionId }),
         });
         const protocol = new ModernTasksProtocol(options.services, { actor: actorForRequestScope(options.actor, requestScope) });
         const taskResponse = await maybeHandleModernTasksWireRequest(protocol, requestMessage);

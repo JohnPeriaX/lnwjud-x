@@ -21,6 +21,8 @@ export interface HttpRequestScopeOptions {
   readonly fallbackSessionId: string;
   /** Server-extracted ChatGPT conversation identity. Never read from tool input. */
   readonly openAiSessionId?: string;
+  /** Internal session generation resolved by the bounded ChatGPT session store. */
+  readonly resolvedSessionId?: string;
 }
 
 /** One synthetic identity for one STDIO serving lifetime. */
@@ -41,9 +43,9 @@ export function createHttpRequestScope(options: HttpRequestScopeOptions): McpReq
   const openAiSessionId = boundedProtocolSessionId(options.openAiSessionId);
   return {
     sessionId: protocolSessionId === undefined
-      ? openAiSessionId === undefined
+      ? options.resolvedSessionId ?? (openAiSessionId === undefined
         ? normalizeInternalSessionId(options.fallbackSessionId)
-        : `chatgpt-${fingerprint(openAiSessionId)}`
+        : `chatgpt-${fingerprint(openAiSessionId)}`)
       : `http-${fingerprint(protocolSessionId)}`,
     transport: 'http',
     ...(protocolSessionId === undefined ? {} : { protocolSessionId }),
