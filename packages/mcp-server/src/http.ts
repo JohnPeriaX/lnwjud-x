@@ -314,8 +314,6 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
       ...(openAiSessionId === undefined ? {} : { openAiSessionId }),
       ...(resolvedSessionId === undefined ? {} : { resolvedSessionId }),
     });
-    const requestActor = actorForRequestScope(options.actor, requestScope);
-    const conversationWorkspaceBinding = chatGptSessionStore.bindingFor(requestActor);
     const server = createMcpServer({
       ...options,
       runBudgetGuard,
@@ -326,7 +324,6 @@ function createSessionfulMcpHandler(options: McpHttpServerOptions): McpHttpHandl
       contextEconomy: modernContextEconomy,
       legacyTasksProtocol: false,
       requestScope,
-      ...(conversationWorkspaceBinding === undefined ? {} : { conversationWorkspaceBinding }),
     });
     if (request !== undefined) {
       modernServersByRequest.set(request, server);

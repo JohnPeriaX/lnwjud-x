@@ -1,7 +1,4 @@
 import { createHash, randomUUID } from 'node:crypto';
-import type { FileActor } from '@lnwjud/application';
-import type { ConversationWorkspaceBinding } from './tool-registry.js';
-
 export interface ChatGptSessionStoreOptions {
   readonly maxSessions?: number;
   readonly ttlMs?: number;
@@ -21,7 +18,6 @@ interface SessionEntry {
   readonly clientId: string;
   readonly openAiSessionId: string;
   readonly internalSessionId: string;
-  workspaceId?: string;
   lastSeenMs: number;
 }
 
@@ -80,31 +76,6 @@ export class ChatGptSessionStore {
       lastSeenMs: now,
     });
     return internalSessionId;
-  }
-
-  public bindingFor(actor: FileActor): ConversationWorkspaceBinding | undefined {
-    const internalSessionId = actor.sessionId;
-    if (internalSessionId === undefined || !internalSessionId.startsWith('chatgpt-')) return undefined;
-    const entry = this.findByInternalSessionId(internalSessionId);
-    if (entry === undefined || entry.clientId !== actor.clientId) return undefined;
-    return {
-      get: (): string | undefined => {
-        this.cleanup();
-        const current = this.findByInternalSessionId(internalSessionId);
-        if (current === undefined) return undefined;
-        current.lastSeenMs = this.now();
-        return current.workspaceId;
-      },
-      bind: (workspaceId: string): boolean => {
-        this.cleanup();
-        const current = this.findByInternalSessionId(internalSessionId);
-        if (current === undefined) return false;
-        current.lastSeenMs = this.now();
-        if (current.workspaceId !== undefined) return current.workspaceId === workspaceId;
-        current.workspaceId = workspaceId;
-        return true;
-      },
-    };
   }
 
   public cleanup(now = this.now()): number {

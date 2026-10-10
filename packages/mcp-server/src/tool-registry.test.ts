@@ -24,30 +24,20 @@ afterEach(() => {
 });
 
 describe('MCP tool registry', () => {
-  it('binds a conversation to its first workspace and rejects cross-workspace reuse', async () => {
-    let boundWorkspaceId: string | undefined;
-    const registry = new ToolRegistry({}, { ...actor, sessionId: 'chatgpt-session-a' }, {
-      conversationWorkspaceBinding: {
-        get: (): string | undefined => boundWorkspaceId,
-        bind: (workspaceId: string): boolean => {
-          if (boundWorkspaceId !== undefined) return boundWorkspaceId === workspaceId;
-          boundWorkspaceId = workspaceId;
-          return true;
-        },
-      },
-    });
+  it('does not permanently bind a ChatGPT conversation to its first workspace', async () => {
+    const registry = new ToolRegistry({}, { ...actor, sessionId: 'chatgpt-session-a' });
 
     const first = await registry.invoke('process_list', { workspaceId: 'workspace-a' });
     expect(first.isError).toBe(true);
     expect(first.structuredContent?.error?.code).not.toBe('PERMISSION_DENIED');
-    expect(boundWorkspaceId).toBe('workspace-a');
 
     const sameWorkspace = await registry.invoke('process_list', { workspaceId: 'workspace-a' });
     expect(sameWorkspace.isError).toBe(true);
     expect(sameWorkspace.structuredContent?.error?.code).not.toBe('PERMISSION_DENIED');
 
     const otherWorkspace = await registry.invoke('process_list', { workspaceId: 'workspace-b' });
-    expect(otherWorkspace).toMatchObject({ isError: true, structuredContent: { error: { code: 'PERMISSION_DENIED' } } });
+    expect(otherWorkspace.isError).toBe(true);
+    expect(otherWorkspace.structuredContent?.error?.code).not.toBe('PERMISSION_DENIED');
   });
 
   it('attaches Goal audit attribution only after verifying a current lease and never executes with a stale proof', async () => {

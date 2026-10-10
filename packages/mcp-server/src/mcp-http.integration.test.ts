@@ -129,7 +129,7 @@ describe('MCP localhost HTTP transport', () => {
     }
   });
 
-  it('keeps a ChatGPT conversation bound to its first workspace across request-scoped server recreation', async () => {
+  it('allows a ChatGPT conversation to switch workspaces while keeping session identity', async () => {
     const post = async (id: number, session: string, workspaceId: string): Promise<Record<string, unknown>> => {
       const response = await fetch(handle.endpoint, {
         method: 'POST',
@@ -167,7 +167,7 @@ describe('MCP localhost HTTP transport', () => {
 
     const crossedWorkspace = await post(303, 'conversation-workspace-a', 'workspace-b');
     expect(crossedWorkspace.error).toBeUndefined();
-    expect(crossedWorkspace.result).toMatchObject({ isError: true, structuredContent: { error: { code: 'PERMISSION_DENIED' } } });
+    expect(crossedWorkspace.result).not.toMatchObject({ isError: true, structuredContent: { error: { code: 'PERMISSION_DENIED' } } });
 
     const otherChat = await post(304, 'conversation-workspace-b', 'workspace-b');
     expect(otherChat.error).toBeUndefined();
@@ -228,7 +228,8 @@ describe('MCP localhost HTTP transport', () => {
       const reconnect = await post(handle.endpoint, 602, 'reconnect-chat', 'workspace-a');
       expect(reconnect.error).toBeUndefined();
       const crossed = await post(handle.endpoint, 603, 'reconnect-chat', 'workspace-b');
-      expect(crossed.result).toMatchObject({ isError: true, structuredContent: { error: { code: 'PERMISSION_DENIED' } } });
+      expect(crossed.error).toBeUndefined();
+      expect(crossed.result).not.toMatchObject({ isError: true, structuredContent: { error: { code: 'PERMISSION_DENIED' } } });
     } finally {
       await firstHandle.close().catch(() => undefined);
     }

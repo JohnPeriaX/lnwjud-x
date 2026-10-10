@@ -12,19 +12,13 @@ describe('ChatGptSessionStore', () => {
     expect(store.stats().activeSessions).toBe(1);
   });
 
-  it('expires a conversation into a new internal generation so stale workspace/process ownership cannot be reused', (): void => {
+  it('expires a conversation into a new internal generation', (): void => {
     let now = 1_000;
     const store = new ChatGptSessionStore({ ttlMs: 100, maxSessions: 4, now: (): number => now });
     const first = store.resolve('client-a', 'conversation-a');
-    const firstBinding = store.bindingFor({ clientId: 'client-a', clientName: 'test', sessionId: first });
-    expect(firstBinding?.bind('workspace-a')).toBe(true);
     now += 101;
     const second = store.resolve('client-a', 'conversation-a');
     expect(second).not.toBe(first);
-    const secondBinding = store.bindingFor({ clientId: 'client-a', clientName: 'test', sessionId: second });
-    expect(secondBinding?.get()).toBeUndefined();
-    expect(secondBinding?.bind('workspace-b')).toBe(true);
-    expect(firstBinding?.get()).toBeUndefined();
     expect(store.stats()).toMatchObject({ activeSessions: 1, expirations: 1 });
   });
 
@@ -38,8 +32,7 @@ describe('ChatGptSessionStore', () => {
     const third = store.resolve('client-a', 'conversation-c');
     expect(third).not.toBe(first);
     expect(store.stats()).toMatchObject({ activeSessions: 2, evictions: 1 });
-    expect(store.bindingFor({ clientId: 'client-a', clientName: 'test', sessionId: first })).toBeUndefined();
-    expect(store.bindingFor({ clientId: 'client-a', clientName: 'test', sessionId: second })).toBeDefined();
+    expect(store.resolve('client-a', 'conversation-b')).toBe(second);
   });
 
   it('isolates clients even when they present the same conversation identifier', (): void => {
@@ -47,9 +40,5 @@ describe('ChatGptSessionStore', () => {
     const first = store.resolve('client-a', 'conversation-a');
     const second = store.resolve('client-b', 'conversation-a');
     expect(second).not.toBe(first);
-    const firstBinding = store.bindingFor({ clientId: 'client-a', clientName: 'a', sessionId: first });
-    const secondBinding = store.bindingFor({ clientId: 'client-b', clientName: 'b', sessionId: second });
-    expect(firstBinding?.bind('workspace-a')).toBe(true);
-    expect(secondBinding?.get()).toBeUndefined();
   });
 });
