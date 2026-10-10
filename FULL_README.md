@@ -51,11 +51,11 @@ The tunnel is outbound-only: `tunnel-client` runs beside lnwjud, reaches OpenAI
 over outbound HTTPS, forwards MCP work to lnwjud's Desktop loopback HTTP MCP,
 and returns the response without opening a public inbound port on the host.
 
-## Current published version: v5.7.4
+## Current published version: v5.8.1
 
 ## Current source version: v5.8.1
 
-Latest published release: **v5.7.4**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
+Latest published release: **v5.8.1**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
 
 ### What's new in v5.8.1
 
@@ -63,8 +63,11 @@ Latest published release: **v5.7.4**. Windows, macOS, and Linux artifacts are pu
 - **Concurrent process ownership:** managed process handles are owned by session, actor and workspace rather than raw OS PIDs, so multiple ChatGPT conversations can operate concurrently without ownership collisions.
 - **Mutation, task and audit safety:** mutation fences serialize or reject conflicting writes; timed-out task results become terminal failures rather than successes; and server-computed permission decisions are retained in activity traces.
 - **Media access:** `media_read` supports bounded image reads and video metadata/frame inspection, with the Windows FFmpeg runtime prepared for packaging.
+- **Dropdown overlay fix:** shared Workspace/Session dropdowns no longer change page padding, compress Work Log tables, or auto-scroll the underlying content.
+- **What's New history:** the in-app modal shows installed-or-earlier patches in the active series, newest first, with a scrollable list.
+- **Tunnel Live Logs:** ineffective Workspace/Session filters are hidden from the Tunnel tab while MCP activity and Processes retain their functional filters.
 
-ภาษาไทย: v5.8.1 แยก ChatGPT session และ workspace ต่อบทสนทนา, รองรับ process หลายตัวแบบมี owner ชัดเจน, ป้องกัน mutation ชนกัน, ตรวจ timeout/task/permission จากผลจริง และเพิ่ม `media_read` สำหรับภาพและวิดีโอ
+ภาษาไทย: v5.8.1 แยก ChatGPT session/workspace และ process ตาม owner, ป้องกัน mutation ชนกัน, ตรวจ timeout/task/permission จากผลจริง, เพิ่ม `media_read` พร้อม FFmpeg และแก้ dropdown, What's New history และ Tunnel Live Logs ตาม upstream
 
 ### What's new in v5.8.0
 
@@ -74,6 +77,12 @@ Latest published release: **v5.7.4**. Windows, macOS, and Linux artifacts are pu
 - **Secure MCP Tunnel and release tooling:** safer startup readiness, verified tunnel-client 0.0.16, dependency automation, target-native gates and SHA-256/provenance checks.
 
 ภาษาไทย: v5.8.0 เพิ่ม Workflow 6 แบบ, ประวัติ MCP และผล Goal ตามหลักฐาน, ตรวจ CSV/XLSX, Git tree/preview, ปรับ UI/Work Log, ลด Tunnel reconnect ก่อนพร้อม และอัปเดต tunnel-client 0.0.16 พร้อม release checks ตามหลักฐานจริง
+
+- **Additional upstream v5.8.0 detail:** MCP Call History, evidence-backed Goal Results, measured process resources, Context Economy observability, safer restore/audit visibility, typed CSV/XLSX workflows, expanded Git explorer, consistent Desktop controls, Command Prism status, modal fixes, Work Log/Doctor UX, 45-second Tunnel readiness grace, bundled tunnel-client 0.0.16, and dependency/release delivery checks.
+
+**ภาษาไทย — รายละเอียด upstream:** v5.8.0 เพิ่มรายละเอียดการตรวจ MCP/Goal/Resource ตามหลักฐานจริง, CSV/XLSX, Git explorer, UI, Work Log/Doctor, Tunnel readiness และ release/dependency checks โดยค่าที่ไม่มีหลักฐานยังเป็น unknown ไม่ถูกแทนด้วย 0
+
+Latest published release: **v5.8.1**. Windows, macOS, and Linux artifacts were published after the exact tagged main commit passed the target-native release gates described below.
 
 ### What's new in v5.7.4
 
@@ -201,13 +210,13 @@ Choose the guide for the host you will run lnwjud on:
 
 1. Download the latest published installer from
    [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/latest).
-   Current published Windows 10/11 x64 v5.7.4 artifacts are `lnwjud-Setup-5.7.4.exe` (recommended installer) and `lnwjud-Portable-5.7.4.exe` (no installation required).
+   Current published Windows 10/11 x64 v5.8.1 artifacts are `lnwjud-Setup-5.8.1.exe` (recommended installer) and `lnwjud-Portable-5.8.1.exe` (no installation required).
 2. Run the NSIS installer and launch **lnwjud Agent Control Center**.
 3. Add or select the project/workspace you want lnwjud to operate on.
 4. Review **Settings** before attaching an AI client, especially Permission
    Profile and Unrestricted Mode.
 
-If you prefer not to install the app, run the currently published `lnwjud-Portable-5.7.4.exe` directly.
+If you prefer not to install the app, run the currently published `lnwjud-Portable-5.8.1.exe` directly.
 Portable mode uses the same per-user lnwjud data/settings location as the installer;
 it is a portable executable, not a keep-all-data-next-to-the-EXE mode.
 Automatic updates preserve the distribution you chose. Installer users read
@@ -325,12 +334,12 @@ Use lnwjud to list registered workspaces, report Git status for the selected pro
 
 ## Quick start: install the Windows release (ภาษาไทย)
 
-ส่วนนี้สำหรับผู้ใช้ Windows ที่ต้องการติดตั้ง lnwjud แล้วเชื่อมกับ ChatGPT แบบง่ายที่สุด โดย **วิธีหลักที่แนะนำสำหรับ v5.7.4 คือ Remote MCP ผ่าน ngrok + OAuth** ไม่ต้องมี OpenAI Tunnel ID และไม่ต้องสร้าง Runtime API key สำหรับขั้นตอนหลักนี้ ส่วน **Tunnel ID + Runtime API key** ยังคงรองรับ แต่เป็นทางเลือก/โหมดขั้นสูงสำหรับผู้ที่ต้องการ OpenAI Secure MCP Tunnel โดยเฉพาะ
+ส่วนนี้สำหรับผู้ใช้ Windows ที่ต้องการติดตั้ง lnwjud แล้วเชื่อมกับ ChatGPT แบบง่ายที่สุด โดย **วิธีหลักที่แนะนำสำหรับ v5.8.1 คือ Remote MCP ผ่าน ngrok + OAuth** ไม่ต้องมี OpenAI Tunnel ID และไม่ต้องสร้าง Runtime API key สำหรับขั้นตอนหลักนี้ ส่วน **Tunnel ID + Runtime API key** ยังคงรองรับ แต่เป็นทางเลือก/โหมดขั้นสูงสำหรับผู้ที่ต้องการ OpenAI Secure MCP Tunnel โดยเฉพาะ
 
 ### 1. ติดตั้ง lnwjud หรือใช้ Portable
 
-1. แบบแนะนำ: ดาวน์โหลด public release ล่าสุด `lnwjud-Setup-5.7.4.exe` แล้วติดตั้งตามปกติ
-2. ถ้าไม่ต้องการติดตั้ง: ดาวน์โหลด `lnwjud-Portable-5.7.4.exe` แล้วเปิดได้ทันที
+1. แบบแนะนำ: ดาวน์โหลด public release ล่าสุด `lnwjud-Setup-5.8.1.exe` แล้วติดตั้งตามปกติ
+2. ถ้าไม่ต้องการติดตั้ง: ดาวน์โหลด `lnwjud-Portable-5.8.1.exe` แล้วเปิดได้ทันที
 3. เปิด **lnwjud Agent Control Center**
 4. เพิ่มหรือเลือก Project/Workspace ที่ต้องการให้ ChatGPT ทำงานด้วย
 
@@ -363,7 +372,7 @@ public ngrok URL นี้ชี้เข้า OAuth gateway แยกต่า
 6. รอ Configure/Doctor ผ่าน แล้วกด **Start Tunnel**
 7. ใน ChatGPT เพิ่ม Connection แบบ **Tunnel** แล้วเลือก tunnel ที่สร้างไว้หรือใส่ `tunnel_id`
 
-`lnwjud-Setup-5.0.0.exe` และ `lnwjud-Portable-5.0.0.exe` รวม official OpenAI `tunnel-client v0.0.15` มาให้แล้ว จึง **ไม่ต้องดาวน์โหลด `tunnel-client.exe` เอง** ช่อง path เป็น override สำหรับ troubleshooting เท่านั้น; หากต้องการกลับไปใช้ตัว bundled ให้ล้าง override แล้วเลือก **Use bundled** อย่างชัดเจน
+`lnwjud-Setup-5.8.1.exe` และ `lnwjud-Portable-5.8.1.exe` รวม official OpenAI `tunnel-client` ที่ตรวจสอบเวอร์ชันและ provenance ตามไฟล์ Release มาให้แล้ว จึง **ไม่ต้องดาวน์โหลด `tunnel-client.exe` เอง** ช่อง path เป็น override สำหรับ troubleshooting เท่านั้น; หากต้องการกลับไปใช้ตัว bundled ให้ล้าง override แล้วเลือก **Use bundled** อย่างชัดเจน
 
 `Persistent Tunnel Identity` จำ Tunnel ID แยกจาก Run/Stop intent. เมื่อผู้ใช้กด **Stop Tunnel** lnwjud จะคงสถานะ stopped ข้ามการ restart และจะไม่ auto-reconnect จนกด Start อีกครั้ง. หากเปลี่ยน custom/bundled client ขณะ runtime ทำงาน ระบบจะหยุดและยืนยัน owner เดิมก่อน commit path ใหม่เพื่อไม่ให้มี runtime ซ้อน
 

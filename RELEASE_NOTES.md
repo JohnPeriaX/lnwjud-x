@@ -4,7 +4,7 @@ Release highlights are listed newest first. The [README](README.md) shows the th
 
 ### What's new in v5.8.1
 
-This release hardens the ChatGPT-to-local automation path across session identity, workspace isolation, process ownership, reconnect persistence, mutation conflict protection, task outcomes, audit attribution, and media access.
+This release hardens the ChatGPT-to-local automation path across session identity, workspace isolation, process ownership, reconnect persistence, mutation conflict protection, task outcomes, audit attribution, and media access, and incorporates upstream v5.8.1 UX fixes.
 
 - **ChatGPT session identity and workspace isolation:** each conversation gets a stable internal session context and a separate logical workspace binding across requests and reconnects. Authorization and existing workspace boundaries remain authoritative.
 - **Concurrent process ownership:** managed process handles are tied to actor, session and workspace, not raw OS PIDs. Multiple conversations can therefore run, inspect, interact with and terminate their own processes concurrently without cross-session leakage.
@@ -12,12 +12,13 @@ This release hardens the ChatGPT-to-local automation path across session identit
 - **Task automation outcomes:** timeout, cancellation and retry behavior remain bounded and ownership-scoped, with timed-out results mapped to terminal failure rather than success or silent duplicate retry.
 - **Audit and observability:** activity traces retain server-computed permission decisions alongside actor/session/workspace/tool context, including deterministic denied-operation coverage.
 - **Media access and Windows packaging:** `media_read` supports images and bounded video metadata/frame inspection, with FFmpeg runtime preparation included in the Windows packaging path.
+- **Upstream UX fixes:** Work Log dropdowns no longer reserve page padding or auto-scroll the underlying content; What's New groups installed-or-earlier patch notes by active series with scrollable history; Tunnel Live Logs hide nonfunctional Workspace/Session filters while MCP activity and Processes retain their useful filters.
 
-**ภาษาไทย — สรุป:** v5.8.1 แยก session/workspace ของ ChatGPT ต่อบทสนทนา, รองรับ process หลายบทสนทนาพร้อมกันโดยยืนยัน owner จาก managed handle, ป้องกัน mutation ชนกัน, ตรวจ timeout/cancellation/retry เป็นผล terminal จริง, เก็บ permission decision ใน audit และเพิ่ม `media_read` สำหรับภาพ/วิดีโอพร้อม FFmpeg สำหรับ Windows
+**ภาษาไทย — สรุป:** v5.8.1 แยก session/workspace ของ ChatGPT, รองรับ process หลายบทสนทนาโดยยืนยัน owner, ป้องกัน mutation ชนกัน, ตรวจ timeout/cancellation/retry เป็นผล terminal จริง, เก็บ permission decision ใน audit, เพิ่ม `media_read` พร้อม FFmpeg และรวม UX fixes ล่าสุดจาก upstream สำหรับ dropdown, What's New และ Tunnel Live Logs
 
 ### What's new in v5.8.0
 
-This release is a substantial functional expansion over **v5.7.4**, whose main fixes were bounded high-risk approval/native-alert dialogs. The features below are based on the `v5.7.4..dev` changeset, not on plans alone.
+This release is a substantial functional expansion over **v5.7.4**, whose main fixes were bounded high-risk approval/native-alert dialogs. The features below are based on the `v5.7.4..v5.8.0` changeset, not on plans alone.
 
 - **Six bilingual, review-first task templates:** Project Check, Code Review, Release Readiness, Connection Check, Data Audit and Template Report. Inputs are validated and drafts can be copied to a connected AI; previewing does not schedule or start a Goal.
 - **Persistent MCP call observability:** SQLite-backed call correlation, bounded keyset paging, tool/Goal filters and server p50/p95 where samples exist. Unmeasured Tunnel spans and transport identity remain unknown, never fabricated. Goal dropdowns omit Goals without attributable calls.

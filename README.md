@@ -22,27 +22,27 @@
 </p>
 
 <h2 align="center">Download lnwjud</h2>
-<p align="center">Choose your platform and download the current v5.7.4 release directly.</p>
+<p align="center">Choose your platform and download the current v5.8.1 release directly.</p>
 
 <table align="center">
   <tr>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Setup-5.7.4.exe">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Setup-5.8.1.exe">
         <img src="assets/download/download-windows.svg" width="300" alt="Download lnwjud for Windows" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Portable-5.7.4.exe">Portable x64</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Portable-5.8.1.exe">Portable x64</a></sub>
     </td>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.7.4-arm64.dmg">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.1-arm64.dmg">
         <img src="assets/download/download-macos.svg" width="300" alt="Download lnwjud for macOS" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.7.4-x64.dmg">Intel x64 DMG</a> · <a href="docs/INSTALL_MACOS.md">Install guide</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.1-x64.dmg">Intel x64 DMG</a> · <a href="docs/INSTALL_MACOS.md">Install guide</a></sub>
     </td>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.7.4-x64.deb">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.1-x64.deb">
         <img src="assets/download/download-linux.svg" width="300" alt="Download lnwjud for Linux" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.7.4-x64.AppImage">x64 AppImage</a> · <a href="docs/INSTALL_LINUX.md">Other architectures</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.1-x64.AppImage">x64 AppImage</a> · <a href="docs/INSTALL_LINUX.md">Other architectures</a></sub>
     </td>
   </tr>
 </table>
@@ -51,20 +51,23 @@
 
 ---
 
-## Current published version: v5.7.4
+## Current published version: v5.8.1
 
 ## Current source version: v5.8.1
 
 ### What's new in v5.8.1
 
-**v5.8.1** hardens the end-to-end ChatGPT automation path from conversation identity through workspace/process isolation, mutation safety, task outcomes, audit attribution, and media access.
+**v5.8.1** hardens the end-to-end ChatGPT automation path from conversation identity through workspace/process isolation, mutation safety, task outcomes, audit attribution, and media access, while incorporating upstream UX fixes for dropdowns, What's New history, and Tunnel Live Logs.
 
 - **ChatGPT session isolation:** each conversation keeps a stable internal session identity and its own logical workspace context across requests and reconnects, while authorization remains authoritative.
 - **Concurrent process ownership:** process handles are scoped to session, actor, and workspace, so multiple ChatGPT conversations can run and interact with different processes concurrently without raw OS PID collisions bypassing ownership.
 - **Mutation and task safety:** workspace mutation fences prevent conflicting writes; task timeout, cancellation and retry outcomes are terminally verified instead of being mistaken for success; server-computed permission decisions are retained in activity traces.
 - **Media access:** `media_read` can inspect supported images and bounded video metadata/frames, with the Windows FFmpeg runtime prepared as part of packaging.
+- **Dropdown overlay fix:** shared dropdowns no longer change page padding, compress Work Log tables, or auto-scroll the underlying content.
+- **What's New history:** the in-app modal shows installed-or-earlier patches in the active series, newest first, with a scrollable list.
+- **Tunnel Live Logs:** ineffective Workspace/Session filters are hidden from the Tunnel tab while MCP activity and Processes retain their functional filters.
 
-**ภาษาไทย — สรุป:** v5.8.1 แยก session ของ ChatGPT ต่อบทสนทนา, ผูก workspace และ process ตามเจ้าของจริง, ป้องกัน mutation ชนกัน, ตรวจ timeout/cancellation/retry และ permission decision จากผลจริง พร้อมเพิ่ม `media_read` สำหรับภาพและวิดีโอแบบจำกัดขอบเขต
+**ภาษาไทย — สรุป:** v5.8.1 แยก session/workspace และ process ตามเจ้าของจริง, ป้องกัน mutation ชนกัน, ตรวจ timeout/cancellation/retry และ permission จากผลจริง, เพิ่ม `media_read` พร้อม FFmpeg และรับ UX fixes จาก upstream สำหรับ dropdown, What's New และ Tunnel Live Logs
 
 ### What's new in v5.8.0
 
@@ -88,7 +91,7 @@
 
 **ภาษาไทย — ต่างจาก 5.7.4:** เพิ่มเทมเพลต 6 แบบ, ประวัติ MCP และผลงาน Goal ที่มีหลักฐาน, RAM/CPU จริงของโปรเซสที่ตรวจเจ้าของได้, Context Economy แบบรวมระดับ Transport, ตรวจ CSV/XLSX, Git tree/preview ที่ครบขึ้น, UI และ dropdown กลาง, กากบาท Modal ขนาดชัดเจน, Work Log ที่กรองง่ายขึ้น, แก้ Tunnel reconnect ก่อนพร้อม และอัปเดต tunnel-client 0.0.16 พร้อมการทดสอบ/แพ็กเกจตาม SHA จริง ค่าไม่ทราบจะไม่แสดงเป็น 0 หรืออ้างว่าสำเร็จโดยไม่มีข้อมูล
 
-Latest published release: **v5.7.4**. The download buttons above point directly to the v5.7.4 assets. The release was published after the exact tagged main commit passed the target-native release gates.
+Latest published release: **v5.8.1**. The download buttons above point directly to the verified v5.8.1 assets. The release was published after the exact tagged main commit passed the target-native release gates.
 
 ### What's new in v5.7.4
 
@@ -98,7 +101,6 @@ Latest published release: **v5.7.4**. The download buttons above point directly 
 ภาษาไทย: v5.7.4 แก้กล่องยืนยันคำสั่งเสี่ยงสูงที่ยาวจนล้นจอ โดยยังดูคำสั่งฉบับเต็มผ่านพื้นที่เลื่อนได้เหมือนกันบน Windows, macOS และ Linux; ปุ่มยกเลิกเป็นค่าเริ่มต้น และยังจำกัด error text ที่ยาวผิดปกติใน native alert จุดอื่นด้วย
 
 See the [Thai Engineering Harness guide](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for setup and workflow details.
-
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for previous releases and the complete release history.
 
 ## Install
