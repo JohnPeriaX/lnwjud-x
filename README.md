@@ -53,7 +53,7 @@
 
 ## Current published version: v5.8.1
 
-## Current source version: v5.8.1
+## Current source version: v5.8.2
 
 ### What's new in v5.8.1
 
