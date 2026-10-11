@@ -155,6 +155,10 @@ describe('standardized GitHub release notes', () => {
     const { extractCuratedHighlights } = await import(releaseNotesModuleUrl);
     const readme = `### Current source changes in v5.7.4\n\n- High-risk approval dialogs stay on-screen across operating systems.\n- Other native alerts bound oversized error text.`;
 
+    const previewReadme = `### What's new in v5.8.3 (development preview; not yet published)\n\n- Verified files and safer workflows.`;
+    expect(extractCuratedHighlights(previewReadme, 'v5.8.3', 'engasnm111/lnwjud')).toEqual([
+      'Verified files and safer workflows.',
+    ]);
     expect(extractCuratedHighlights(readme, 'v5.7.4', 'engasnm111/lnwjud')).toEqual([
       'High-risk approval dialogs stay on-screen across operating systems.',
       'Other native alerts bound oversized error text.',

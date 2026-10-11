@@ -57,6 +57,7 @@
 
 ### What's new in v5.8.3 (development preview; not yet published)
 
+- **Ponytail ULTRA Goal context (Issue #190):** Code mutations without `goalLease` now explain when Ponytail was loaded for a Goal, and tell users to supply that Goal's lease or load the bundled skill in workspace scope. Goal-scoped activation never silently authorizes unbound edits.
 - **Doctor MCP history and Results:** Improved tables and full-detail JSON copy; all visible dates use Gregorian DD/MM/YYYY, Asia/Bangkok (UTC+07:00), 24-hour time. Copied timestamp fields use offset-aware ISO 8601 without changing the underlying instant.
 - **Doctor Resources:** Tracked Goal tasks remain visible even when CPU/RAM cannot be measured; show ownership and why cancellation is unavailable. Only verified active owned blocking jobs can request native-approved cancellation.
 - **Workflows guided inputs:** Detect actual workbook sheets/columns, choose real Git branches and a project package version, and generate a new, workspace-bound report mapping when requested. Advanced manual input remains available; no AI workflow starts automatically.

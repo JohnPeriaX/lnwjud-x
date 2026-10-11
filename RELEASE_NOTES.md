@@ -2,6 +2,12 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.8.3
+
+- **Ponytail ULTRA scope clarity (Issue #190):** When the bundled skill was loaded with `goalId`, code edits without `goalLease` report the missing context and give actionable alternatives; unbound edits do not inherit goal-scoped authorization. Regression coverage includes the safe impossible-match `edit_file` probe and sequential `tool_batch`.
+- **Doctor and Workflows:** Improve diagnostics, evidence copying, Goal task visibility and safe file-derived input choices; clarify the Code Review Git baseline.
+- **Release reliability:** Honor version-specific development-preview README highlights when generating release notes so a verified build is not blocked by its preview heading.
+
 ### What's new in v5.8.2
 
 - **macOS update lifecycle:** Keep the Desktop runtime and IPC available while Squirrel.Mac validates a downloaded update. Only shut down for the native updater's accepted quit.
