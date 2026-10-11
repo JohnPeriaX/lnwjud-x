@@ -13,7 +13,7 @@ export interface WorkflowFileInspection {
 
 /** Read only metadata from an existing workspace-bound Office file, never cell content. */
 export async function inspectWorkflowFile(root: string, inputPath: string): Promise<WorkflowFileInspection> {
-  const filename = await safeOfficePath(root, inputPath);
+  const filename = await safeOfficePath(root, path.isAbsolute(inputPath) ? path.relative(root, inputPath) : inputPath);
   if (path.extname(filename).toLowerCase() === '.csv') {
     const table = await loadOfficeTable(root, filename, { scanCellLimit: 256 });
     return { fileType: 'csv', sheets: [{ name: 'CSV', columns: table.headers.slice(0, 256) }] };
@@ -57,7 +57,7 @@ export async function inspectWorkflowGitBranches(root: string): Promise<readonly
 /** Explicit user action: create a new mapping that appends findings below the template's used rows. */
 export async function generateWorkflowReportMapping(root: string, templatePath: string, sheetName: string): Promise<string> {
   if (!sheetName || sheetName.length > 31) throw new Error('Select a report worksheet');
-  const filename = await safeOfficePath(root, templatePath);
+  const filename = await safeOfficePath(root, path.isAbsolute(templatePath) ? path.relative(root, templatePath) : templatePath);
   if (path.extname(filename).toLowerCase() !== '.xlsx') throw new Error('A report template must be XLSX');
   const raw = await readFile(filename);
   preflightXlsxZip(Buffer.from(raw));
