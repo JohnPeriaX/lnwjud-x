@@ -4,6 +4,7 @@ import { SearchableSelect } from '../../components/ui/SearchableSelect.js';
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type { DoctorGoalOption, TaskResultSummary, UiLocale } from '@lnwjud/ipc-contracts';
 import { v580Strings } from '../../i18n/v580-copy.js';
+import { formatDateTime } from '../../date-time.js';
 
 /** On demand: only inspect an explicitly selected Goal, never infer success from status. */
 export function GoalResultsPanel(props: {
@@ -85,7 +86,7 @@ export function GoalResultsPanel(props: {
     {selectedGoal ? <div className="diagnostics-selected-goal">
       <strong>{selectedGoal.goalKey}</strong>
       <span>{selectedGoal.objective}</span>
-      <small>{copy.updated}: {new Date(selectedGoal.updatedAt).toLocaleString(copy.dateLocale)}</small>
+      <small>{copy.updated}: {formatDateTime(selectedGoal.updatedAt, '—', props.locale)}</small>
     </div> : null}
     {goalId && !result && !busy && !error ? <p role="status" className="hint">
       {copy.inspectHint}
@@ -112,7 +113,7 @@ export function GoalResultsPanel(props: {
         <dl className="diagnostics-progress-overview">
           <dt>{copy.phase}</dt><dd>{result.progress.currentPhase || copy.unknown}</dd>
           <dt>{copy.updated}</dt><dd>{result.progress.updatedAt
-            ? new Date(result.progress.updatedAt).toLocaleString(copy.dateLocale) : '-'}</dd>
+            ? formatDateTime(result.progress.updatedAt, '—', props.locale) : '-'}</dd>
           <dt>{copy.nextAction}</dt><dd>{result.progress.nextAction || '-'}</dd>
           <dt>{copy.checkpointSummary}</dt>
           <dd>{result.progress.lastCheckpointSummary || copy.noSummary}</dd>
@@ -146,7 +147,7 @@ export function GoalResultsPanel(props: {
           : <div className="diagnostics-history-scroll"><table className="diagnostics-data-table"><thead><tr>
             <th>{copy.at}</th><th>{copy.action}</th><th>{copy.path}</th><th>{copy.details}</th>
           </tr></thead><tbody>{result.observedChanges.map((item) => <tr key={item.operationId}>
-            <td className="diagnostics-date">{new Date(item.observedAt).toLocaleString(copy.dateLocale)}</td>
+            <td className="diagnostics-date">{formatDateTime(item.observedAt, '—', props.locale)}</td>
             <td>{item.action}</td><td className="diagnostics-identifier">{item.path}</td>
             <td><DiagnosticCopyButton details={item} label={copy.copyDetails} copiedLabel={copy.copied} errorLabel={copy.copyError} onError={setError} /></td>
           </tr>)}</tbody></table></div>}

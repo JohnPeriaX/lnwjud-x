@@ -3,6 +3,7 @@ import { DiagnosticCopyButton } from '../ui/DiagnosticCopyButton.js';
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import type { CallHistoryPage, CallHistoryRequest, DoctorGoalOption, ToolCatalogItem, UiLocale } from '@lnwjud/ipc-contracts';
 import { v580Strings } from '../../i18n/v580-copy.js';
+import { formatDateTime } from '../../date-time.js';
 import { SearchableSelect } from '../../components/ui/SearchableSelect.js';
 export function CallHistoryPanel(props: { readonly workspaceId: string | null; readonly locale: UiLocale }): ReactElement {
   const [goalId, setGoalId] = useState('');
@@ -103,7 +104,7 @@ export function CallHistoryPanel(props: { readonly workspaceId: string | null; r
       </div> : <div className="diagnostics-history-scroll"><table className="diagnostics-data-table">
         <thead><tr><th>{copy.at}</th><th>{copy.tool}</th><th>{copy.outcome}</th><th>Server ms</th><th>Tunnel ms</th><th>{copy.goal}</th><th>{copy.details}</th></tr></thead>
         <tbody>{page.items.map(item=><tr key={item.correlationKey}>
-          <td className="diagnostics-date">{item.completedAt ? new Date(item.completedAt).toLocaleString(copy.dateLocale) : '—'}</td>
+          <td className="diagnostics-date">{item.completedAt ? formatDateTime(item.completedAt, '—', props.locale) : '—'}</td>
           <td className="diagnostics-tool" title={item.toolName}>{toolTitles.get(item.toolName) ?? item.toolName}<small>{item.toolName}</small></td>
           <td><span className={`diagnostics-status diagnostics-status--${item.outcome === 'success' ? 'success' : item.outcome === 'failure' ? 'error' : 'neutral'}`}>{item.outcome}</span></td>
           <td className="diagnostics-number">{item.serverMs ?? '—'}</td>

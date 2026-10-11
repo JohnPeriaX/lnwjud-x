@@ -51,6 +51,7 @@ export function WorkflowsPage(props: { readonly workspaceId: string | null; read
     const initial: Record<string, string> = {};
     for (const field of template.inputFields) {
       if (field.type === 'enum' && field.options?.length) initial[field.key] = field.options[0]!;
+      if (template.id === 'code-review' && field.key === 'baseRef') initial[field.key] = 'HEAD';
       if ((field.key === 'projectPath' || field.key === 'repoPath') && props.workspacePath) initial[field.key] = props.workspacePath;
     }
     setInputs(initial);

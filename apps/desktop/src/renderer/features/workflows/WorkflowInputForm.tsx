@@ -48,11 +48,12 @@ export function WorkflowInputForm(props: {
                 aria-invalid={invalid || undefined} aria-describedby={invalid ? errorId : undefined}
                 value={props.values[field.key] ?? ''}
                 onChange={(event) => props.onChange({ ...props.values, [field.key]: event.target.value })}
-                placeholder={field.type === 'path' || field.type === 'mapping_file' ? copy.path : field.key} />
+                placeholder={field.key === 'baseRef' ? copy.baseRefPlaceholder : field.type === 'path' || field.type === 'mapping_file' ? copy.path : field.key} />
               {isFile ? <ActionButton type="button" className="ui-browse-button" disabled={props.disabled || browsing !== null}
                 onClick={() => { void browse(field.key); }}>{browsing === field.key ? '…' : browseLabel}</ActionButton> : null}
             </div>
           )}
+          {field.key === 'baseRef' ? <p className="hint">{copy.baseRefHelp}</p> : null}
           {invalid ? <p id={errorId} className="field-validation-message" role="alert">{copy.required}</p> : null}
         </FormField>;
       })}

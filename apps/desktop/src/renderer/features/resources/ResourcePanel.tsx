@@ -4,6 +4,7 @@ import { SearchableSelect } from '../../components/ui/SearchableSelect.js';
 import { useEffect, useState, type ReactElement } from 'react';
 import type { DoctorGoalOption, ResourceSnapshot, UiLocale } from '@lnwjud/ipc-contracts';
 import { v580Strings } from '../../i18n/v580-copy.js';
+import { formatDateTime } from '../../date-time.js';
 
 type ResourceRow = ResourceSnapshot['resources'][number];
 
@@ -140,7 +141,7 @@ export function ResourcePanel(props: { readonly locale: UiLocale; readonly works
       <small>{copy.goalStatus}: {selectedGoal.status}</small>
     </div> : null}
     {snapshot ? <div aria-live="polite" className="diagnostics-resources-output">
-      <p>{copy.sampled} {new Date(snapshot.sampledAt).toLocaleString(copy.dateLocale)} · {copy.coverage}: {snapshot.coverage} · {snapshot.stale ? copy.stale : copy.sample}</p>
+      <p>{copy.sampled} {formatDateTime(snapshot.sampledAt, '—', props.locale)} · {copy.coverage}: {snapshot.coverage} · {snapshot.stale ? copy.stale : copy.sample}</p>
       {snapshot.desktopMain ? <div className="diagnostics-context-counters">
         <strong>{copy.desktopMain}</strong>
         <dl className="diagnostics-resource-summary">

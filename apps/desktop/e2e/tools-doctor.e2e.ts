@@ -166,8 +166,10 @@ test.describe('Tools catalog and Doctor real Electron acceptance', () => {
       await app.page.getByRole('button', { name: /^(เวิร์กโฟลว์|Workflows)$/ }).click();
       await expect(app.page.locator('.workflow-card')).toHaveCount(6);
       await app.page.locator('.workflow-card').filter({ hasText: /รีวิวโค้ด|Code Review/ }).click();
-      await app.page.locator('.workflow-primary-action').first().click();
       const required = app.page.locator('#workflow-baseRef');
+      await expect(required).toHaveValue('HEAD');
+      await required.fill('');
+      await app.page.locator('.workflow-primary-action').first().click();
       await expect(required).toHaveAttribute('aria-invalid', 'true');
       await expect(required).toBeFocused();
       await expect(app.page.locator('#workflow-baseRef-error')).toBeVisible();

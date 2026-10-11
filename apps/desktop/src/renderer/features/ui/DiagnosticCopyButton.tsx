@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import { copyTextToClipboard } from '../../clipboard.js';
+import { diagnosticCopyJson } from './diagnostic-copy-json.js';
 import { ActionButton } from './UiPrimitives.js';
 
 export function DiagnosticCopyButton(props: {
@@ -12,7 +13,7 @@ export function DiagnosticCopyButton(props: {
   const [copied, setCopied] = useState(false);
   async function copy(): Promise<void> {
     try {
-      if (!await copyTextToClipboard(JSON.stringify(props.details, null, 2))) throw new Error(props.errorLabel);
+      if (!await copyTextToClipboard(diagnosticCopyJson(props.details))) throw new Error(props.errorLabel);
       setCopied(true);
     } catch (cause: unknown) {
       setCopied(false);
