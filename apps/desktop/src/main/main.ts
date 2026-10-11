@@ -727,11 +727,13 @@ export function registerIpcHandlers(
     const workspace = (await services.listWorkspaces()).find((item) => item.id === request.workspaceId);
     if (!workspace) throw new Error('Workspace not found');
     const root = workspace.realRootPath;
-    return {
-      projectVersion: await inspectWorkflowProjectVersion(root),
-      branches: await inspectWorkflowGitBranches(root),
-      file: typeof request.filePath === 'string' ? await inspectWorkflowFile(root, request.filePath) : null,
-    };
+    if (typeof request.filePath === 'string') {
+      return { projectVersion: null, branches: [], file: await inspectWorkflowFile(root, request.filePath) };
+    }
+    const [projectVersion, branches] = await Promise.all([
+      inspectWorkflowProjectVersion(root), inspectWorkflowGitBranches(root),
+    ]);
+    return { projectVersion, branches, file: null };
   });
   registerHandler(ipcChannels.generateWorkflowMapping, async (event, payload: unknown) => {
     assertTrustedSender(event, getMainWindow());
