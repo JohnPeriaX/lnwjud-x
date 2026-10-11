@@ -159,6 +159,21 @@ test.describe('Tools catalog and Doctor real Electron acceptance', () => {
     } finally { await closeDesktop(app); }
   });
 
+  test('Workflow reads real CSV headers into guided choices', async () => {
+    const app = await launchDesktop();
+    try {
+      const csv = path.join(app.fixtureRoot, 'customers.csv');
+      await writeFile(csv, '\uFEFFรหัส,ชื่อ,ยอด\n001,ไทย,10\n002,English,20\n');
+      await dismissFirstRunTip(app.page);
+      await app.page.getByRole('button', { name: /^(เวิร์กโฟลว์|Workflows)$/ }).click();
+      await app.page.locator('.workflow-card').filter({ hasText: /ตรวจข้อมูล Excel|Data Audit/ }).click();
+      await app.page.locator('#workflow-inputPath').fill(csv);
+      await expect(app.page.locator('#workflow-sheet')).toContainText('CSV');
+      await expect(app.page.locator('#workflow-keyColumns')).toContainText('รหัส');
+      await expect(app.page.locator('.workflow-field-error')).toHaveCount(0);
+    } finally { await closeDesktop(app); }
+  });
+
   test('Workflow required input is shown inline and focused before backend preparation', async () => {
     const app = await launchDesktop();
     try {
@@ -166,6 +181,7 @@ test.describe('Tools catalog and Doctor real Electron acceptance', () => {
       await app.page.getByRole('button', { name: /^(เวิร์กโฟลว์|Workflows)$/ }).click();
       await expect(app.page.locator('.workflow-card')).toHaveCount(6);
       await app.page.locator('.workflow-card').filter({ hasText: /รีวิวโค้ด|Code Review/ }).click();
+      await app.page.getByRole('button', { name: /กรอกเอง|Enter manually/ }).click();
       const required = app.page.locator('#workflow-baseRef');
       await expect(required).toHaveValue('HEAD');
       await required.fill('');

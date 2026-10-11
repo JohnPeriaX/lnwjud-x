@@ -59,6 +59,7 @@ and returns the response without opening a public inbound port on the host.
 
 - Doctor MCP history, Results, and Resources have readable tables and complete JSON copy actions. Visible dates use Gregorian DD/MM/YYYY, Asia/Bangkok (UTC+07:00) and 24-hour clock; copied ISO evidence timestamps use Bangkok's +07:00 offset, preserving the instant.
 - Resource diagnostics show all tracked Goal tasks, including those without CPU/RAM samples; missing measurements remain unknown rather than zero. Cancellation only appears for verified owned running blocking jobs and requires native authorization.
+- Workflows guided mode derives Sheet and column choices from the selected workspace-bound XLSX/CSV file, real Git branches and project package version. Explicit mapping generation writes only a new JSON file, appending the report below existing template rows; Advanced mode keeps manual fields and unsupported files visible.
 - Code Review workflow now defaults baseRef to HEAD and explains Git branch/commit comparison choices.
 - ภาษาไทย: ทุกหน้าจอแสดงปี ค.ศ. เขตเวลา Asia/Bangkok และเวลา 24 ชั่วโมง รวมทั้ง JSON ที่คัดลอกเป็น timestamp +07:00; ฐานเปรียบเทียบรีวิวโค้ดมีคำอธิบายและค่าเริ่มต้น HEAD
 

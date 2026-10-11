@@ -109,7 +109,7 @@ export function WorkflowsPage(props: { readonly workspaceId: string | null; read
       {selected ? (
         <Surface as="section" className="workflow-config" aria-label={copy.inputLabel}>
           <h2>{workflowLocalized(props.locale,{th:selected.titleTh,en:selected.titleEn})}</h2>
-          <WorkflowInputForm template={selected} locale={props.locale} values={inputs} disabled={busy}
+          <WorkflowInputForm key={selected.id} template={selected} workspaceId={props.workspaceId} locale={props.locale} values={inputs} disabled={busy}
             invalidKeys={invalidFields}
             onChange={(values) => { setInputs(values); setDraft(null); setMessage(null);
               setInvalidFields((current) => new Set([...current].filter((key) => !(values[key] ?? '').trim())));

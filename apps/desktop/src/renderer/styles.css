@@ -3432,7 +3432,15 @@ h2 {
 .workflow-input-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:16px; width:100%; min-width:0; }
 .workflow-field { display:flex; flex-direction:column; align-items:stretch; gap:8px; min-width:0; }
 .workflow-field label { color:var(--text); font-size:13px; font-weight:600; }
-.workflow-field-control { display:flex; align-items:stretch; gap:8px; width:100%; min-width:0; }
+.workflow-field-control { display:flex; align-items:stretch; gap:8px; width:100%; min-width:0; flex-wrap:wrap; }
+.workflow-field-control > .ui-combobox, .workflow-field-control > input { flex:1 1 220px; min-width:0; }
+.workflow-field-control > button { flex:0 0 auto; }
+.workflow-input-mode { grid-column:1/-1; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 14px; border:1px solid var(--border-subtle); border-radius:10px; background:rgba(245,197,66,.035); }
+.workflow-input-mode .hint { flex:1 1 300px; margin:0; }
+.workflow-field > .hint { margin:0; font-size:12px; line-height:1.5; }
+.workflow-mapping-tools { display:flex; gap:8px; align-items:center; flex-wrap:wrap; min-width:0; }
+.workflow-mapping-tools > .ui-combobox { flex:1 1 190px; min-width:0; }
+.workflow-mapping-tools > button { flex:0 0 auto; }
 .workflow-field-control input { flex:1 1 100%; width:100%; min-width:0; }
 .workflow-field-control .ui-browse-button { flex:0 0 auto; min-height:42px; white-space:nowrap; border-color:var(--border); color:var(--gold-bright); }
 .workflow-primary-action { align-self:flex-start; min-height:42px; padding:10px 18px; border-color:var(--gold-primary); background:rgba(245,197,66,.13); color:var(--gold-bright); }
