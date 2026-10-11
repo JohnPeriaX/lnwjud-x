@@ -37,7 +37,7 @@ export async function inspectWorkflowFile(root: string, inputPath: string): Prom
 /** Suggest only a version actually found in a package at the selected workspace root. */
 export async function inspectWorkflowProjectVersion(root: string): Promise<string | null> {
   try {
-    const file = await safeOfficePath(root, path.join(root, 'package.json'));
+    const file = await safeOfficePath(root, 'package.json');
     const data: unknown = JSON.parse(await readFile(file, 'utf8'));
     if (!data || typeof data !== 'object' || !('version' in data)) return null;
     const version = (data as {version?:unknown}).version;
@@ -68,7 +68,7 @@ export async function generateWorkflowReportMapping(root: string, templatePath: 
   if ((sheet.model as unknown as {sheetProtection?:unknown}).sheetProtection) throw new Error('Cannot write to protected template sheet');
   const appendRow = Math.max(2, sheet.rowCount + 2);
   if (appendRow > 1_048_570) throw new Error('Not enough rows available in template');
-  const target = await safeOfficePath(root, path.join(path.dirname(filename), `lnwjud-report-mapping-${randomUUID().slice(0,8)}.json`), true);
+  const target = await safeOfficePath(root, `lnwjud-report-mapping-${randomUUID().slice(0,8)}.json`, true);
   const mapping = {
     schemaVersion: 1,
     cells: [],
