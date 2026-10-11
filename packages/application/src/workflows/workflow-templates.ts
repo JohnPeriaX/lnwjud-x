@@ -11,7 +11,7 @@ export const WORKFLOW_TEMPLATES: readonly WorkflowTemplate[] = [
   {
     id: 'code-review', revision: 1, titleTh: 'รีวิวโค้ด', titleEn: 'Code Review',
     descriptionTh: 'ตรวจความเสี่ยงจาก diff โดยไม่แก้ไฟล์', descriptionEn: 'Review scoped diff without editing files.',
-    category: 'coding', inputFields: [field('repoPath','โฟลเดอร์โค้ด','Repository','path'), field('baseRef','ฐานเปรียบเทียบ','Base ref','text')],
+    category: 'coding', inputFields: [field('repoPath','โฟลเดอร์โค้ด','Repository','path'), field('baseRef','เทียบกับ Branch / Commit','Compare with branch / commit','text')],
     outputKinds: ['report'], requiredCapabilities: [], readOnly: true, estimatedEffort: 'medium',
   },
   {

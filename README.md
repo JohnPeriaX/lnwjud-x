@@ -53,7 +53,15 @@
 
 ## Current published version: v5.8.2
 
-## Current source version: v5.8.2
+## Current source version: v5.8.3
+
+### What's new in v5.8.3 (development preview; not yet published)
+
+- **Doctor MCP history and Results:** Improved tables and full-detail JSON copy; all visible dates use Gregorian DD/MM/YYYY, Asia/Bangkok (UTC+07:00), 24-hour time. Copied timestamp fields use offset-aware ISO 8601 without changing the underlying instant.
+- **Doctor Resources:** Tracked Goal tasks remain visible even when CPU/RAM cannot be measured; show ownership and why cancellation is unavailable. Only verified active owned blocking jobs can request native-approved cancellation.
+- **Workflows guided inputs:** Detect actual workbook sheets/columns, choose real Git branches and a project package version, and generate a new, workspace-bound report mapping when requested. Advanced manual input remains available; no AI workflow starts automatically.
+- **Code Review:** Default Git comparison base is HEAD, with clear guidance for main/dev/commit refs.
+- **ภาษาไทย:** ตาราง Doctor อ่านง่ายขึ้น ข้อมูลวันที่ทุกหน้าจอเป็นปี ค.ศ. เวลาไทย 24 ชั่วโมง และ JSON ที่คัดลอกใช้ +07:00; หน้ารีวิวโค้ดอธิบายฐานเปรียบเทียบ Git และมีค่า HEAD เริ่มต้น
 
 ### What's new in v5.8.2
 

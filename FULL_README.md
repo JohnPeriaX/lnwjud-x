@@ -53,7 +53,15 @@ and returns the response without opening a public inbound port on the host.
 
 ## Current published version: v5.8.2
 
-## Current source version: v5.8.2
+## Current source version: v5.8.3
+
+### What's new in v5.8.3 (local preview; not published)
+
+- Doctor MCP history, Results, and Resources have readable tables and complete JSON copy actions. Visible dates use Gregorian DD/MM/YYYY, Asia/Bangkok (UTC+07:00) and 24-hour clock; copied ISO evidence timestamps use Bangkok's +07:00 offset, preserving the instant.
+- Resource diagnostics show all tracked Goal tasks, including those without CPU/RAM samples; missing measurements remain unknown rather than zero. Cancellation only appears for verified owned running blocking jobs and requires native authorization.
+- Workflows guided mode derives Sheet and column choices from the selected workspace-bound XLSX/CSV file, real Git branches and project package version. Explicit mapping generation writes only a new JSON file, appending the report below existing template rows; Advanced mode keeps manual fields and unsupported files visible.
+- Code Review workflow now defaults baseRef to HEAD and explains Git branch/commit comparison choices.
+- ภาษาไทย: ทุกหน้าจอแสดงปี ค.ศ. เขตเวลา Asia/Bangkok และเวลา 24 ชั่วโมง รวมทั้ง JSON ที่คัดลอกเป็น timestamp +07:00; ฐานเปรียบเทียบรีวิวโค้ดมีคำอธิบายและค่าเริ่มต้น HEAD
 
 ### What's new in v5.8.2
 
@@ -264,7 +272,7 @@ A few operating-system boundaries still apply:
 
 ### 2. Connect ChatGPT with Remote MCP + OAuth (recommended)
 
-For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.8.2 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
+For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.8.3 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
 
 1. Open **lnwjud → Settings → Remote MCP & Tunnel**.
 2. Check the ngrok status. If lnwjud shows **READY**, keep the detected installation. If it is not ready, lnwjud shows only the installation path supported by the current host: Windows may use Microsoft Store/WinGet, macOS may use Homebrew when available, and hosts without a verified automatic installer get the official ngrok download link instead. Runtime discovery itself is cross-platform and verifies `ngrok version` before use.
@@ -635,8 +643,8 @@ corepack pnpm@10.15.0 package:windows
 The Windows 10/11 x64 artifacts are written to:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.8.2.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.8.2.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.8.3.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.8.3.exe
 ```
 
 The installer is per-user by default. The portable executable needs no installation but uses the same per-user lnwjud data/settings location. A common installed executable path is:

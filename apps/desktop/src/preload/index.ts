@@ -22,6 +22,8 @@ import {
   type WorkflowTemplate,
   type WorkflowPrepareRequest,
   type WorkflowDraft,
+  type WorkflowChoicesRequest,
+  type WorkflowChoicesResult,
   type CallHistoryRequest,
   type CallHistoryPage,
   type TaskResultSummary,
@@ -1669,6 +1671,37 @@ const api: LnwjudApi = {
   setGoalPonytailMode,
   chooseTunnelClientPath,
   chooseWorkflowDataFile,
+  generateWorkflowMapping: (request: {workspaceId:string;templatePath:string;sheet:string}): Promise<{filePath:string}> => {
+    if (!isRecord(request) || typeof request.workspaceId !== 'string' || typeof request.templatePath !== 'string'
+      || typeof request.sheet !== 'string' || !request.sheet || request.sheet.length > 31
+      || !request.workspaceId || request.workspaceId.length > 128 || !request.templatePath || request.templatePath.length > 4096) return Promise.reject(new Error('Invalid mapping request'));
+    return invoke(ipcChannels.generateWorkflowMapping, request).then((value: unknown) => {
+      if (!isRecord(value) || typeof value.filePath !== 'string' || !value.filePath) throw new Error('Invalid mapping result');
+      return {filePath:value.filePath};
+    });
+  },
+  inspectWorkflowChoices: (request: WorkflowChoicesRequest): Promise<WorkflowChoicesResult> => {
+    if (!isRecord(request) || typeof request.workspaceId !== 'string' || !request.workspaceId || request.workspaceId.length > 128
+      || (request.filePath !== undefined && (typeof request.filePath !== 'string' || request.filePath.length > 4096))) {
+      return Promise.reject(new Error('Invalid workflow inspection request'));
+    }
+    return invoke(ipcChannels.inspectWorkflowChoices, request).then((value: unknown) => {
+      if (!isRecord(value) || (value.projectVersion !== null && typeof value.projectVersion !== 'string')
+        || !Array.isArray(value.branches) || value.branches.length > 80 || !value.branches.every((name: unknown) => typeof name === 'string' && name.length>0 && name.length<=256)
+        || (value.file !== null && (!isRecord(value.file) || !Array.isArray(value.file.sheets)))) {
+        throw new Error('Invalid workflow inspection result');
+      }
+      if (value.file !== null) {
+        if (value.file.fileType !== 'csv' && value.file.fileType !== 'xlsx') throw new Error('Invalid file type');
+        if ((value.file.sheets as unknown[]).length > 64 || !(value.file.sheets as unknown[]).every((sheet: unknown) => isRecord(sheet)
+          && typeof sheet.name === 'string' && sheet.name.length <= 64 && Array.isArray(sheet.columns)
+          && sheet.columns.length <= 256 && sheet.columns.every((column: unknown) => typeof column === 'string' && column.length <= 1024))) {
+          throw new Error('Invalid Office metadata');
+        }
+      }
+      return value as unknown as WorkflowChoicesResult;
+    });
+  },
   configureTunnelProfile,
   openExternalSetupPage,
   launchManagedBrowser,

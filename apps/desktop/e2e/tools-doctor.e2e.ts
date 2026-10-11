@@ -159,6 +159,36 @@ test.describe('Tools catalog and Doctor real Electron acceptance', () => {
     } finally { await closeDesktop(app); }
   });
 
+  test('Workflow reads real CSV headers into guided choices', async () => {
+    const app = await launchDesktop();
+    try {
+      const csv = path.join(app.fixtureRoot, 'customers.csv');
+      await writeFile(csv, '\uFEFFรหัส,ชื่อ,ยอด\n001,ไทย,10\n002,English,20\n');
+      await dismissFirstRunTip(app.page);
+      await app.page.getByRole('button', { name: /^(เวิร์กโฟลว์|Workflows)$/ }).click();
+      await app.page.locator('.workflow-card').filter({ hasText: /ตรวจข้อมูล Excel|Data Audit/ }).click();
+      await app.page.locator('#workflow-inputPath').fill(csv);
+      try {
+        await expect(app.page.locator('#workflow-sheet')).toContainText('CSV', { timeout: 10_000 });
+      } catch (cause) {
+        const diagnostics = await app.page.evaluate(async (filePath) => {
+          const dashboard = await window.lnwjud.getDashboard();
+          const workspace = dashboard.selectedWorkspace;
+          const uiError = document.querySelector('.workflow-field-error')?.textContent ?? null;
+          const inspection = workspace
+            ? await window.lnwjud.inspectWorkflowChoices({ workspaceId: workspace.id, filePath })
+              .then(result => ({ sheets: result.file?.sheets ?? [] }))
+              .catch(error => ({ error: String(error) }))
+            : null;
+          return { workspaceRoot: workspace?.rootPath ?? null, uiError, inspection };
+        }, csv);
+        throw new Error(`Guided CSV choices did not load: ${JSON.stringify(diagnostics)}; ${String(cause)}`);
+      }
+      await expect(app.page.locator('#workflow-keyColumns')).toContainText('รหัส');
+      await expect(app.page.locator('.workflow-field-error')).toHaveCount(0);
+    } finally { await closeDesktop(app); }
+  });
+
   test('Workflow required input is shown inline and focused before backend preparation', async () => {
     const app = await launchDesktop();
     try {
@@ -166,8 +196,11 @@ test.describe('Tools catalog and Doctor real Electron acceptance', () => {
       await app.page.getByRole('button', { name: /^(เวิร์กโฟลว์|Workflows)$/ }).click();
       await expect(app.page.locator('.workflow-card')).toHaveCount(6);
       await app.page.locator('.workflow-card').filter({ hasText: /รีวิวโค้ด|Code Review/ }).click();
-      await app.page.locator('.workflow-primary-action').first().click();
+      await app.page.getByRole('button', { name: /กรอกเอง|Enter manually/ }).click();
       const required = app.page.locator('#workflow-baseRef');
+      await expect(required).toHaveValue('HEAD');
+      await required.fill('');
+      await app.page.locator('.workflow-primary-action').first().click();
       await expect(required).toHaveAttribute('aria-invalid', 'true');
       await expect(required).toBeFocused();
       await expect(app.page.locator('#workflow-baseRef-error')).toBeVisible();

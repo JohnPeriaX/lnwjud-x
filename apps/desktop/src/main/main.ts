@@ -91,7 +91,7 @@ import {
   type UpdateStatus,
   type WorkspaceSummary,
 } from '@lnwjud/ipc-contracts';
-import { readSharedActivitySnapshot, startMcpStdio, type EccRuntimeOptions, type HostMutationApprovalRequest } from '@lnwjud/mcp-server';
+import { readSharedActivitySnapshot, startMcpStdio, inspectWorkflowFile, inspectWorkflowProjectVersion, inspectWorkflowGitBranches, generateWorkflowReportMapping, type EccRuntimeOptions, type HostMutationApprovalRequest } from '@lnwjud/mcp-server';
 import { createExplicitKeySecretProtector, DEFAULT_DISPLAY_TIME_ZONE, DEFAULT_MCP_POLL_WAIT_SECONDS, DEFAULT_SHELL_SYNCHRONOUS_WAIT_SECONDS, MAX_CONFIGURABLE_WAIT_SECONDS, MIN_CONFIGURABLE_WAIT_SECONDS, formatDisplayDateTime, formatOffsetIsoTimestamp, normalizeMcpAllowedHostname, resolveLnwjudDataPath, type SecretProtector } from '@lnwjud/shared';
 import { applyPendingSqliteRestoreSync, CheckpointKeyStore, type CheckpointPayloadCipher } from '@lnwjud/storage';
 import { createDesktopRuntime, formatCompleteTargetDetail, formatIncompleteLegacyHistory, writeSerializedLogRows, type DesktopRuntime } from './desktop-services.js';
@@ -711,9 +711,41 @@ export function registerIpcHandlers(
     const result = await dialog.showOpenDialog(owner, {
       title: 'Select Excel / CSV data file',
       properties: ['openFile'],
-      filters: [{ name: 'Excel and CSV', extensions: ['xlsx', 'csv', 'tsv'] }, { name: 'All files', extensions: ['*'] }],
+      filters: [{ name: 'Excel and CSV', extensions: ['xlsx', 'csv'] }, { name: 'JSON mappings', extensions: ['json'] }, { name: 'All files', extensions: ['*'] }],
     });
     return { filePath: result.canceled ? null : (result.filePaths[0] ?? null) };
+  });
+  registerHandler(ipcChannels.inspectWorkflowChoices, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Invalid workflow inspection request');
+    const request = payload as Record<string, unknown>;
+    if (typeof request.workspaceId !== 'string' || !request.workspaceId || request.workspaceId.length > 128
+      || Object.keys(request).some((key) => key !== 'workspaceId' && key !== 'filePath')
+      || (request.filePath !== undefined && (typeof request.filePath !== 'string' || request.filePath.length > 4096))) {
+      throw new Error('Invalid workflow inspection request');
+    }
+    const workspace = (await services.listWorkspaces()).find((item) => item.id === request.workspaceId);
+    if (!workspace) throw new Error('Workspace not found');
+    const root = workspace.realRootPath;
+    if (typeof request.filePath === 'string') {
+      return { projectVersion: null, branches: [], file: await inspectWorkflowFile(root, request.filePath) };
+    }
+    const [projectVersion, branches] = await Promise.all([
+      inspectWorkflowProjectVersion(root), inspectWorkflowGitBranches(root),
+    ]);
+    return { projectVersion, branches, file: null };
+  });
+  registerHandler(ipcChannels.generateWorkflowMapping, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Invalid mapping request');
+    const request = payload as Record<string,unknown>;
+    if (typeof request.workspaceId !== 'string' || request.workspaceId.length > 128 || !request.workspaceId
+      || typeof request.templatePath !== 'string' || !request.templatePath || request.templatePath.length > 4096
+      || typeof request.sheet !== 'string' || !request.sheet || request.sheet.length > 31
+      || Object.keys(request).some(key => !['workspaceId','templatePath','sheet'].includes(key))) throw new Error('Invalid mapping request');
+    const workspace = (await services.listWorkspaces()).find(item => item.id === request.workspaceId);
+    if (!workspace) throw new Error('Workspace not found');
+    return {filePath: await generateWorkflowReportMapping(workspace.realRootPath, request.templatePath, request.sheet)};
   });
   registerHandler(ipcChannels.chooseTunnelClientPath, async (event, payload: unknown) => {
     assertTrustedSender(event, getMainWindow());

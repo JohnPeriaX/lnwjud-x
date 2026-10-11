@@ -21,6 +21,18 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.3',
+    categories: [{
+      id: 'experience',
+      titleKey: 'whatsNew.category.experience',
+      items: [
+        { id: 'doctor-tables-copy', titleKey: 'whatsNew.583.tables.title', descriptionKey: 'whatsNew.583.tables.description', badge: 'improved', tags: ['Doctor', 'MCP history', 'Results', 'copy JSON'] },
+        { id: 'doctor-resources-visibility', titleKey: 'whatsNew.583.resources.title', descriptionKey: 'whatsNew.583.resources.description', badge: 'fixed', tags: ['Resources', 'Task', 'ownership', 'cancel'] },
+        { id: 'workflow-guided-choices', titleKey: 'whatsNew.583.workflow.title', descriptionKey: 'whatsNew.583.workflow.description', badge: 'improved', tags: ['Workflows', 'Excel', 'CSV', 'choices', 'mapping'] },
+      ],
+    }],
+  },
+  {
     version: '5.8.2',
     categories: [{
       id: 'safety',
