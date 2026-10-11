@@ -78,7 +78,7 @@
 
 **ภาษาไทย:** แก้ dropdown ไม่บีบตาราง Work Log หรือเลื่อนหน้าเอง; What's New รวมประวัติของชุดเวอร์ชันปัจจุบัน เรียงใหม่ก่อนและเลื่อนอ่านได้; Live Logs แท็บ Tunnel เอา Workspace/Session Filter ที่ไม่สามารถกรองได้จริงออก โดยยังคงฟิลเตอร์ของ MCP activity และ Processes ตามเดิม
 
-### What's new in v5.8.0
+### Earlier release highlights — v5.8.0
 
 **v5.7.4** primarily fixed oversized native approval dialogs. **v5.8.0** adds six review-first workflows, richer Doctor evidence, CSV/XLSX data tasks, Git explorer upgrades, a consistent Desktop UI, more reliable Secure MCP Tunnel startup, and controlled dependency maintenance.
 
