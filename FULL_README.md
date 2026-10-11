@@ -57,6 +57,7 @@ and returns the response without opening a public inbound port on the host.
 
 ### What's new in v5.8.3 (local preview; not published)
 
+- Ponytail ULTRA now explains missing `goalLease` for goal-scoped skill loads. Pass the active Goal's lease to code edits, or load the bundled skill without `goalId` for workspace-only edits; a different Goal's activation cannot authorize an unbound mutation (Issue #190).
 - Doctor MCP history, Results, and Resources have readable tables and complete JSON copy actions. Visible dates use Gregorian DD/MM/YYYY, Asia/Bangkok (UTC+07:00) and 24-hour clock; copied ISO evidence timestamps use Bangkok's +07:00 offset, preserving the instant.
 - Resource diagnostics show all tracked Goal tasks, including those without CPU/RAM samples; missing measurements remain unknown rather than zero. Cancellation only appears for verified owned running blocking jobs and requires native authorization.
 - Workflows guided mode derives Sheet and column choices from the selected workspace-bound XLSX/CSV file, real Git branches and project package version. Explicit mapping generation writes only a new JSON file, appending the report below existing template rows; Advanced mode keeps manual fields and unsupported files visible.
