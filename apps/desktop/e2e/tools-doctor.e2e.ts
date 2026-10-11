@@ -168,7 +168,22 @@ test.describe('Tools catalog and Doctor real Electron acceptance', () => {
       await app.page.getByRole('button', { name: /^(เวิร์กโฟลว์|Workflows)$/ }).click();
       await app.page.locator('.workflow-card').filter({ hasText: /ตรวจข้อมูล Excel|Data Audit/ }).click();
       await app.page.locator('#workflow-inputPath').fill(csv);
-      await expect(app.page.locator('#workflow-sheet')).toContainText('CSV');
+      try {
+        await expect(app.page.locator('#workflow-sheet')).toContainText('CSV', { timeout: 10_000 });
+      } catch (cause) {
+        const diagnostics = await app.page.evaluate(async (filePath) => {
+          const dashboard = await window.lnwjud.getDashboard();
+          const workspace = dashboard.selectedWorkspace;
+          const uiError = document.querySelector('.workflow-field-error')?.textContent ?? null;
+          const inspection = workspace
+            ? await window.lnwjud.inspectWorkflowChoices({ workspaceId: workspace.id, filePath })
+              .then(result => ({ sheets: result.file?.sheets ?? [] }))
+              .catch(error => ({ error: String(error) }))
+            : null;
+          return { workspaceRoot: workspace?.rootPath ?? null, uiError, inspection };
+        }, csv);
+        throw new Error(`Guided CSV choices did not load: ${JSON.stringify(diagnostics)}; ${String(cause)}`);
+      }
       await expect(app.page.locator('#workflow-keyColumns')).toContainText('รหัส');
       await expect(app.page.locator('.workflow-field-error')).toHaveCount(0);
     } finally { await closeDesktop(app); }
