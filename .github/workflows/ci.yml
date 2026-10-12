@@ -59,6 +59,37 @@ jobs:
         shell: bash
         run: pnpm typecheck
 
+      - name: Install ripgrep for native search acceptance (Windows)
+        if: matrix.name == 'Windows'
+        shell: powershell
+        run: |
+          if (-not (Get-Command rg -ErrorAction SilentlyContinue)) {
+            $rgDir = Join-Path $env:RUNNER_TEMP 'ripgrep-native-contract'
+            New-Item -ItemType Directory -Force -Path $rgDir | Out-Null
+            $zip = Join-Path $rgDir 'ripgrep.zip'
+            Invoke-WebRequest -Uri 'https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-pc-windows-msvc.zip' -OutFile $zip -UseBasicParsing
+            Expand-Archive -Path $zip -DestinationPath $rgDir -Force
+            $rgExe = (Get-ChildItem -Path $rgDir -Filter 'rg.exe' -Recurse | Select-Object -First 1).FullName
+            Copy-Item -LiteralPath $rgExe -Destination (Join-Path $rgDir 'rg.exe') -Force
+            $rgDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            $env:PATH = "$rgDir;$env:PATH"
+          }
+          rg --version
+
+      - name: Install ripgrep for native search acceptance (macOS/Linux)
+        if: matrix.name != 'Windows'
+        shell: bash
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            if [[ "$RUNNER_OS" == "macOS" ]]; then
+              brew install ripgrep
+            else
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends ripgrep
+            fi
+          fi
+          rg --version
+
       - name: Run native platform contract tests
         shell: bash
         run: pnpm exec vitest run tests/integration/platform-composition.test.ts tests/integration/cross-platform-release-scenarios.test.ts tests/release/platform-support-contract.test.ts packages/mcp-server/src/tool-runtime-contract.test.ts

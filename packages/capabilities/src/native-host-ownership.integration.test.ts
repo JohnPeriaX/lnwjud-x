@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -72,10 +72,11 @@ async function fixture(terminator: ProcessTreeTerminator = { stop: stopChild }, 
   const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-native-owner-'));
   const helper = path.join(root, 'fixture.mjs');
   await writeFile(helper, fixtureSource, 'utf8');
-  const bytes = await readFile(helper);
+  const canonicalHelper = await realpath(helper);
+  const bytes = await readFile(canonicalHelper);
   const children: ChildProcess[] = [];
   const bridge = new NativeHostProcessBridge({
-    platform: 'linux', executablePath: helper, expectedSha256: createHash('sha256').update(bytes).digest('hex'), expectedSizeBytes: bytes.byteLength, requireIntegrity: true,
+    platform: 'linux', executablePath: canonicalHelper, expectedSha256: createHash('sha256').update(bytes).digest('hex'), expectedSizeBytes: bytes.byteLength, requireIntegrity: true,
     timeoutMs: 5_000, terminator,
     ...(ownerIdleTtlMs === undefined ? {} : { ownerIdleTtlMs }),
     spawnProcess: (executable, _args, options): ReturnType<typeof spawn> => {
