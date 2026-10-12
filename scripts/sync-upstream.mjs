@@ -17,10 +17,13 @@ function readFlag(name) {
   return index === -1 ? null : argv[index + 1];
 }
 
+// A dry run must never mutate. The upstream:merge package script bakes in --apply, so --simulate
+// has to win over it; otherwise a documented "safe rehearsal" starts a real conflicted merge.
+const simulate = argv.includes('--simulate');
 const options = {
   from: readFlag('--from') ?? 'upstream/main',
-  apply: argv.includes('--apply'),
-  simulate: argv.includes('--simulate'),
+  apply: argv.includes('--apply') && !simulate,
+  simulate,
 };
 
 async function git(args, { env, allowFailure = false } = {}) {
