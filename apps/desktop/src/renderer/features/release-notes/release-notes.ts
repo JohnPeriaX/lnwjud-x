@@ -21,6 +21,46 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.4',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'goal-lease-scope', titleKey: 'whatsNew.584.lease.title', descriptionKey: 'whatsNew.584.lease.description', badge: 'fixed', tags: ['goalLease', 'Git', 'Active Project'] },
+        ],
+      },
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'tree-path-consistency', titleKey: 'whatsNew.584.tree.title', descriptionKey: 'whatsNew.584.tree.description', badge: 'fixed', tags: ['workspace_tree', 'absolute path'] },
+        ],
+      },
+    ],
+  },
+  {
+    version: '5.8.3',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'path-attach', titleKey: 'whatsNew.583.attach.title', descriptionKey: 'whatsNew.583.attach.description', badge: 'new', tags: ['absolute path', 'Active Project', 'Full Access'] },
+          { id: 'denial-guidance', titleKey: 'whatsNew.583.denial.title', descriptionKey: 'whatsNew.583.denial.description', badge: 'fixed', tags: ['permission', 'retry', 'MCP'] },
+        ],
+      },
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'git-any-folder', titleKey: 'whatsNew.583.gitpath.title', descriptionKey: 'whatsNew.583.gitpath.description', badge: 'improved', tags: ['Git', 'cwd', 'git_status'] },
+          { id: 'get-file-info', titleKey: 'whatsNew.583.fileinfo.title', descriptionKey: 'whatsNew.583.fileinfo.description', badge: 'new', tags: ['get_file_info', 'metadata'] },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.8.1',
     categories: [
       {

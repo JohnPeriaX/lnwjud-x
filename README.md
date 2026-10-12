@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Cross-platform local AI-agent runtime and MCP gateway</strong><br />
-  <em>285 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 273 are advertised by default and all 285 when Codex delegation plus Agent Swarm is enabled.</em>
+  <em>288 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 276 are advertised by default and all 288 when Codex delegation plus Agent Swarm is enabled.</em>
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D4" />
   <img alt="Node" src="https://img.shields.io/badge/Node.js-24.x-339933" />
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-285%20tools-6f42c1" />
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-288%20tools-6f42c1" />
 </p>
 
 <h2 align="center">Download lnwjud</h2>
@@ -53,7 +53,13 @@
 
 ## Current published version: v5.8.1
 
-## Current source version: v5.8.2
+## Current source version: v5.8.4
+
+### Current source changes in v5.8.4
+
+- **Cross-project work while a durable goal runs:** a `goalLease` belonging to another project no longer blocks ordinary Git and file mutations in a workspace that carries no rolling goal, while per-workspace ownership checks remain required and fail closed when fence state cannot be read.
+- **Consistent absolute-path reads:** `workspace_tree` now honours the same host explicit-absolute-read grant as the file read path instead of refusing targets it already accepted.
+- **Fork stays upstream-mergeable:** an upstream divergence registry with marker guard tests, plus `upstream:plan`/`upstream:merge` tooling that classifies a merge into fork-critical, needs-review and mechanical version noise and can simulate it before touching history.
 
 ### What's new in v5.8.1
 
@@ -148,7 +154,7 @@ For the Thai setup and workflow guide, see [docs/USAGE_TH.md](docs/USAGE_TH.md#8
 
 ## What can lnwjud do?
 
-lnwjud exposes **285 tool definitions** through one local runtime and MCP gateway. The default advertised set is 273; all 285 are available when Codex delegation plus Agent Swarm is enabled.
+lnwjud exposes **288 tool definitions** through one local runtime and MCP gateway. The default advertised set is 276; all 288 are available when Codex delegation plus Agent Swarm is enabled.
 
 | Area | Examples |
 | --- | --- |
