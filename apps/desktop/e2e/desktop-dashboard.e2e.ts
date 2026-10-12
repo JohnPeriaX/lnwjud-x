@@ -17,6 +17,42 @@ const electronExecutable = electronExecutablePath(desktopRoot);
 const execFileAsync = promisify(execFile);
 const packagedExecutable = process.env.LNWJUD_PACKAGED_EXECUTABLE;
 
+function versionTuple(version: string): number[] {
+  return version.split('.').map((part) => Number(part));
+}
+
+function compareVersionDesc(a: string, b: string): number {
+  const left = versionTuple(a);
+  const right = versionTuple(b);
+  for (let index = 0; index < 3; index += 1) {
+    if ((left[index] ?? 0) !== (right[index] ?? 0)) return (right[index] ?? 0) - (left[index] ?? 0);
+  }
+  return 0;
+}
+
+/**
+ * The modal lists installed-or-earlier releases in the active minor train, newest first. Deriving
+ * that list from the registry keeps this journey truthful when a release or an upstream merge adds a
+ * patch entry; the literal list this replaced had silently drifted twice.
+ */
+async function expectedWhatsNewTitles(): Promise<string[]> {
+  const [registrySource, packageSource] = await Promise.all([
+    readFile(path.join(desktopRoot, 'src', 'renderer', 'features', 'release-notes', 'release-notes.ts'), 'utf8'),
+    readFile(path.join(desktopRoot, 'package.json'), 'utf8'),
+  ]);
+  const installed = versionTuple((JSON.parse(packageSource) as { version: string }).version);
+  const titles = [...registrySource.matchAll(/^\s+version: '(\d+\.\d+\.\d+)',$/gm)]
+    .map((match) => match[1])
+    .filter((version) => {
+      const candidate = versionTuple(version);
+      return candidate[0] === installed[0] && candidate[1] === installed[1]
+        && (candidate[2] ?? 0) <= (installed[2] ?? 0);
+    })
+    .sort(compareVersionDesc);
+  if (titles.length === 0) throw new Error('No release-note entry belongs to the installed version train');
+  return titles.map((version) => `v${version}`);
+}
+
 test('control center auto-starts MCP and supports project + doctor journey', async ({ browserName }, testInfo) => {
   void browserName;
   test.setTimeout(90_000);
@@ -71,7 +107,7 @@ test('control center auto-starts MCP and supports project + doctor journey', asy
     await page.locator('button.titlebar-whats-new').click();
     const whatsNew = page.getByRole('dialog', { name: /มีอะไรใหม่ใน|What.s new in/ });
     await expect(whatsNew).toBeVisible();
-    await expect(whatsNew.locator('.whats-new-version-title')).toHaveText(['v5.8.4', 'v5.8.3', 'v5.8.1', 'v5.8.0']);
+    await expect(whatsNew.locator('.whats-new-version-title')).toHaveText(await expectedWhatsNewTitles());
     await expect.poll(() => whatsNew.locator('.whats-new-scroll').evaluate((container) => container.scrollHeight > container.clientHeight)).toBe(true);
     await whatsNew.press('Escape');
     await expect(whatsNew).toHaveCount(0);
