@@ -23,7 +23,7 @@ export function workspaceTools(context: McpToolContext): McpToolDefinition[] {
     }),
     defineTool({
       name: 'workspace_register',
-      description: 'Register an existing project directory by absolute path. parentWorkspaceId is optional and retained only for legacy machine-root-relative registration. Idempotent for the same path.',
+      description: 'Register an existing project directory by absolute path and make it an Active Project. Not required just to work in a folder: any file, Git, or office call with an absolute path attaches that folder on its own. parentWorkspaceId is optional and retained only for legacy machine-root-relative registration. Idempotent for the same path.',
       permission: 'WRITE',
       annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: workspaceRegisterSchema,
@@ -57,13 +57,13 @@ export function workspaceTools(context: McpToolContext): McpToolDefinition[] {
       permission: 'READ',
       annotations: { readOnlyHint: true, destructiveHint: false },
       inputSchema: workspaceTreeSchema,
-      handler: async (input) => context.services.workspaceQuery === undefined
+      handler: async (input, _signal, authorization) => context.services.workspaceQuery === undefined
         ? missingService()
         : context.services.workspaceQuery.tree(context.actor, input.workspaceId, {
           ...(input.path === undefined ? {} : { path: input.path }),
           ...(input.maxDepth === undefined ? {} : { maxDepth: input.maxDepth }),
           ...(input.maxEntries === undefined ? {} : { maxEntries: input.maxEntries }),
-        }),
+        }, authorization),
     }),
     defineTool({
       name: 'project_snapshot',

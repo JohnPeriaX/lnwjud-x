@@ -97,7 +97,7 @@ export interface McpApplicationServices {
   readonly projectSnapshot?: ProjectSnapshotPort;
   readonly project?: Pick<ProjectService, 'detect'>;
   readonly engineeringPreparation?: Pick<EngineeringPreparationService, 'prepare'>;
-  readonly file?: Pick<FileService, 'readFile' | 'readFiles' | 'writeFile' | 'applyPatch' | 'editFile' | 'moveFile' | 'copyFile' | 'deleteFile' | 'listRecoveryItems' | 'restoreDeletedFile' | 'prepareExternalFileMutation'>;
+  readonly file?: Pick<FileService, 'readFile' | 'readFiles' | 'getFileInfo' | 'writeFile' | 'applyPatch' | 'editFile' | 'moveFile' | 'copyFile' | 'deleteFile' | 'listRecoveryItems' | 'restoreDeletedFile' | 'prepareExternalFileMutation'>;
   readonly checkpoint?: Pick<CheckpointService, 'list' | 'restore'>;
   readonly callHistory?: Pick<CallHistoryService, 'history'>;
   readonly taskResults?: Pick<TaskResultService, 'get'>;

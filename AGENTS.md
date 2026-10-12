@@ -60,6 +60,23 @@ When a GitHub Actions workflow must be monitored until completion, use one autho
 
 This policy is cross-platform because the monitoring contract is shared while the wrapper shell is platform-native. Do not label a PowerShell-only implementation as cross-platform.
 
+## Upstream sync policy
+
+This repository is a fork of `https://github.com/engasnm111/lnwjud` (`upstream`). Absorbing upstream
+fixes is a standing requirement, not an occasional task, so load
+[`docs/development/UPSTREAM_SYNC.md`](docs/development/UPSTREAM_SYNC.md) as the source of truth before
+merging, proposing a merge resolution, or changing a file that upstream also owns.
+
+Run `corepack pnpm@10.15.0 run upstream:plan` first. It is read-only and classifies every overlapping
+file as fork-critical, needs-review, or version noise. Never hand-edit a version-noise file to fix a
+version string: re-derive it with the canonical version script instead. Never resolve a fork-critical
+conflict by accepting the upstream side; that silently deletes fork-only behavior.
+
+Fork-only behavior is declared in `scripts/upstream-divergence.json` with a source marker and proof
+tests, and `tests/release/upstream-divergence.test.ts` fails when a marker disappears. When a change
+makes lnwjud-x behave differently from upstream in a file upstream owns, register that behavior in the
+same change. An unregistered divergence is a sync hazard, not documentation debt.
+
 ## Version Bump Policy
 
 For any repository/application version change, use the canonical root version script first: `corepack pnpm@10.15.0 run set-version <version>`. Do not start by hand-editing package versions or current-version documentation.

@@ -1979,6 +1979,7 @@ function bootstrapMcpStdio(): void {
       destructivePolicyProvider: () => runtime.getDestructivePolicy(),
       activeWorkspaceScopeProvider: () => runtime.getActiveWorkspaceScope(),
       activeWorkspaceScopesProvider: () => runtime.getActiveWorkspaceScopes(),
+      externalProjectAttachProvider: (request) => runtime.attachExternalProjectScope(request),
       hostMutationApprovalProvider: requestMutationApproval,
       codexToolsEnabledProvider: () => runtime.getUserSettings().codexToolsEnabled,
       ponytailModeProvider: () => runtime.getUserSettings().ponytailMode,

@@ -21,6 +21,20 @@ Desktop Vitest configuration:
 ### Packaged Electron E2E
 Playwright runs packaged or development Electron journeys. The Playwright config currently uses one worker with a 30-second per-test timeout.
 
+From a source checkout the desktop app resolves bundled runtime tools relative to Electron's own
+`resourcesPath`, which contains no ripgrep, and `executable_ripgrep` is a **required** first-launch
+Doctor check. When it fails, startup stays on Doctor and every dashboard locator times out with
+`element(s) not found` rather than a clear cause. The staged copy comes from packaging
+(`apps/desktop/scripts/prepare-runtime-tools.mjs`), so a checkout that has been packaged before
+already has it; point the suite at it instead of assuming the host provides ripgrep:
+
+```powershell
+$env:PATH = "$PWD/apps/desktop/build/runtime-tools/ripgrep;$env:PATH"
+```
+
+`tools-doctor.e2e.ts` intentionally constructs both a missing-`rg` and a present-`rg` PATH for its own
+scenarios, so it does not depend on the host copy and cannot be used as evidence for the other specs.
+
 ### Native hosts
 - macOS native protocol/provider tests run with Swift Package Manager.
 - Linux native host tests run with Cargo `--locked`.

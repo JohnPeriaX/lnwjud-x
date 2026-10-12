@@ -1,4 +1,5 @@
 export * from './machine-root.js';
+export * from './project-attach.js';
 export * from './filesystem-root.js';
 export * from './path-containment.js';
 export * from './secret-policy.js';

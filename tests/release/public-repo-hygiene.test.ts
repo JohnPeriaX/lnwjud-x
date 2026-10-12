@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
+import { ToolRegistry } from '@lnwjud/mcp-server';
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = path.resolve(import.meta.dirname, '..', '..');
@@ -99,7 +100,6 @@ describe('public repository hygiene', () => {
   });
 
   it('documents the live tool catalog instead of a hand-maintained count', async () => {
-    const { ToolRegistry } = await import('@lnwjud/mcp-server');
     const readme = await readFile(path.join(repositoryRoot, 'README.md'), 'utf8');
     const actor = { clientId: 'public-repo-hygiene', clientName: 'public-repo-hygiene' };
     const defaultRegistry = new ToolRegistry({}, actor);

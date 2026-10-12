@@ -283,6 +283,7 @@ async function main(): Promise<void> {
     allowAiDeleteProvider: runtime.allowAiDeleteProvider,
     destructivePolicyProvider: runtime.destructivePolicyProvider,
     activeWorkspaceScopeProvider: runtime.activeWorkspaceScopeProvider,
+    externalProjectAttachProvider: runtime.attachExternalProjectScope,
     toolAvailabilitySnapshotProvider: () => runtime.toolAvailabilityService.snapshot(),
     toolAvailabilitySubscribe: (listener) => runtime.toolAvailabilityService.subscribe(listener),
     onError: (error): void => {

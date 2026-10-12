@@ -8,7 +8,49 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const targetVersion = process.argv[2];
 const semanticVersionPattern = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
-if (targetVersion !== undefined && !semanticVersionPattern.test(targetVersion)) {
+/**
+ * The canonical current-version surface: every file whose version text is derived from the package
+ * version rather than authored. Exported so upstream-sync tooling can classify a merge conflict as
+ * mechanical version noise instead of a semantic decision, without duplicating this list and drifting.
+ * Dated release notes, plans and evidence are deliberately absent: they are history, not surface.
+ * `packages/mcp-server/src/tool-registry.ts` is also excluded on purpose even though one approval line
+ * in it carries a version number - classifying a behaviour-critical file as auto-healable noise is
+ * exactly the silent regression this list exists to prevent.
+ */
+export const VERSION_SURFACE_PATHS = [
+  'packages/shared/src/index.ts',
+  'packages/ipc-contracts/src/index.ts',
+  'tests/packaging/desktop-packaging.test.ts',
+  'apps/desktop/tests/mutation-safety-ui.test.ts',
+  'README.md',
+  'FULL_README.md',
+  '.github/RELEASE_CHECKLIST.md',
+  'docs/development/PACKAGING_WINDOWS.md',
+  'docs/INSTALL_MACOS.md',
+  'docs/USAGE_TH.md',
+  'docs/LNWJUD_CAPABILITIES.md',
+  'docs/architecture/MULTI_WORKSPACE_CONCURRENCY.md',
+  'docs/architecture/TOOL_CONTRACT.md',
+  'docs/architecture/UPGRADE_ARCHITECTURE.md',
+  'packages/application/src/agent-swarm-service.ts',
+];
+
+/** True when a repository-relative path carries the version field derived from the package version. */
+export function isVersionSurfacePath(relativePath) {
+  const normalized = relativePath.replaceAll('\\', '/');
+  if (VERSION_SURFACE_PATHS.includes(normalized)) return true;
+  if (normalized === 'package.json') return true;
+  // Every workspace manifest under apps/<name> and packages/<name> carries the same derived version.
+  return /^(?:apps|packages)\/[^/]+\/package\.json$/.test(normalized);
+}
+
+const isCliInvocation = process.argv[1] !== undefined
+  && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+
+if (isCliInvocation && targetVersion !== undefined && !semanticVersionPattern.test(targetVersion)) {
+  // Validated only when this file is run as a command. Importing it to read VERSION_SURFACE_PATHS
+  // must not inherit the caller's argv, or `node scripts/sync-upstream.mjs --apply` would look like
+  // an invalid version and crash on import.
   throw new Error(`Invalid semantic version: ${targetVersion}`);
 }
 
@@ -180,4 +222,7 @@ async function syncAllVersions() {
   console.log(`\nAll versions successfully synchronized to ${name} v${version}!`);
 }
 
-void syncAllVersions();
+// Only run when invoked as a command. Importing the module must read the surface list, never rewrite files.
+if (isCliInvocation) {
+  void syncAllVersions();
+}

@@ -5,6 +5,7 @@ import {
   copyFileSchema,
   deleteFileSchema,
   editFileSchema,
+  getFileInfoSchema,
   listRecoveryItemsSchema,
   listCheckpointsSchema,
   moveFileSchema,
@@ -48,8 +49,18 @@ export function fileTools(context: McpToolContext): McpToolDefinition[] {
         }, authorization),
     }),
     defineTool({
+      name: 'get_file_info',
+      description: 'Read metadata for one file or directory: size, created and modified times, file/directory/symlink kind, and permission bits, without loading any content. Absolute host paths do not require workspaceId. Use this before read_file when the size or kind of a target is unknown.',
+      permission: 'READ',
+      annotations: { readOnlyHint: true, destructiveHint: false },
+      inputSchema: getFileInfoSchema,
+      handler: async (input, _signal, authorization) => context.services.file === undefined
+        ? missingService()
+        : context.services.file.getFileInfo(context.actor, input.workspaceId, { path: input.path }, authorization),
+    }),
+    defineTool({
       name: 'write_file',
-      description: 'Create or replace a UTF-8 text file and missing parents. Balanced/Safe refuse existing targets unless overwriteExisting is explicit; Full may replace an existing target without a confirmation prompt and still creates a checkpoint. Prefer edit_file for narrow repairs. Use this instead of shell scripts that call fs.writeFile, writeFileSync, Set-Content, or equivalent when the task is simply to create or replace guarded text. Do not use write_file to persist lnwjud continuation/recovery as USER_INSTRUCTIONS, user-instruction, or generic handoff-history files; use checkpoint_goal/session_handoff for that state.',
+      description: 'Create or replace a UTF-8 text file and missing parents. An absolute path outside every Active Project needs no prior registration: Full Access attaches that folder immediately, stricter profiles ask once and then attach it. Balanced/Safe refuse existing targets unless overwriteExisting is explicit; Full may replace an existing target without a confirmation prompt and still creates a checkpoint. Prefer edit_file for narrow repairs. Use this instead of shell scripts that call fs.writeFile, writeFileSync, Set-Content, or equivalent when the task is simply to create or replace guarded text. Do not use write_file to persist lnwjud continuation/recovery as USER_INSTRUCTIONS, user-instruction, or generic handoff-history files; use checkpoint_goal/session_handoff for that state.',
       permission: 'WRITE',
       annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: writeFileSchema,

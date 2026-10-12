@@ -142,6 +142,13 @@ export interface ToolRegistryOptions {
   readonly activeWorkspaceScopeProvider?: () => WorkspaceScope | null | Promise<WorkspaceScope | null>;
   /** Host-owned active project set; first entry is the primary/default project. */
   readonly activeWorkspaceScopesProvider?: () => readonly WorkspaceScope[] | Promise<readonly WorkspaceScope[]>;
+  /**
+   * Host-owned bridge that turns one explicit absolute path outside every Active Project into a
+   * usable project scope, the way a path-only file tool does. Reads and already-confirmed calls
+   * attach permanently; an unconfirmed mutation gets a call-scoped pending scope so the agent
+   * receives a retryable confirmation instead of a dead-end denial.
+   */
+  readonly externalProjectAttachProvider?: (request: ExternalProjectAttachRequest) => WorkspaceScope | null | Promise<WorkspaceScope | null>;
   /** @deprecated Compatibility alias for activeWorkspaceScopeProvider. */
   readonly activeProjectProvider?: () => WorkspaceScope | null;
   /** Host-owned exact-action approval boundary, such as a native desktop confirmation dialog. */
@@ -172,6 +179,14 @@ export interface HostMutationApprovalRequest {
   readonly summary: string;
   readonly workspaceId?: string;
   readonly workspaceRoot?: string;
+}
+
+export interface ExternalProjectAttachRequest {
+  /** Absolute host path taken verbatim from the tool input; the host decides the project directory. */
+  readonly path: string;
+  readonly toolName: string;
+  /** True when the call is read-only, Full Bypass, or carries the user's explicit confirmation. */
+  readonly approve: boolean;
 }
 
 const DEFAULT_MCP_TOOL_RESPONSE_BUDGET_MS: number | null = null;
@@ -219,6 +234,7 @@ export class ToolRegistry {
   private readonly ponytailActivation: PonytailActivationLedger;
   private readonly activeWorkspaceScopeProvider: () => Promise<WorkspaceScope | null>;
   private readonly activeWorkspaceScopesProvider: (() => Promise<readonly WorkspaceScope[]>) | undefined;
+  private readonly externalProjectAttachProvider: ToolRegistryOptions['externalProjectAttachProvider'];
   private readonly enforceActiveWorkspaceScope: boolean;
   private readonly hostMutationApprovalProvider: ToolRegistryOptions['hostMutationApprovalProvider'];
   private readonly activityWorkspaceResolver: (cwd: string) => Promise<string | undefined>;
@@ -242,6 +258,7 @@ export class ToolRegistry {
     this.ponytailActivation = options.ponytailActivationLedger ?? new PonytailActivationLedger();
     this.activeWorkspaceScopeProvider = normalizeActiveWorkspaceScopeProvider(options);
     this.activeWorkspaceScopesProvider = normalizeActiveWorkspaceScopesProvider(options);
+    this.externalProjectAttachProvider = options.externalProjectAttachProvider;
     this.enforceActiveWorkspaceScope = options.activeWorkspaceScopesProvider !== undefined || options.activeWorkspaceScopeProvider !== undefined || options.activeProjectProvider !== undefined;
     this.hostMutationApprovalProvider = options.hostMutationApprovalProvider;
     this.activityWorkspaceResolver = normalizeActivityWorkspaceResolver(services, actor);
@@ -494,7 +511,20 @@ export class ToolRegistry {
       // Do not bind a ChatGPT conversation permanently to its first workspace.
       // The host Active Project is the current routing/authorization boundary.
       // This avoids stale conversation state locking a chat to an old project.
-      const activeRoutedInput = await this.routeInputToActiveWorkspace(goalBoundInput);
+      // A preliminary decision is needed before routing so a read-only call can attach silently.
+      const preliminaryDecision = inspectMutationOperation(tool.name, goalBoundInput, tool.permission);
+      // Full Access already promises ordinary writes without a prompt, so a folder it was pointed at
+      // by absolute path is not a surprise grant. Stricter profiles ask once per new folder. Full
+      // Bypass is a Full-profile mode, so it is covered by the same condition.
+      const silentProjectAttachApproved = profile.name === 'full';
+      const autoAttachApproved = silentProjectAttachApproved
+        || preliminaryDecision.kind === 'read'
+        || hasExplicitUserConfirmation(goalBoundInput);
+      const routed = await this.routeInputToActiveWorkspace(goalBoundInput, {
+        toolName: tool.name,
+        autoAttachApproved,
+      });
+      const activeRoutedInput = routed.input;
       const prohibitedReason = fullBypass ? undefined : prohibitedInvocationReason(tool.name, activeRoutedInput);
       if (prohibitedReason !== undefined) {
         const response = mapError(appError('PERMISSION_DENIED', prohibitedReason));
@@ -504,11 +534,13 @@ export class ToolRegistry {
       let mutationDecision = inspectMutationOperation(tool.name, activeRoutedInput, tool.permission);
       const policy = this.destructivePolicyProvider();
       const mutationWorkspaceId = readExplicitWorkspaceId(activeRoutedInput);
+      const attachedScope = routed.attachedScope
+        ?? await this.attachRegisteredWorkspaceScope(mutationWorkspaceId, tool.name, autoAttachApproved);
       const nativePathScopeRequired = requiresNativePathScope(tool.name, activeRoutedInput);
       const activeWorkspaceScope = !this.enforceActiveWorkspaceScope
         || (mutationDecision.kind === 'read' && !nativePathScopeRequired)
         ? null
-        : await this.resolveActiveWorkspaceScope(mutationWorkspaceId);
+        : await this.resolveActiveWorkspaceScope(mutationWorkspaceId, attachedScope);
       if (!fullBypass && mutationDecision.kind === 'execute' && commandExecutionLeavesActiveWorkspace(tool.name, activeRoutedInput, activeWorkspaceScope)) {
         mutationDecision = { kind: 'opaque_mutation', reason: 'Command execution explicitly targets a working directory outside the host Active Project' };
       }
@@ -519,9 +551,7 @@ export class ToolRegistry {
       const nativePathScopeMismatch = nativePathScopeRequired
         && (activeWorkspaceScope === null || (mutationWorkspaceId !== undefined && mutationWorkspaceId !== activeWorkspaceScope.workspaceId));
       if (!fullBypass && this.enforceActiveWorkspaceScope && (mutationScopeMismatch || nativePathScopeMismatch)) {
-        const message = nativePathScopeMismatch
-          ? 'Path-bearing native target does not match the host active workspace'
-          : 'Mutation target does not match the host active workspace';
+        const message = describeActiveWorkspaceScopeMismatch(mutationWorkspaceId, activeWorkspaceScope);
         const response = mapError(appError('PERMISSION_DENIED', message));
         await this.activity.end(callId, 'PERMISSION_DENIED', Date.now() - started, message);
         return response;
@@ -550,6 +580,9 @@ export class ToolRegistry {
         }
       }
       let mutationFenceProof: GoalLeaseProof | undefined;
+      // Set only by an actual per-workspace fence read that returned "no fence". `false` covers both
+      // "not yet read" and "the fence does not apply to this call", which must keep failing closed.
+      let mutationWorkspaceConfirmedUnfenced = false;
       if (
         mutationDecision.kind !== 'read'
         && mutationFenceWorkspaceId !== undefined
@@ -570,11 +603,19 @@ export class ToolRegistry {
             return response;
           }
           mutationFenceProof = goalLease;
+        } else {
+          mutationWorkspaceConfirmedUnfenced = true;
         }
       }
       const policyAllowsScopedDestructive = !fullBypass && mutationWorkspaceId !== undefined
-        && isScopedAutoApprovalAllowed(tool.name, activeRoutedInput, mutationDecision, policy, activeWorkspaceScope);
+        // A folder still waiting for its first confirmation is not yet a user-approved Active
+        // Project, so saved destructive-family switches never auto-approve inside it.
+        && isScopedAutoApprovalAllowed(tool.name, activeRoutedInput, mutationDecision, policy,
+          attachedScope?.requiresProjectApproval === true ? null : activeWorkspaceScope);
       const hostApprovalRequired = !fullBypass && requiresProfileMutationConfirmation(tool.name, mutationDecision, profile);
+      const pendingProjectApproval = attachedScope?.requiresProjectApproval === true
+        && mutationDecision.kind !== 'read'
+        && !silentProjectAttachApproved;
       const effectivePermission = permissionLevelForMutationDecision(mutationDecision);
       const permissionDecision = fullBypass ? 'ALLOW' : this.permissionEngine.decide(profile, {
         action: 'mcp:' + tool.name,
@@ -586,9 +627,11 @@ export class ToolRegistry {
       this.activity.updatePermissionDecision(callId, permissionDecision);
       const chatConfirmationRequired = permissionDecision !== 'DENY'
         && !policyAllowsScopedDestructive
-        && (permissionDecision === 'ASK' || hostApprovalRequired);
+        && (permissionDecision === 'ASK' || hostApprovalRequired || pendingProjectApproval);
       if (chatConfirmationRequired && !hasExplicitUserConfirmation(activeRoutedInput)) {
-        const message = `Mutation requires explicit user confirmation: ${mutationDecision.reason}. Ask the user in chat first, then retry with userConfirmed: true`;
+        const message = pendingProjectApproval
+          ? `${mutationDecision.reason}. Ask the user to confirm working in "${attachedScope?.rootPath ?? 'this folder'}", then retry the same call with userConfirmed: true — lnwjud will add it as an Active Project automatically`
+          : `Mutation requires explicit user confirmation: ${mutationDecision.reason}. Ask the user in chat first, then retry with userConfirmed: true`;
         const response = mapError(appError('PERMISSION_REQUIRED', message, true));
         await this.activity.end(callId, 'PERMISSION_REQUIRED', Date.now() - started, message);
         return response;
@@ -695,6 +738,7 @@ export class ToolRegistry {
         );
       }
       if (goalLease !== undefined && mutationDecision.kind !== 'read') {
+        let leaseIgnoredAsForeign = false;
         // An admitted Goal mutation fence has already verified this exact proof and
         // workspace; do not require a second validator from hosts that expose only
         // the fenced mutation contract. Without a fence, validate independently.
@@ -702,14 +746,27 @@ export class ToolRegistry {
           const validated = this.services.goals?.validateGoalLease
             ? await this.services.goals.validateGoalLease(this.actor, { goalId: goalLease.goalId, leaseToken: goalLease.leaseToken })
             : err(appError('CONFLICT', 'Goal lease validation service is unavailable'));
-          if (!validated.ok || (mutationFenceWorkspaceId !== undefined && validated.value.workspaceId !== mutationFenceWorkspaceId)) {
-            const message = validated.ok ? 'Goal lease workspace mismatch' : validated.error.message;
+          const mismatched = !validated.ok
+            || (mutationFenceWorkspaceId !== undefined && validated.value.workspaceId !== mutationFenceWorkspaceId);
+          if (validated.ok && mismatched && mutationWorkspaceConfirmedUnfenced) {
+            // The lease belongs to a different project and a real per-workspace fence read proved
+            // this folder carries no live rolling goal. Such a lease neither authorizes nor governs
+            // this call, so treating it as an ordinary unscheduled invocation is what the
+            // scheduled-continuation contract already implies: the lease is required per fenced
+            // workspace, not globally. The goal's own workspace is unaffected - its fence still
+            // demands and validates the current lease above, and the storage layer re-checks
+            // goal/workspace identity inside beginGoalFencedMutation.
+            leaseIgnoredAsForeign = true;
+          } else if (mismatched) {
+            const message = validated.ok
+              ? describeGoalLeaseWorkspaceMismatch(goalLease.goalId, validated.value.workspaceId, mutationFenceWorkspaceId)
+              : validated.error.message;
             const response = mapError(appError('CONFLICT', message, true));
             await this.activity.end(callId, 'CONFLICT', Date.now() - started, message);
             return response;
           }
         }
-        this.activity.bindVerifiedGoal(callId, goalLease.goalId);
+        if (!leaseIgnoredAsForeign) this.activity.bindVerifiedGoal(callId, goalLease.goalId);
       }
       const resolvedActivityInput = this.withRememberedActivityTarget(
         name,
@@ -971,26 +1028,90 @@ export class ToolRegistry {
     }
   }
 
-  private async routeInputToActiveWorkspace(input: unknown): Promise<unknown> {
-    if (!isRecord(input) || this.activeWorkspaceScopesProvider === undefined) return input;
+  private async routeInputToActiveWorkspace(
+    input: unknown,
+    context: { readonly toolName: string; readonly autoAttachApproved: boolean },
+  ): Promise<{ readonly input: unknown; readonly attachedScope: WorkspaceScope | null }> {
+    const noAttachment = { input, attachedScope: null } as const;
+    if (!isRecord(input)) return noAttachment;
     const absolutePaths = absoluteWorkspaceScopePaths(input);
-    if (absolutePaths.length === 0) return input;
+    if (absolutePaths.length === 0) return noAttachment;
+    if (this.activeWorkspaceScopesProvider === undefined && this.externalProjectAttachProvider === undefined) return noAttachment;
     try {
-      const scopes = await this.activeWorkspaceScopesProvider();
+      const scopes = this.activeWorkspaceScopesProvider === undefined
+        ? []
+        : await this.activeWorkspaceScopesProvider();
       const matched = commonActiveWorkspaceScope(scopes, absolutePaths);
-      if (matched === null || readExplicitWorkspaceId(input) === matched.workspaceId) return input;
-      return { ...input, workspaceId: matched.workspaceId };
+      if (matched !== null) {
+        return readExplicitWorkspaceId(input) === matched.workspaceId
+          ? noAttachment
+          : { input: { ...input, workspaceId: matched.workspaceId }, attachedScope: null };
+      }
+      const attached = await this.attachExternalProject(absolutePaths, context.toolName, context.autoAttachApproved);
+      if (attached === null) return noAttachment;
+      return {
+        input: readExplicitWorkspaceId(input) === attached.workspaceId ? input : { ...input, workspaceId: attached.workspaceId },
+        attachedScope: attached,
+      };
     } catch {
-      return input;
+      return noAttachment;
     }
   }
 
-  private async resolveActiveWorkspaceScope(workspaceId?: string): Promise<WorkspaceScope | null> {
+  private async attachExternalProject(
+    absolutePaths: readonly string[],
+    toolName: string,
+    approve: boolean,
+  ): Promise<WorkspaceScope | null> {
+    if (this.externalProjectAttachProvider === undefined) return null;
+    const targetPath = commonExternalAttachPath(absolutePaths);
+    if (targetPath === null) return null;
+    const scope = await this.externalProjectAttachProvider({ path: targetPath, toolName, approve });
+    if (scope === null || typeof scope.workspaceId !== 'string' || scope.workspaceId.trim().length === 0
+      || typeof scope.rootPath !== 'string' || scope.rootPath.trim().length === 0) return null;
+    return scope;
+  }
+
+  /**
+   * A conversation can carry a workspaceId for a folder that is registered but no longer in the host
+   * Active Project set. That is still a project the user named, so attach it the same way an explicit
+   * absolute path is attached instead of dead-ending the call on remembered state.
+   */
+  private async attachRegisteredWorkspaceScope(
+    workspaceId: string | undefined,
+    toolName: string,
+    approve: boolean,
+  ): Promise<WorkspaceScope | null> {
+    if (workspaceId === undefined || this.externalProjectAttachProvider === undefined
+      || this.activeWorkspaceScopesProvider === undefined) return null;
+    try {
+      const scopes = await this.activeWorkspaceScopesProvider();
+      if (scopes.some((scope) => scope.workspaceId === workspaceId)) return null;
+      const infoPort = this.services.workspaceInfo;
+      if (infoPort?.info === undefined) return null;
+      const registered = await infoPort.info(this.actor, workspaceId);
+      if (!registered.ok) return null;
+      const rootPath = readTrimmedString((registered.value as { realRootPath?: unknown }).realRootPath);
+      if (rootPath === undefined) return null;
+      return await this.attachExternalProject([rootPath], toolName, approve);
+    } catch {
+      return null;
+    }
+  }
+
+  private async resolveActiveWorkspaceScope(
+    workspaceId?: string,
+    attachedScope?: WorkspaceScope | null,
+  ): Promise<WorkspaceScope | null> {
+    if (workspaceId !== undefined && attachedScope !== null && attachedScope !== undefined && attachedScope.workspaceId === workspaceId) {
+      return attachedScope;
+    }
     try {
       if (this.activeWorkspaceScopesProvider !== undefined) {
         const scopes = await this.activeWorkspaceScopesProvider();
         if (workspaceId === undefined) return scopes[0] ?? null;
-        return scopes.find((scope) => scope.workspaceId === workspaceId) ?? null;
+        const known = scopes.find((scope) => scope.workspaceId === workspaceId);
+        return known ?? (attachedScope !== null && attachedScope !== undefined && attachedScope.workspaceId === workspaceId ? attachedScope : null);
       }
       return await this.activeWorkspaceScopeProvider();
     } catch { return null; }
@@ -1144,23 +1265,38 @@ function rememberBounded(map: Map<string, string>, key: string, value: string, m
 }
 
 
+/**
+ * Every top-level field a tool can use to name a file target. Active Project routing and the native
+ * path-scope fence both read this list, so a field can never be scope-enforced without also being
+ * routable — an enforced-but-unroutable field dead-ends a valid absolute path in a folder that is
+ * not yet an Active Project.
+ */
+export const PATH_SCOPE_KEYS = [
+  'cwd', 'path', 'target', 'database', 'filePath', 'targetPath', 'sourcePath', 'destinationPath',
+  'file_path', 'target_path', 'output_path', 'source_path', 'destination_path', 'image_path',
+  'file', 'primary', 'baseline_path', 'actual_path', 'left_path', 'right_path', 'baseline', 'actual',
+  'worktreePath', 'initial_directory',
+] as const;
+
+/** Array fields whose entries are paths, either bare strings or `{ path }` objects. */
+export const PATH_SCOPE_ARRAY_KEYS = ['files', 'merge_paths'] as const;
+
+/** Fields only the native office/browser/media tools use, where even a relative target is scoped. */
+const NATIVE_PATH_SCOPE_KEYS = ['file_path', 'target_path', 'output_path', 'source_path', 'image_path'] as const;
+
 function firstAbsoluteActivityPath(input: Readonly<Record<string, unknown>>): string | undefined {
   return absoluteWorkspaceScopePaths(input)[0];
 }
 
 function absoluteWorkspaceScopePaths(input: Readonly<Record<string, unknown>>): string[] {
   const paths: string[] = [];
-  for (const key of [
-    'cwd', 'path', 'target', 'database', 'filePath', 'targetPath', 'sourcePath', 'destinationPath',
-    'file_path', 'target_path', 'output_path', 'source_path', 'destination_path', 'initial_directory',
-  ]) {
+  for (const key of PATH_SCOPE_KEYS) {
     const value = readTrimmedString(input[key]);
     if (value !== undefined && isAbsoluteActivityPath(value)) paths.push(value);
   }
   if (Array.isArray(input.files)) {
     for (const entry of input.files) {
-      if (!isRecord(entry)) continue;
-      const value = readTrimmedString(entry.path);
+      const value = typeof entry === 'string' ? entry : isRecord(entry) ? readTrimmedString(entry.path) : undefined;
       if (value !== undefined && isAbsoluteActivityPath(value)) paths.push(value);
     }
   }
@@ -1190,6 +1326,70 @@ function mostSpecificActiveWorkspaceScope(scopes: readonly WorkspaceScope[], can
     .filter((scope) => isAbsoluteActivityPath(scope.rootPath) && activityPathContains(scope.rootPath, candidate))
     .sort((left, right) => normalizedActivityPath(right.rootPath).length - normalizedActivityPath(left.rootPath).length);
   return matches[0] ?? null;
+}
+
+/**
+ * A goal lease is ownership proof for the workspace its goal owns. When it is supplied for a
+ * mutation elsewhere whose fence state could not be confirmed, refuse and name both retries; a
+ * bare "workspace mismatch" reads like a setup problem the user must fix in the Desktop UI.
+ */
+function describeGoalLeaseWorkspaceMismatch(
+  goalId: string,
+  goalWorkspaceId: string | undefined,
+  mutationWorkspaceId: string | undefined,
+): string {
+  return `The supplied goalLease belongs to goal ${goalId}, which owns workspace "${goalWorkspaceId ?? 'unknown'}", so it cannot govern this mutation in workspace "${mutationWorkspaceId ?? 'an unresolved project'}", and this workspace's mutation-fence state could not be confirmed. Retry without goalLease for ordinary work in this folder, or pass the lease of the goal that owns it.`;
+}
+
+/**
+ * A scope denial is the one place where the agent decides what to tell the user, so it has to name
+ * the retry that actually works instead of sounding like the folder must be registered by hand.
+ */
+function describeActiveWorkspaceScopeMismatch(
+  mutationWorkspaceId: string | undefined,
+  activeWorkspaceScope: WorkspaceScope | null,
+): string {
+  const primary = activeWorkspaceScope?.rootPath;
+  if (mutationWorkspaceId === undefined) {
+    return `No project target could be resolved for this mutation, so it was not run. Pass an absolute path inside the folder you mean (lnwjud attaches that folder as a project automatically) or an explicit workspaceId; a relative path has no project context. ${primary === undefined ? 'No Active Project is available.' : `The current Primary Project is "${primary}".`}`
+  }
+  return `Workspace "${mutationWorkspaceId}" is not an Active Project, so this mutation was not run. Pass an absolute path inside the folder you mean instead and lnwjud will attach it automatically. ${primary === undefined ? 'No Active Project is available.' : `The current Primary Project is "${primary}".`}`
+}
+
+/**
+ * Deepest absolute prefix shared by every explicit path in one invocation. A call that spans two
+ * unrelated projects collapses to their common parent, which the host refuses when it is only a
+ * drive/home root, instead of silently picking one side.
+ */
+function commonExternalAttachPath(absolutePaths: readonly string[]): string | null {
+  const [first, ...rest] = absolutePaths;
+  if (typeof first !== 'string' || first.trim().length === 0) return null;
+  if (rest.length === 0) return first;
+  const api = workspacePathApi(first);
+  const root = api.parse(api.resolve(first)).root;
+  const segmentsOf = (value: string): readonly string[] | null => {
+    if (workspacePathApi(value) !== api) return null;
+    const resolved = api.resolve(value);
+    if (!activityPathContains(root, resolved)) return null;
+    const relative = api.relative(root, resolved);
+    return relative.length === 0 ? [] : relative.split(/[\\/]+/).filter(Boolean);
+  };
+  const firstSegments = segmentsOf(first);
+  if (firstSegments === null) return null;
+  let commonLength = firstSegments.length;
+  for (const candidate of rest) {
+    const segments = segmentsOf(candidate);
+    if (segments === null) return null;
+    let shared = 0;
+    while (shared < commonLength && shared < segments.length) {
+      const left = firstSegments[shared] ?? '';
+      const right = segments[shared] ?? '';
+      if (api === path.win32 ? left.toLowerCase() !== right.toLowerCase() : left !== right) break;
+      shared += 1;
+    }
+    commonLength = shared;
+  }
+  return commonLength === 0 ? root : api.join(root, ...firstSegments.slice(0, commonLength));
 }
 
 type ActiveWorkspaceScopeOptions = Pick<ToolRegistryOptions, 'activeWorkspaceScopeProvider' | 'activeWorkspaceScopesProvider' | 'activeProjectProvider'>;
@@ -1629,7 +1829,7 @@ function summarizeMutationForApproval(toolName: string, input: unknown, activeWo
       lines.push(`launchCount = ${taskIds.length}`);
       if (taskIds.length > 0) lines.push(`taskIds = ${JSON.stringify(taskIds)}`);
     }
-    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.8.2 enforces read-only child sandboxes.');
+    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.8.4 enforces read-only child sandboxes.');
     return boundedApprovalSummary(lines);
   }
   const projectKind = projectCommandKind(toolName);
@@ -1761,10 +1961,11 @@ function requiresActiveWorkspaceScope(toolName: string, decision: MutationPolicy
 }
 function requiresNativePathScope(toolName: string, input: unknown): boolean {
   if (!NATIVE_ACTIVE_SCOPE_TOOLS.has(toolName) || !isRecord(input)) return false;
-  for (const key of ['file_path', 'target_path', 'output_path', 'source_path', 'image_path'] as const) {
+  for (const key of NATIVE_PATH_SCOPE_KEYS) {
     if (readTrimmedString(input[key]) !== undefined) return true;
   }
-  return Array.isArray(input.merge_paths) && input.merge_paths.some((entry) => readTrimmedString(entry) !== undefined);
+  return PATH_SCOPE_ARRAY_KEYS.some((key) => Array.isArray(input[key])
+    && input[key].some((entry) => readTrimmedString(typeof entry === 'string' ? entry : isRecord(entry) ? entry.path : undefined) !== undefined));
 }
 function commandExecutionLeavesActiveWorkspace(toolName: string, input: unknown, activeWorkspaceScope: WorkspaceScope | null): boolean {
   if (!COMMAND_EXECUTION_TOOLS.has(toolName) || activeWorkspaceScope === null || !isRecord(input)) return false;

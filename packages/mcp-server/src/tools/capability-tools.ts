@@ -215,7 +215,7 @@ export function capabilityTools(context: McpToolContext, setOfMarksStore?: SetOf
     }),
     defineTool({
       name: 'audio',
-      description: 'Record the microphone to a WAV file or play a local audio file through the host media provider. In standard mode recording requires the host-selected Active Project workspaceId and explicit confirmation; trusted Full Bypass skips lnwjud approval/scope checks. Existing in-workspace outputs use Recovery Trash before replacement when available. record is synchronous and limited to 600 seconds. Use stop to abort an ongoing record/play.',
+      description: 'Record the microphone to a WAV file or play a local audio file through the host media provider. In standard mode recording requires an Active Project (an absolute output_path outside every Active Project attaches that folder after one confirmation) and explicit confirmation; trusted Full Bypass skips lnwjud approval/scope checks. Existing in-workspace outputs use Recovery Trash before replacement when available. record is synchronous and limited to 600 seconds. Use stop to abort an ongoing record/play.',
       permission: 'EXECUTE',
       annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: audioCapabilitySchema,
@@ -223,7 +223,7 @@ export function capabilityTools(context: McpToolContext, setOfMarksStore?: SetOf
     }),
     defineTool({
       name: 'screen_record',
-      description: 'Record the screen to an MP4 using the host-native media provider. In standard mode starting a recording requires the host-selected Active Project workspaceId and explicit confirmation; trusted Full Bypass skips lnwjud approval/scope checks. Existing in-workspace outputs use Recovery Trash before replacement when available. start spawns a background capture, status checks it, stop finalizes the file. Recording stops automatically after 3600 seconds.',
+      description: 'Record the screen to an MP4 using the host-native media provider. In standard mode starting a recording requires an Active Project (an absolute output_path outside every Active Project attaches that folder after one confirmation) and explicit confirmation; trusted Full Bypass skips lnwjud approval/scope checks. Existing in-workspace outputs use Recovery Trash before replacement when available. start spawns a background capture, status checks it, stop finalizes the file. Recording stops automatically after 3600 seconds.',
       permission: 'EXECUTE',
       annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: screenRecordCapabilitySchema,
@@ -231,7 +231,7 @@ export function capabilityTools(context: McpToolContext, setOfMarksStore?: SetOf
     }),
     defineTool({
       name: 'office',
-      description: 'Automate a supported spreadsheet/document provider when installed. In standard mode every write, replace, merge, or save_as action requires an Active Project workspaceId, explicit chat confirmation, and host approval. Trusted Full Bypass skips lnwjud approval/scope checks without forging userConfirmed. Existing in-workspace targets use Recovery Trash before replacement when available. Unsupported app/action pairs are dependency-gated rather than approximated.',
+      description: 'Automate a supported spreadsheet/document provider when installed. In standard mode every write, replace, merge, or save_as action requires an Active Project (an absolute file_path/target_path outside every Active Project attaches that folder after one confirmation), explicit chat confirmation, and host approval. Trusted Full Bypass skips lnwjud approval/scope checks without forging userConfirmed. Existing in-workspace targets use Recovery Trash before replacement when available. Unsupported app/action pairs are dependency-gated rather than approximated.',
       permission: 'WRITE',
       annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: officeCapabilitySchema,

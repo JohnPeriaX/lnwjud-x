@@ -32,6 +32,23 @@ export class WorkspacePathGuard {
     this.platform = options.platform ?? process.platform;
   }
 
+  /**
+   * The read-trust the host granted this guard. Other read paths need it so they cannot disagree
+   * with the guard about the same absolute path; a host that allowed explicit absolute reads for
+   * `read_file` must not refuse `workspace_tree` on the same target.
+   */
+  public get readTrust(): {
+    readonly platform: NodeJS.Platform;
+    readonly externalReadRoots: readonly string[];
+    readonly allowExplicitAbsoluteRead: boolean;
+  } {
+    return {
+      platform: this.platform,
+      externalReadRoots: this.options.externalReadRoots ?? [],
+      allowExplicitAbsoluteRead: this.options.allowExplicitAbsoluteRead === true,
+    };
+  }
+
   public async resolveForRead(
     workspace: Workspace,
     inputPath: string,

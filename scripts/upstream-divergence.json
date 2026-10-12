@@ -1,0 +1,114 @@
+{
+  "$comment": [
+    "Divergence registry for the lnwjud-x fork of https://github.com/engasnm111/lnwjud.",
+    "Every entry is a behaviour this repository added that the upstream project does not have and",
+    "therefore has no reason to preserve. A merge from upstream can delete it while still merging",
+    "cleanly, so each entry names the source marker that proves it survived plus the test that",
+    "actually exercises it. tests/release/upstream-divergence.test.ts fails if any marker disappears.",
+    "Add an entry here whenever lnwjud-x changes upstream-owned behaviour. Do not add upstream-owned",
+    "behaviour that lnwjud-x merely consumes."
+  ],
+  "upstreamRemote": "upstream",
+  "customizations": [
+    {
+      "id": "project-attach",
+      "summary": "An absolute path outside every Active Project is attached as a project by the host instead of being refused with 'not registered'.",
+      "markers": [
+        { "file": "packages/workspace/src/project-attach.ts", "contains": "export function resolveAttachableProjectRoot" },
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "externalProjectAttachProvider" },
+        { "file": "packages/mcp-server/src/server.ts", "contains": "externalProjectAttachProvider" },
+        { "file": "packages/mcp-server/src/destructive-scope.ts", "contains": "requiresProjectApproval" },
+        { "file": "apps/desktop/src/main/desktop-services.ts", "contains": "externalProjectAttachProvider" },
+        { "file": "apps/desktop/src/main/main.ts", "contains": "externalProjectAttachProvider" },
+        { "file": "apps/cli/src/bin/mcp-stdio.ts", "contains": "externalProjectAttachProvider" }
+      ],
+      "proofTests": [
+        "packages/workspace/src/project-attach.test.ts",
+        "packages/mcp-server/src/external-project-attach.test.ts",
+        "apps/desktop/tests/external-project-attach.test.ts"
+      ]
+    },
+    {
+      "id": "path-scope-shared-keys",
+      "summary": "Path routing and native path-scope enforcement read one shared key list, so no path field can be enforced without also being routable.",
+      "markers": [
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "export const PATH_SCOPE_KEYS" },
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "NATIVE_PATH_SCOPE_KEYS" },
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "PATH_SCOPE_ARRAY_KEYS" }
+      ],
+      "proofTests": [
+        "packages/mcp-server/src/path-scope-field-coverage.test.ts",
+        "tests/release/native-active-project-wiring.test.ts"
+      ]
+    },
+    {
+      "id": "actionable-scope-denial",
+      "summary": "A scope refusal names the retry that works, because a vague refusal makes the assistant tell the user to register the folder by hand.",
+      "markers": [
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "describeActiveWorkspaceScopeMismatch" }
+      ],
+      "proofTests": ["packages/mcp-server/src/external-project-attach.test.ts"]
+    },
+    {
+      "id": "silent-attach-profile",
+      "summary": "Full Access attaches a new folder without prompting; stricter profiles confirm once per folder. This is the fork's deliberate approval policy.",
+      "markers": [
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "silentProjectAttachApproved" }
+      ],
+      "proofTests": [
+        "packages/mcp-server/src/external-project-attach.test.ts",
+        "apps/desktop/tests/external-project-attach.test.ts"
+      ]
+    },
+    {
+      "id": "pending-attach-activation",
+      "summary": "Attach activates a project at the end of the active list only, never moves the Primary Project, and never re-activates a project the user switched off.",
+      "markers": [
+        { "file": "apps/desktop/src/main/desktop-services.ts", "contains": "pending_attach_workspace_ids" }
+      ],
+      "proofTests": [
+        "apps/desktop/tests/external-project-attach.test.ts",
+        "apps/desktop/tests/multi-workspace-concurrency-acceptance.test.ts"
+      ]
+    },
+    {
+      "id": "git-cwd-targeting",
+      "summary": "git_status, git_diff and git_log resolve a project from an absolute cwd instead of requiring an active workspaceId.",
+      "markers": [
+        { "file": "packages/mcp-server/src/tools/git-tools.ts", "contains": "unresolvedGitProject" },
+        { "file": "packages/mcp-server/src/tools/schemas.ts", "contains": "gitStatusSchema" }
+      ],
+      "proofTests": ["packages/mcp-server/src/external-project-attach.test.ts"]
+    },
+    {
+      "id": "get-file-info-tool",
+      "summary": "get_file_info reports metadata for a path without loading content, mirroring the reference tool surface this fork targets.",
+      "markers": [
+        { "file": "packages/application/src/file-service.ts", "contains": "public async getFileInfo" },
+        { "file": "packages/mcp-server/src/tools/file-tools.ts", "contains": "get_file_info" }
+      ],
+      "proofTests": [
+        "packages/application/src/file-service-info.test.ts",
+        "packages/mcp-server/src/external-project-attach.test.ts"
+      ]
+    },
+    {
+      "id": "goal-lease-per-workspace",
+      "summary": "A goal lease from another project neither authorizes nor blocks a mutation whose workspace was actually read as unfenced; the refusal is retained when fence state cannot be confirmed.",
+      "markers": [
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "mutationWorkspaceConfirmedUnfenced" },
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "describeGoalLeaseWorkspaceMismatch" }
+      ],
+      "proofTests": ["packages/mcp-server/src/scheduled-continuation-fence.test.ts"]
+    },
+    {
+      "id": "tree-read-trust",
+      "summary": "workspace_tree honours the host explicit-absolute-read grant and invocation authorization, so it cannot refuse a path read_file accepts.",
+      "markers": [
+        { "file": "packages/workspace/src/workspace-path-guard.ts", "contains": "public get readTrust" },
+        { "file": "packages/application/src/workspace-query-service.ts", "contains": "this.guard.readTrust" }
+      ],
+      "proofTests": ["packages/application/src/workspace-query-service.test.ts"]
+    }
+  ]
+}

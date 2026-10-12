@@ -1,6 +1,6 @@
 import { constants as fsConstants } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { copyFile, cp, lstat, mkdir, readFile as readFsFile, readdir, rename, rm, rmdir, unlink, writeFile as writeFsFile } from 'node:fs/promises';
+import { copyFile, cp, lstat, mkdir, readFile as readFsFile, readdir, rename, rm, rmdir, stat, unlink, writeFile as writeFsFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   appError,
@@ -61,6 +61,19 @@ export interface ReadFilesRequest {
 
 export interface ReadFilesResult {
   readonly files: readonly ReadFileResult[];
+}
+
+/** Metadata only. Content is never returned here, so a huge or binary target costs the same as a text one. */
+export interface FileInfoResult {
+  readonly path: string;
+  readonly absolutePath: string;
+  readonly isDirectory: boolean;
+  readonly isFile: boolean;
+  readonly isSymlink: boolean;
+  readonly sizeBytes: number;
+  readonly createdAt: string;
+  readonly modifiedAt: string;
+  readonly permissions: string;
 }
 
 export interface FileServiceDependencies {
@@ -326,6 +339,37 @@ export class FileService {
       files.push(result.value);
     }
     return ok({ files });
+  }
+
+  public async getFileInfo(
+    actor: FileActor,
+    workspaceId: string | undefined,
+    request: { readonly path: string },
+    authorization?: InvocationAuthorization,
+  ): Promise<Result<FileInfoResult>> {
+    void actor;
+    const workspaceResult = await resolveWorkspaceForPath(this.workspaces, workspaceId, request.path, authorization, process.platform, this.externalReadRoots, this.allowExplicitAbsoluteRead);
+    if (!workspaceResult.ok) return workspaceResult;
+    const resolved = await this.guard.resolveForRead(workspaceResult.value, request.path, authorization);
+    if (!resolved.ok) return resolved;
+    const absolute = resolved.value.realPath ?? resolved.value.absolutePath;
+    try {
+      const [info, link] = await Promise.all([stat(absolute), lstat(absolute)]);
+      return ok({
+        path: resultPath(resolved.value),
+        absolutePath: absolute,
+        isDirectory: info.isDirectory(),
+        isFile: info.isFile(),
+        isSymlink: link.isSymbolicLink(),
+        sizeBytes: info.size,
+        createdAt: info.birthtime.toISOString(),
+        modifiedAt: info.mtime.toISOString(),
+        permissions: (info.mode & 0o777).toString(8).padStart(3, '0'),
+      });
+    } catch (error: unknown) {
+      if (nodeErrorCode(error) === 'ENOENT') return err(appError('FILE_NOT_FOUND', `Path was not found: ${resultPath(resolved.value)}`));
+      return err(mapNodeFsError(error, 'File metadata could not be read'));
+    }
   }
 
   public async writeFile(actor: FileActor, workspaceId: string | undefined, request: WriteFileRequest, signal?: AbortSignal, authorization?: InvocationAuthorization): Promise<Result<WriteFileResult>> {

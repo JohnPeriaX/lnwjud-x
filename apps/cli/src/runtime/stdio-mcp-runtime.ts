@@ -46,7 +46,7 @@ import {
   createLocalExtensionsService,
   type ExtensionsService,
 } from '@lnwjud/extensions';
-import { OfficeDataWorkflowService, ActivityTracker, RuntimeEngineeringEvidenceVerifier, createEngineeringArtifactVerifier, createEngineeringSourceStateProvider, RuntimeGoalManagedTaskStateReader, SharedActivitySnapshotLease, composeActivitySinks, createFileActivitySink, currentSharedActivityOwner, mcpActivityLogPath, type ActivitySink, type ActivitySinkEvent, type McpApplicationServices, type WorkspaceScope } from '@lnwjud/mcp-server';
+import { OfficeDataWorkflowService, ActivityTracker, RuntimeEngineeringEvidenceVerifier, createEngineeringArtifactVerifier, createEngineeringSourceStateProvider, RuntimeGoalManagedTaskStateReader, SharedActivitySnapshotLease, composeActivitySinks, createFileActivitySink, currentSharedActivityOwner, mcpActivityLogPath, type ActivitySink, type ActivitySinkEvent, type ExternalProjectAttachRequest, type McpApplicationServices, type WorkspaceScope } from '@lnwjud/mcp-server';
 import { permissionProfiles, type PermissionProfile, type PermissionProfileName } from '@lnwjud/permissions';
 import {
   AesGcmCheckpointCipher,
@@ -59,7 +59,7 @@ import {
   SqliteSettingsRepository,
   SqliteWorkspaceRepository,
 } from '@lnwjud/storage';
-import { isMachineRootPath, SecretPolicy, WorkspacePathGuard, WorkspaceService, type Workspace } from '@lnwjud/workspace';
+import { comparableHostPath, isMachineRootPath, resolveAttachableProjectRoot, SecretPolicy, WorkspacePathGuard, WorkspaceService, type Workspace } from '@lnwjud/workspace';
 import { StrictWorkspaceRepository } from './strict-workspace-repository.js';
 
 export interface PersistedStdioSecurityPolicy {
@@ -82,6 +82,8 @@ export interface StdioMcpRuntime {
   readonly allowAiDeleteProvider: () => boolean;
   readonly destructivePolicyProvider: () => DestructiveAutoApprovalPolicy;
   readonly activeWorkspaceScopeProvider: () => Promise<WorkspaceScope>;
+  /** Attaches an explicit absolute path outside the configured workspace as its own project scope. */
+  readonly attachExternalProjectScope: (request: ExternalProjectAttachRequest) => Promise<WorkspaceScope | null>;
   readonly codexToolsEnabled: boolean;
   readonly ponytailMode: PonytailMode;
   readonly engineeringHarnessSettingsProvider: () => ParsedEngineeringHarnessSettings;
@@ -148,6 +150,33 @@ export function createStdioMcpRuntime(
     parseBooleanSetting(settingsRepository.get(ALLOW_AI_DELETE_SETTING_KEY), false),
   );
   const allowAiDeleteProvider = (): boolean => fullBypassAll || destructivePolicyProvider().approvals.delete_file;
+
+  /**
+   * Mirrors Desktop: an explicit absolute path outside the launched workspace becomes that folder's
+   * project scope instead of a dead-end denial. An explicit --strict-roots policy is a hard boundary,
+   * so nothing is attached in that mode.
+   */
+  const attachExternalProjectScope = async (request: ExternalProjectAttachRequest): Promise<WorkspaceScope | null> => {
+    if (strictRoots) return null;
+    const projectRoot = resolveAttachableProjectRoot(request.path, process.platform);
+    if (projectRoot === null) return null;
+    const comparableRoot = comparableHostPath(projectRoot, process.platform);
+    if (comparableRoot === null) return null;
+    const existing = await workspaceService.list();
+    const known = existing.find((entry) => comparableHostPath(entry.realRootPath, process.platform) === comparableRoot);
+    if (known !== undefined) return stdioProjectScope(known, request.approve);
+    const added = await workspaceService.add(path.basename(projectRoot) || 'Workspace', projectRoot);
+    if (!added.ok) return null;
+    return stdioProjectScope(added.value, request.approve);
+  };
+
+  function stdioProjectScope(scopeWorkspace: Workspace, approve: boolean): WorkspaceScope | null {
+    if (isMachineRootPath(scopeWorkspace.realRootPath) || isMachineRootPath(scopeWorkspace.rootPath)) return null;
+    if (scopeWorkspace.archivedAt !== undefined && scopeWorkspace.archivedAt !== null) return null;
+    return approve
+      ? { workspaceId: scopeWorkspace.id, rootPath: scopeWorkspace.realRootPath }
+      : { workspaceId: scopeWorkspace.id, rootPath: scopeWorkspace.realRootPath, requiresProjectApproval: true };
+  }
 
   const projectService = new ProjectService(workspaceRepository);
   const engineeringPreparationService = new EngineeringPreparationService(workspaceRepository, {
@@ -341,6 +370,7 @@ export function createStdioMcpRuntime(
     allowAiDeleteProvider,
     destructivePolicyProvider,
     activeWorkspaceScopeProvider: async (): Promise<WorkspaceScope> => ({ workspaceId: workspace.id, rootPath: workspace.realRootPath }),
+    attachExternalProjectScope,
     codexToolsEnabled: parseBooleanSetting(settingsRepository.get(USER_SETTING_KEYS.codexToolsEnabled), DEFAULT_CODEX_TOOLS_ENABLED),
     ponytailMode: parsePonytailMode(settingsRepository.get(USER_SETTING_KEYS.ponytailMode), DEFAULT_PONYTAIL_MODE),
     engineeringHarnessSettingsProvider: () => parseEngineeringHarnessSettings(settingsRepository.get(USER_SETTING_KEYS.engineeringHarnessSettings)),

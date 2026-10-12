@@ -34,7 +34,17 @@ export class WorkspaceInfoService {
     private readonly workspaceService?: WorkspaceService,
     private readonly unrestricted: boolean = false,
     private readonly platform: NodeJS.Platform = process.platform,
+    /**
+     * Host hook run after a project becomes known. Desktop adds it to the Active Project set so a
+     * registered path is immediately usable instead of waiting for a manual pick in the UI.
+     */
+    private readonly onRegistered?: (workspaceId: string) => Promise<void>,
   ) {}
+
+  private async notifyRegistered(workspaceId: string): Promise<void> {
+    if (this.onRegistered === undefined) return;
+    await this.onRegistered(workspaceId).catch(() => undefined);
+  }
 
   public async list(actor: FileActor): Promise<Result<readonly WorkspaceInfo[]>> {
     void actor;
@@ -102,13 +112,17 @@ export class WorkspaceInfoService {
     const normalizedTarget = normalizeCompare(absolutePath, this.platform);
     const duplicate = existing.find((entry) => normalizeCompare(entry.realRootPath, this.platform) === normalizedTarget
       || normalizeCompare(entry.rootPath, this.platform) === normalizedTarget);
-    if (duplicate !== undefined) return ok(this.toWorkspaceInfo(duplicate));
+    if (duplicate !== undefined) {
+      await this.notifyRegistered(duplicate.id);
+      return ok(this.toWorkspaceInfo(duplicate));
+    }
 
     const displayName = request.displayName?.trim()
       || hostPathApi(this.platform).basename(absolutePath)
       || 'Workspace';
     const added = await this.workspaceService.add(displayName, absolutePath);
     if (!added.ok) return added;
+    await this.notifyRegistered(added.value.id);
     return ok(this.toWorkspaceInfo(added.value));
   }
 }

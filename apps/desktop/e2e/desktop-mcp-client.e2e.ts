@@ -83,9 +83,9 @@ test('desktop serves the real MCP client development workflow', async () => {
     const expectedCoreTools = [
       'workspace_list', 'workspace_register', 'workspace_info', 'workspace_tree', 'project_snapshot',
       'engineering_prepare_task', 'engineering_start_task', 'engineering_get_status', 'read_file', 'read_files',
-      'search_files', 'search_text', 'git_status', 'git_diff', 'git_log', 'git', 'write_file',
+      'search_files', 'search_text', 'git_status', 'git_diff', 'git_log', 'git', 'get_file_info', 'write_file',
       'apply_patch', 'edit_file', 'move_file', 'copy_file', 'delete_file', 'list_recovery_items', 'restore_deleted_file', 'list_checkpoints', 'restore_checkpoint', 'process_start', 'process_list', 'process_status',
-      'process_logs', 'process_stop', 'project_dev', 'project_test', 'project_lint',
+      'process_logs', 'interact_with_process', 'process_stop', 'project_dev', 'project_test', 'project_lint',
       'project_typecheck', 'project_build',
       'shell', 'dom_cdp', 'computer_use', 'accessibility', 'input_event', 'vision', 'vision_annotated_capture', 'ui_target_action', 'window', 'health',
       'system_info', 'notification', 'file_dialog', 'clipboard', 'web_fetch',

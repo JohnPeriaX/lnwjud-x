@@ -310,7 +310,13 @@ describe('MCP localhost HTTP transport', () => {
 
     try {
       await client.connect(transport);
-      for (let index = 0; index < 64; index += 1) {
+      // The invariant is per-request teardown, and it is observable after any number of requests:
+      // every created subscription must be released and no listener may remain. Each round trip
+      // rebuilds a full per-request MCP server (~117ms alone, far slower under whole-suite CPU
+      // contention), so the loop is sized to prove repetition without turning the assertion into a
+      // race against the test timeout.
+      const requests = 16;
+      for (let index = 0; index < requests; index += 1) {
         const tools = await client.listTools();
         expect(tools.tools.length).toBeGreaterThan(0);
       }
@@ -319,7 +325,7 @@ describe('MCP localhost HTTP transport', () => {
         expect(listeners.size).toBe(0);
         expect(closed).toBe(created);
       });
-      expect(created).toBeGreaterThanOrEqual(64);
+      expect(created).toBeGreaterThanOrEqual(requests);
     } finally {
       await client.close().catch(() => undefined);
     }

@@ -62,6 +62,7 @@ import {
   mcpActivityLogPath,
   type ActivitySinkEvent,
   type EccRuntimeOptions,
+  type ExternalProjectAttachRequest,
   type HostMutationApprovalRequest,
   type McpApplicationServices,
   type McpHttpServerOptions,
@@ -129,7 +130,7 @@ import {
 import { AesGcmCheckpointCipher, BACKUP_RESTORE_NOTICE_SETTING_KEY, parseBackupRestoreNotice, SqliteAgentSwarmRepository, SqliteAuditRepository, SqliteAutomationRepository, SqliteBackupService, SqliteCheckpointRepository, SqliteDatabase, SqliteSettingsRepository, SqliteWorkspaceRepository, type BackupReason, type BackupRestoreNotice as StorageBackupRestoreNotice, type BackupSummary, type CheckpointPayloadCipher } from '@lnwjud/storage';
 import { SqliteGoalRepository } from '@lnwjud/storage';
 import type { Workspace } from '@lnwjud/workspace';
-import { comparableHostPath, isDriveRoot, isMachineRootPath, resolveHostPath, SecretPolicy, WorkspacePathGuard, WorkspaceService } from '@lnwjud/workspace';
+import { comparableHostPath, isDriveRoot, isMachineRootPath, resolveAttachableProjectRoot, resolveHostPath, SecretPolicy, WorkspacePathGuard, WorkspaceService } from '@lnwjud/workspace';
 import {
   type AddWorkspaceRequest,
   type BackupRestoreNotice as IpcBackupRestoreNotice,
@@ -248,6 +249,8 @@ const MAX_GIT_IMAGE_PREVIEW_BYTES = 4 * 1024 * 1024;
 const permissionSettingKey = 'permission_profile';
 const selectedWorkspaceSettingKey = 'selected_workspace_id';
 const activeWorkspaceIdsSettingKey = 'active_workspace_ids';
+/** Workspaces created by an unconfirmed auto-attach; they may activate themselves, never a user-deactivated project. */
+const pendingAttachWorkspaceIdsSettingKey = 'pending_attach_workspace_ids';
 const workLogClearedSettingKey = 'work_log_cleared_at';
 const localeSettingKey = 'ui_locale';
 const tunnelIdentitySettingKey = 'tunnel_identity_id';
@@ -271,6 +274,8 @@ export interface DesktopRuntime {
   getDestructivePolicy(): DestructiveAutoApprovalPolicy;
   getActiveWorkspaceScope(): Promise<WorkspaceScope | null>;
   getActiveWorkspaceScopes(): Promise<readonly WorkspaceScope[]>;
+  /** Attaches one explicit absolute path as a project so a chat is never locked to a remembered Active Project. */
+  attachExternalProjectScope(request: ExternalProjectAttachRequest): Promise<WorkspaceScope | null>;
   createBackup(reason?: BackupReason): Promise<BackupSummary>;
   ensureDefaultWorkspace(rootPath: string): Promise<string>;
   autoStartMcp(): Promise<McpConnectionStatus>;
@@ -611,7 +616,9 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
       activeGoals,
     };
   };
-  const workspaceInfoService = new WorkspaceInfoService(workspaceRepository, workspaceService, unrestricted);
+  const workspaceInfoService = new WorkspaceInfoService(workspaceRepository, workspaceService, unrestricted, process.platform, async (workspaceId): Promise<void> => {
+    await activateWorkspace(workspaceId).catch(() => undefined);
+  });
   const workspaceQueryService = new WorkspaceQueryService(workspaceRepository, pathGuard);
   const searchService = new SearchService(workspaceRepository);
   const projectSnapshotService = new ProjectSnapshotService(workspaceRepository, {
@@ -855,6 +862,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
       activeWorkspaceScopesProvider: async (): Promise<readonly WorkspaceScope[]> => (
         (await resolveActiveProjectWorkspaces()).map((workspace) => ({ workspaceId: workspace.id, rootPath: workspace.realRootPath }))
       ),
+      externalProjectAttachProvider: attachExternalProjectScope,
       ...(options.hostMutationApprovalProvider === undefined ? {} : { hostMutationApprovalProvider: options.hostMutationApprovalProvider }),
       codexToolsEnabledProvider: () => readSettings().codexToolsEnabled,
       ponytailModeProvider: () => readSettings().ponytailMode,
@@ -1242,12 +1250,67 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
     return orderedIds.map((id) => byId.get(id)!).filter(Boolean);
   }
 
+  /**
+   * Turns one explicit absolute path into a usable project scope, mirroring the path-only model of
+   * generic file MCP servers. Reads and user-confirmed calls register the folder and add it to the
+   * Active Project set; an unconfirmed mutation only records a pending scope so the agent gets a
+   * retryable confirmation instead of a dead-end denial. A project the user deliberately deactivated
+   * in the Desktop UI is never re-activated from here, and the Primary Project never changes.
+   */
+  async function attachExternalProjectScope(request: ExternalProjectAttachRequest): Promise<WorkspaceScope | null> {
+    const projectRoot = resolveAttachableProjectRoot(request.path, process.platform);
+    if (projectRoot === null) return null;
+    const comparableRoot = comparableHostPath(projectRoot, process.platform);
+    if (comparableRoot === null) return null;
+    const existing = await workspaceService.list();
+    const known = existing.find((workspace) => comparableHostPath(workspace.realRootPath, process.platform) === comparableRoot);
+    if (known === undefined) {
+      const registered = await registerProject(path.basename(projectRoot) || 'Workspace', projectRoot);
+      return finishProjectAttach(registered, request.approve, true);
+    }
+    return finishProjectAttach(known, request.approve, false);
+  }
+
+  async function registerProject(displayName: string, rootPath: string): Promise<Workspace | null> {
+    const added = await workspaceService.add(displayName, rootPath);
+    return added.ok ? added.value : null;
+  }
+
+  async function finishProjectAttach(workspace: Workspace | null, approve: boolean, newlyRegistered: boolean): Promise<WorkspaceScope | null> {
+    if (workspace === null) return null;
+    if (isMachineRootPath(workspace.realRootPath) || isMachineRootPath(workspace.rootPath)) return null;
+    if (workspace.archivedAt !== undefined && workspace.archivedAt !== null) return null;
+    const pendingIds = parseStoredWorkspaceIds(settingsRepository.get(pendingAttachWorkspaceIdsSettingKey));
+    const activeIds = (await resolveActiveProjectWorkspaces()).map((active) => active.id);
+    if (activeIds.includes(workspace.id)) return { workspaceId: workspace.id, rootPath: workspace.realRootPath };
+    // Only a folder this call just registered, or one already waiting for its confirmation, may
+    // attach itself. A project the user switched off in the Desktop UI stays switched off.
+    if (!newlyRegistered && !pendingIds.includes(workspace.id)) return null;
+    if (!approve) {
+      if (!pendingIds.includes(workspace.id)) {
+        persistStoredWorkspaceIds(settingsRepository, pendingAttachWorkspaceIdsSettingKey, [...pendingIds, workspace.id]);
+      }
+      return { workspaceId: workspace.id, rootPath: workspace.realRootPath, requiresProjectApproval: true };
+    }
+    persistStoredWorkspaceIds(settingsRepository, pendingAttachWorkspaceIdsSettingKey, pendingIds.filter((id) => id !== workspace.id));
+    try {
+      await activateWorkspace(workspace.id);
+    } catch {
+      return null;
+    }
+    return { workspaceId: workspace.id, rootPath: workspace.realRootPath };
+  }
+
   async function activateWorkspace(workspaceId: string): Promise<void> {
     const workspace = await resolveManageableWorkspace(workspaceId);
     if (workspace.archivedAt !== undefined && workspace.archivedAt !== null) throw new Error('Archived workspace cannot be activated');
     const ids = [...parseStoredWorkspaceIds(settingsRepository.get(activeWorkspaceIdsSettingKey))];
     if (!ids.includes(workspace.id)) ids.push(workspace.id);
     persistStoredWorkspaceIds(settingsRepository, activeWorkspaceIdsSettingKey, ids);
+    const pendingIds = parseStoredWorkspaceIds(settingsRepository.get(pendingAttachWorkspaceIdsSettingKey));
+    if (pendingIds.includes(workspace.id)) {
+      persistStoredWorkspaceIds(settingsRepository, pendingAttachWorkspaceIdsSettingKey, pendingIds.filter((id) => id !== workspace.id));
+    }
   }
 
   async function deactivateWorkspace(workspaceId: string): Promise<void> {
@@ -2274,6 +2337,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
     getActiveWorkspaceScopes: async (): Promise<readonly WorkspaceScope[]> => (
       (await resolveActiveProjectWorkspaces()).map((workspace) => ({ workspaceId: workspace.id, rootPath: workspace.realRootPath }))
     ),
+    attachExternalProjectScope,
     createBackup: (reason: BackupReason = 'manual'): Promise<BackupSummary> => backupService.create(reason),
     ensureDefaultWorkspace: async (rootPath: string): Promise<string> => {
       const existing = await workspaceService.list();

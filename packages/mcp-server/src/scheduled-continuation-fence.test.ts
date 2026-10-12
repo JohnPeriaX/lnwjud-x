@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { appError, err, ok } from '@lnwjud/domain';
 import { permissionProfiles } from '@lnwjud/permissions';
+import { ActivityTracker } from './activity-tracker.js';
 import { ToolRegistry, type McpApplicationServices } from './tool-registry.js';
 
 const actor = { clientId: 'client-1', clientName: 'test', sessionId: 'session-a' };
@@ -229,5 +230,83 @@ describe('scheduled continuation mutation fence', () => {
     expect(inspectWorkspaceFence).toHaveBeenCalledWith(actor, 'workspace-1');
     expect(begin).toHaveBeenCalled();
     expect(writeFile).not.toHaveBeenCalled();
+  });
+
+  it('runs an ordinary mutation in a second unfenced project even when the call carries another goal lease', async (): Promise<void> => {
+    // The failure this prevents: a session holds a durable goal bound to project A, the user drops
+    // an absolute path in project B, lnwjud attaches B, and the model sends A's lease because it
+    // believes a lease is always required. B carries no rolling fence, so A's lease governs nothing
+    // here and must neither authorize nor block the work.
+    const inspectWorkspaceFence = vi.fn(async (): Promise<ReturnType<typeof ok>> => ok(null));
+    const validateGoalLease = vi.fn(async (): Promise<ReturnType<typeof ok>> => ok({ workspaceId: 'workspace-a' }));
+    const run = vi.fn(async (): Promise<ReturnType<typeof ok>> => ok({ exitCode: 0, stdout: '', stderr: '' }));
+    const tracker = new ActivityTracker();
+    const bindVerifiedGoal = vi.spyOn(tracker, 'bindVerifiedGoal');
+    const services = {
+      goalMutationFence: { inspectWorkspaceFence },
+      goals: { validateGoalLease },
+      git: { run },
+    } as unknown as McpApplicationServices;
+
+    const response = await new ToolRegistry(services, actor, { activityTracker: tracker }).invoke('git', {
+      workspaceId: 'workspace-b',
+      args: ['add', 'src/file.ts'],
+      userConfirmed: true,
+      goalLease: { goalId: 'goal-a', leaseToken: 'token-a', leaseGeneration: 3 },
+    });
+
+    expect(response.isError, JSON.stringify(response)).not.toBe(true);
+    expect(inspectWorkspaceFence).toHaveBeenCalledWith(actor, 'workspace-b');
+    expect(run).toHaveBeenCalledTimes(1);
+    // Ignoring a foreign lease also means not mislabelling this call as that goal's verified work.
+    expect(bindVerifiedGoal).not.toHaveBeenCalled();
+  });
+
+  it('still refuses when the target workspace is fenced by a goal the supplied lease does not belong to', async (): Promise<void> => {
+    const inspectWorkspaceFence = vi.fn(async (): Promise<ReturnType<typeof ok>> => ok({ goalId: 'goal-b', leaseGeneration: 9 }));
+    const begin = vi.fn(async (): Promise<ReturnType<typeof err>> => err(appError('CONFLICT', 'Goal fence workspace does not match the request', true)));
+    const run = vi.fn(async (): Promise<ReturnType<typeof ok>> => ok({ exitCode: 0, stdout: '', stderr: '' }));
+    const services = {
+      goalMutationFence: { inspectWorkspaceFence, begin },
+      git: { run },
+    } as unknown as McpApplicationServices;
+
+    const response = await new ToolRegistry(services, actor, {
+      profileProvider: (): typeof permissionProfiles.full => permissionProfiles.full,
+      authorizationModeProvider: (): 'full_bypass' => 'full_bypass',
+    }).invoke('git', {
+      workspaceId: 'workspace-b',
+      args: ['commit', '-m', 'x'],
+      userConfirmed: true,
+      goalLease: { goalId: 'goal-a', leaseToken: 'token-a', leaseGeneration: 3 },
+    });
+
+    expect(response.isError).toBe(true);
+    expect(begin).toHaveBeenCalledWith(actor, 'workspace-b', expect.any(String), { goalId: 'goal-a', leaseToken: 'token-a', leaseGeneration: 3 });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on a foreign lease when the target fence state cannot be read, and names the retry', async (): Promise<void> => {
+    // A host without a fence provider cannot prove the workspace is unfenced, so the refusal stays,
+    // but it must state both working retries instead of the old bare "Goal lease workspace mismatch".
+    const validateGoalLease = vi.fn(async (): Promise<ReturnType<typeof ok>> => ok({ workspaceId: 'workspace-a' }));
+    const run = vi.fn(async (): Promise<ReturnType<typeof ok>> => ok({ exitCode: 0, stdout: '', stderr: '' }));
+    const services = {
+      goals: { validateGoalLease },
+      git: { run },
+    } as unknown as McpApplicationServices;
+
+    const response = await new ToolRegistry(services, actor).invoke('git', {
+      workspaceId: 'workspace-b',
+      args: ['add', 'src/file.ts'],
+      userConfirmed: true,
+      goalLease: { goalId: 'goal-a', leaseToken: 'token-a', leaseGeneration: 3 },
+    });
+
+    expect(response.isError).toBe(true);
+    const message = (response.structuredContent as { error: { message: string } }).error.message;
+    expect(message).toContain('goal-a');
+    expect(message).toContain('Retry without goalLease');
+    expect(run).not.toHaveBeenCalled();
   });
 });

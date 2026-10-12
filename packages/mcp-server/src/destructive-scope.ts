@@ -5,6 +5,12 @@ import type { MutationPolicyDecision } from './mutation-policy.js';
 export interface WorkspaceScope {
   readonly workspaceId: string;
   readonly rootPath: string;
+  /**
+   * True when the host attached this scope for the current call only because an
+   * explicit absolute path fell outside every Active Project, and the user has
+   * not confirmed the folder yet. Non-read invocations must ask first.
+   */
+  readonly requiresProjectApproval?: boolean;
 }
 
 /** @deprecated Use WorkspaceScope for request-scoped resolution. */

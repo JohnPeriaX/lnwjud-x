@@ -71,6 +71,7 @@ export const CORE_TOOL_RUNTIME_FIXTURES = {
   engineering_get_status: service({ goalId: 'goal-1' }, 'goals.getGoal'),
   read_file: service({ workspaceId, path: 'README.md' }, 'file.readFile'),
   read_files: service({ workspaceId, files: [{ path: 'README.md' }] }, 'file.readFiles'),
+  get_file_info: service({ workspaceId, path: 'README.md' }, 'file.getFileInfo'),
   search_files: service({ workspaceId }, 'search.searchFiles'),
   search_text: service({ workspaceId, query: 'needle' }, 'search.searchText'),
   git_status: service({ workspaceId }, 'git.status'),
