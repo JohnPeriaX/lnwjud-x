@@ -668,7 +668,11 @@ export class ToolRegistry {
       if (ponytailInvocation !== undefined && ponytailInvocation.policy.mode !== 'off') {
         const activation = this.ponytailActivation.state(ponytailInvocation.context, ponytailInvocation.policy);
         if (!activation.primarySkillLoaded && !activation.sessionSuppressed) {
-          const message = `Ponytail ${ponytailInvocation.policy.mode.toUpperCase()} is active. Call skill_load with skillId=${BUNDLED_PONYTAIL_SKILL_ID}, this workspaceId, and the same goalId when applicable, then retry this code mutation.`;
+          const goalScopedLoadWithoutLease = goalLease === undefined
+            && this.ponytailActivation.hasGoalScopedPrimaryLoad(this.actor.clientId, ponytailInvocation.context.workspaceId);
+          const message = goalScopedLoadWithoutLease
+            ? `Ponytail ${ponytailInvocation.policy.mode.toUpperCase()} was loaded for a goal, but this code mutation has no goalLease. Supply the active goalLease (goalId, leaseToken, leaseGeneration) with this mutation to use that goal-scoped skill_load, or call skill_load with skillId=${BUNDLED_PONYTAIL_SKILL_ID} and workspaceId only for an unbound edit. Goal-scoped activation cannot authorize an unbound mutation.`
+            : `Ponytail ${ponytailInvocation.policy.mode.toUpperCase()} is active. Call skill_load with skillId=${BUNDLED_PONYTAIL_SKILL_ID} and workspaceId for an unbound mutation, or load the same goalId and supply goalLease on each goal-bound mutation.`;
           const response = mapError(appError('CONFLICT', message, true));
           await this.activity.end(callId, 'CONFLICT', Date.now() - started, message);
           return response;

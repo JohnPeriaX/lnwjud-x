@@ -28,6 +28,8 @@ const RELEASE_NOTES: readonly ReleaseNote[] = [
         titleKey: 'whatsNew.category.safety',
         items: [
           { id: 'goal-lease-scope', titleKey: 'whatsNew.584.lease.title', descriptionKey: 'whatsNew.584.lease.description', badge: 'fixed', tags: ['goalLease', 'Git', 'Active Project'] },
+          { id: 'path-attach', titleKey: 'whatsNew.584.attach.title', descriptionKey: 'whatsNew.584.attach.description', badge: 'new', tags: ['absolute path', 'Active Project', 'Full Access'] },
+          { id: 'denial-guidance', titleKey: 'whatsNew.584.denial.title', descriptionKey: 'whatsNew.584.denial.description', badge: 'fixed', tags: ['permission', 'retry', 'MCP'] },
         ],
       },
       {
@@ -35,30 +37,35 @@ const RELEASE_NOTES: readonly ReleaseNote[] = [
         titleKey: 'whatsNew.category.experience',
         items: [
           { id: 'tree-path-consistency', titleKey: 'whatsNew.584.tree.title', descriptionKey: 'whatsNew.584.tree.description', badge: 'fixed', tags: ['workspace_tree', 'absolute path'] },
+          { id: 'git-any-folder', titleKey: 'whatsNew.584.gitpath.title', descriptionKey: 'whatsNew.584.gitpath.description', badge: 'improved', tags: ['Git', 'cwd', 'git_status'] },
+          { id: 'get-file-info', titleKey: 'whatsNew.584.fileinfo.title', descriptionKey: 'whatsNew.584.fileinfo.description', badge: 'new', tags: ['get_file_info', 'metadata'] },
         ],
       },
     ],
   },
   {
     version: '5.8.3',
-    categories: [
-      {
-        id: 'safety',
-        titleKey: 'whatsNew.category.safety',
-        items: [
-          { id: 'path-attach', titleKey: 'whatsNew.583.attach.title', descriptionKey: 'whatsNew.583.attach.description', badge: 'new', tags: ['absolute path', 'Active Project', 'Full Access'] },
-          { id: 'denial-guidance', titleKey: 'whatsNew.583.denial.title', descriptionKey: 'whatsNew.583.denial.description', badge: 'fixed', tags: ['permission', 'retry', 'MCP'] },
-        ],
-      },
-      {
-        id: 'experience',
-        titleKey: 'whatsNew.category.experience',
-        items: [
-          { id: 'git-any-folder', titleKey: 'whatsNew.583.gitpath.title', descriptionKey: 'whatsNew.583.gitpath.description', badge: 'improved', tags: ['Git', 'cwd', 'git_status'] },
-          { id: 'get-file-info', titleKey: 'whatsNew.583.fileinfo.title', descriptionKey: 'whatsNew.583.fileinfo.description', badge: 'new', tags: ['get_file_info', 'metadata'] },
-        ],
-      },
-    ],
+    categories: [{
+      id: 'experience',
+      titleKey: 'whatsNew.category.experience',
+      items: [
+        { id: 'doctor-tables-copy', titleKey: 'whatsNew.583.tables.title', descriptionKey: 'whatsNew.583.tables.description', badge: 'improved', tags: ['Doctor', 'MCP history', 'Results', 'copy JSON'] },
+        { id: 'doctor-resources-visibility', titleKey: 'whatsNew.583.resources.title', descriptionKey: 'whatsNew.583.resources.description', badge: 'fixed', tags: ['Resources', 'Task', 'ownership', 'cancel'] },
+        { id: 'workflow-guided-choices', titleKey: 'whatsNew.583.workflow.title', descriptionKey: 'whatsNew.583.workflow.description', badge: 'improved', tags: ['Workflows', 'Excel', 'CSV', 'choices', 'mapping'] },
+        { id: 'ponytail-goal-context', titleKey: 'whatsNew.583.ponytail.title', descriptionKey: 'whatsNew.583.ponytail.description', badge: 'fixed', tags: ['Ponytail', 'Goal', 'skill_load', 'goalLease'] },
+      ],
+    }],
+  },
+  {
+    version: '5.8.2',
+    categories: [{
+      id: 'safety',
+      titleKey: 'whatsNew.category.safety',
+      items: [
+        { id: 'macos-signed-update-safety', titleKey: 'whatsNew.582.macos.title', descriptionKey: 'whatsNew.582.macos.description', badge: 'fixed', tags: ['macOS', 'Squirrel.Mac', 'Developer ID', 'manual migration'] },
+        { id: 'linux-appimage-recovery', titleKey: 'whatsNew.582.linux.title', descriptionKey: 'whatsNew.582.linux.description', badge: 'fixed', tags: ['Linux', 'AppImage', 'rollback', 'IPC'] },
+      ],
+    }],
   },
   {
     version: '5.8.1',

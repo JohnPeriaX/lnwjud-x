@@ -301,11 +301,8 @@ visual adapter เพิ่ม:
 - render_excel_preview
 - inspect_pdf
 - compare_pdf_pages
-- media_read
 
-`media_read` รองรับการอ่านไฟล์ภาพเป็น native MCP image content และอ่านวิดีโอด้วย ffprobe/ffmpeg เพื่อดึง metadata, frame เดี่ยว หรือ sampling หลาย frame แบบ bounded โดย path ต้องอยู่ใน workspace ที่ลงทะเบียนไว้ โดย Windows packaged builds จะ bundle ffmpeg/ffprobe มาให้พร้อมใช้งาน ส่วนแพลตฟอร์มอื่นสามารถใช้ binary ในเครื่องผ่าน PATH หรือ environment variables
-
-Office ต้องมี Microsoft Office ติดตั้ง ส่วน screen recording ใช้ dependency ของ operation นั้น ๆ และ video frame sampling บน Windows packaged builds ไม่ต้องติดตั้ง ffmpeg เพิ่ม
+Office ต้องมี Microsoft Office ติดตั้ง ส่วน screen recording ต้องมี ffmpeg ตาม operation ที่ใช้
 
 ## Live Logs, audit, telemetry และ recovery
 

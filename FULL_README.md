@@ -8,7 +8,7 @@
 
 <p align="center">
   <strong>Cross-platform local AI-agent runtime and MCP gateway</strong><br />
-  <em>279 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 267 are advertised by default and all 279 when Codex delegation plus Agent Swarm is enabled.</em>
+  <em>285 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 273 are advertised by default and all 285 when Codex delegation plus Agent Swarm is enabled.</em>
 
   <em>อ่านที่เหลือใน Readme ได้เลยครับ ติดปัญหาทักมาได้ใน FB: Adisorn NM ได้ตลอดครับ / กำลังพัฒนาให้เรื่อยๆครับ ท่านที่ถามหาช่องสนับสนุนค่ากาแฟ แปะลิงค์ ไว้ให้แล้วครับ ขอบคุณครับ</em>
  https://easydonate.app/abcz
@@ -25,7 +25,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D4" />
   <img alt="Node" src="https://img.shields.io/badge/Node.js-24.x-339933" />
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-279%20tools-6f42c1" />
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-285%20tools-6f42c1" />
 </p>
 
 ---
@@ -51,53 +51,65 @@ The tunnel is outbound-only: `tunnel-client` runs beside lnwjud, reaches OpenAI
 over outbound HTTPS, forwards MCP work to lnwjud's Desktop loopback HTTP MCP,
 and returns the response without opening a public inbound port on the host.
 
-## Current published version: v5.8.1
+## Current published version: v5.8.3
 
 ## Current source version: v5.8.4
-
-Latest published release: **v5.8.1**. Windows, macOS, and Linux artifacts are published only after the exact tagged main commit passes the target-native release gates described below.
 
 ### Current source changes in v5.8.4
 
 - **Cross-project work while a durable goal runs:** a `goalLease` belonging to another project no longer blocks ordinary Git and file mutations in a workspace that carries no rolling goal, while per-workspace ownership checks remain required and fail closed when fence state cannot be read.
-- **Consistent absolute-path reads:** `workspace_tree` now honours the same host explicit-absolute-read grant as the file read path instead of refusing targets it already accepted.
+- **Absolute paths attach their own project:** an absolute folder path outside every Active Project is registered as a project scope by the host bridge, silently on the Full profile and after one confirmation per folder on stricter profiles, without moving the primary project.
+- **Consistent absolute-path reads:** `workspace_tree` honours the same host explicit-absolute-read grant as the file read path instead of refusing targets it already accepted.
 - **Fork stays upstream-mergeable:** an upstream divergence registry with marker guard tests, plus `upstream:plan`/`upstream:merge` tooling that classifies a merge into fork-critical, needs-review and mechanical version noise and can simulate it before touching history.
 
-ภาษาไทย: v5.8.4 เปิดให้สั่ง Git/ไฟล์ในโปรเจกต์อื่นได้แม้ session มี durable goal ค้างอยู่ โดยยังตรวจความเป็นเจ้าของแบบต่อ-workspace และ fail closed เมื่ออ่านสถานะ fence ไม่ได้, ทำให้ workspace_tree ยอมรับ absolute path เดียวกับที่ read_file รับ, และเพิ่มทะเบียนความต่างจาก lnwjud ต้นฉบับพร้อมเครื่องมือ plan/merge/simulate เพื่ออัปเดตจาก upstream ได้โดยไม่เสียงานของ fork
+ภาษาไทย: v5.8.4 เปิดให้สั่ง Git/ไฟล์ในโปรเจกต์อื่นได้แม้ session มี durable goal ค้างอยู่ โดยยังตรวจความเป็นเจ้าของแบบต่อ-workspace และ fail closed เมื่ออ่านสถานะ fence ไม่ได้, วาง absolute path แล้วผูกเป็นโปรเจกต์ได้อัตโนมัติโดยไม่ย้ายโปรเจกต์หลัก, ทำให้ workspace_tree ยอมรับ path เดียวกับที่ read_file รับ, และเพิ่มทะเบียนความต่างจาก lnwjud ต้นฉบับพร้อมเครื่องมือ plan/merge/simulate เพื่ออัปเดตจาก upstream ได้โดยไม่เสียงานของ fork
+
+### What's new in v5.8.3
+
+- Ponytail ULTRA now explains missing `goalLease` for goal-scoped skill loads. Pass the active Goal's lease to code edits, or load the bundled skill without `goalId` for workspace-only edits; a different Goal's activation cannot authorize an unbound mutation (Issue #190).
+- Doctor MCP history, Results, and Resources have readable tables and complete JSON copy actions. Visible dates use Gregorian DD/MM/YYYY, Asia/Bangkok (UTC+07:00) and 24-hour clock; copied ISO evidence timestamps use Bangkok's +07:00 offset, preserving the instant.
+- Resource diagnostics show all tracked Goal tasks, including those without CPU/RAM samples; missing measurements remain unknown rather than zero. Cancellation only appears for verified owned running blocking jobs and requires native authorization.
+- Workflows guided mode derives Sheet and column choices from the selected workspace-bound XLSX/CSV file, real Git branches and project package version. Explicit mapping generation writes only a new JSON file, appending the report below existing template rows; Advanced mode keeps manual fields and unsupported files visible.
+- Code Review workflow now defaults baseRef to HEAD and explains Git branch/commit comparison choices.
+- ภาษาไทย: ทุกหน้าจอแสดงปี ค.ศ. เขตเวลา Asia/Bangkok และเวลา 24 ชั่วโมง รวมทั้ง JSON ที่คัดลอกเป็น timestamp +07:00; ฐานเปรียบเทียบรีวิวโค้ดมีคำอธิบายและค่าเริ่มต้น HEAD
+
+### What's new in v5.8.2
+
+- macOS Squirrel.Mac updater preserves IPC until native validation and refuses incompatible ad-hoc automatic installs; existing users must migrate by manually replacing the application. Future auto-updates require stable Developer ID signing.
+- Linux AppImage update staging retains a rollback link and restores the old file on native replacement failure; DEB remains package-manager owned.
+- In-app Thai/English What's New now includes the v5.8.2 fixes plus prior 5.8.x history.
 
 ### What's new in v5.8.1
 
-- **ChatGPT conversation isolation:** stable session identity binds each conversation to its own logical workspace context across requests and reconnects, while authorization remains authoritative and cross-workspace access stays denied.
-- **Concurrent process ownership:** managed process handles are owned by session, actor and workspace rather than raw OS PIDs, so multiple ChatGPT conversations can operate concurrently without ownership collisions.
-- **Mutation, task and audit safety:** mutation fences serialize or reject conflicting writes; timed-out task results become terminal failures rather than successes; and server-computed permission decisions are retained in activity traces.
-- **Media access:** `media_read` supports bounded image reads and video metadata/frame inspection, with the Windows FFmpeg runtime prepared for packaging.
-- **Dropdown overlay fix:** shared Workspace/Session dropdowns no longer change page padding, compress Work Log tables, or auto-scroll the underlying content.
-- **What's New history:** the in-app modal shows installed-or-earlier patches in the active series, newest first, with a scrollable list.
-- **Tunnel Live Logs:** ineffective Workspace/Session filters are hidden from the Tunnel tab while MCP activity and Processes retain their functional filters.
+- **Dropdown overlay fix:** Opening Workspace, Session, and other shared dropdowns no longer changes page padding, compresses scrollable Work Log tables, or auto-scrolls the underlying content. Menus remain anchored below their fields with bounded internal scrolling.
+- **What's New history:** The in-app modal now shows all installed-or-earlier patches in the active series, newest first (5.8.x, then 5.9.x after upgrading, with 6.x.x grouped by major), each with its own heading and a scrollable list.
+- **Tunnel Live Logs:** Hide ineffective Workspace and Session filters and their scoped-clear actions from the Tunnel tab only; keep search, pause, clear tab and export. MCP activity and Processes retain their functional filters.
 
-ภาษาไทย: v5.8.1 แยก ChatGPT session/workspace และ process ตาม owner, ป้องกัน mutation ชนกัน, ตรวจ timeout/task/permission จากผลจริง, เพิ่ม `media_read` พร้อม FFmpeg และแก้ dropdown, What's New history และ Tunnel Live Logs ตาม upstream
+**ภาษาไทย:** แก้ dropdown ไม่บีบตาราง Work Log หรือเลื่อนหน้าเอง; What's New รวมประวัติของชุดเวอร์ชันปัจจุบัน เรียงใหม่ก่อนและเลื่อนอ่านได้; Live Logs แท็บ Tunnel เอา Workspace/Session Filter ที่ไม่สามารถกรองได้จริงออก โดยยังคงฟิลเตอร์ของ MCP activity และ Processes ตามเดิม
 
-### What's new in v5.8.0
+### Earlier release highlights — v5.8.0
 
-- **Six bilingual, review-first task templates:** Project Check, Code Review, Release Readiness, Connection Check, Data Audit and Template Report, with validated inputs and no automatic Goal start during preview.
-- **Evidence-backed observability:** MCP history, Goal results, resource measurements, restore/cancellation checks and release verification use observed evidence and keep unavailable values unknown rather than inventing data.
-- **CSV/XLSX, Git and Desktop UX:** typed data audits and reports, recursive Git exploration, consistent filters/dropdowns, Work Log improvements and clearer modal controls.
-- **Secure MCP Tunnel and release tooling:** safer startup readiness, verified tunnel-client 0.0.16, dependency automation, target-native gates and SHA-256/provenance checks.
+**v5.7.4** primarily fixed oversized native approval dialogs. **v5.8.0** adds six review-first workflows, richer Doctor evidence, CSV/XLSX data tasks, Git explorer upgrades, a consistent Desktop UI, more reliable Secure MCP Tunnel startup, and controlled dependency maintenance.
 
-ภาษาไทย: v5.8.0 เพิ่ม Workflow 6 แบบ, ประวัติ MCP และผล Goal ตามหลักฐาน, ตรวจ CSV/XLSX, Git tree/preview, ปรับ UI/Work Log, ลด Tunnel reconnect ก่อนพร้อม และอัปเดต tunnel-client 0.0.16 พร้อม release checks ตามหลักฐานจริง
+- **Six bilingual workflows:** Project Check, Code Review, Release Readiness, Connection Check, Data Audit, and Template Report. Required inputs are validated before preparing a draft; a preview never silently launches a Goal, scheduler, or AI worker.
+- **MCP Call History:** retained audit-backed calls with bounded pagination, tool/Goal filters, outcomes, and server p50/p95 when samples exist. Transport/Tunnel timing is still `unknown` where no trusted sample exists; only Goals with attributable calls appear in the Goal filter.
+- **Goal Results and checkpoints:** inspect meaningful progress, completed steps, recorded checks, actual mutation receipts and verifiable file artifacts. Result filters exclude Goals without evidence; verification is not inferred from a Goal's completed status.
+- **Process Resources:** display measured Windows working-set RAM and lifetime-average CPU for verified Goal-owned child processes; separately show the Desktop main process. Refresh while viewing, suppress Goals without measured resources, and never substitute zero for unavailable measurements.
+- **Context Economy observability:** show real transport-scoped MCP HTTP ledger hits and context bytes, explicitly not per-Goal totals. Shared services are not cancelled with a Goal; owned-task cancellation stays permission- and identity-checked.
+- **Safer restore and audit visibility:** result and restore flows preserve workspace scope, exact checkpoint/Goal revision checks, verified current file hashes, and explicit user confirmation.
+- **CSV/XLSX data workflows:** typed audit and comparison of tabular data plus template-based report creation with readback. Preserve source files by default; native Office actions remain dependent on platform/provider support.
+- **Git explorer and diffs:** show individual untracked files in new folders, not merely folder counts. Expand/collapse the tree, search and filter files, retain code/diff navigation, and show safe text/image previews or bounded binary metadata.
+- **Desktop controls and typography:** shared inputs, filters, buttons and responsive searchable dropdowns across Settings/Tools/Doctor/Git; menus anchor **below their fields only**, reserve outer scrolling room and scroll internally for long lists. Options wrap when long, compact options remain compact. Restore Prompt/previous Git text sizing and improve validation/loading feedback.
+- **Command Prism status visual:** replace the plain golden orb with a faceted prism, using actual MCP states (gold = ready, blue = working, red = stopped/offline). A reserved neutral gray visual does not claim a new backend state. Workflow cards receive matching restrained line icons.
+- **Modal and layout fixes:** correct shared-button CSS precedence so close glyphs stay visible in What's New, Tool Detail, and the guided Tunnel screen. Increase close targets, preserve keyboard access, and separate search fields from actions.
+- **Work Log and Doctor UX:** default Work Log to all workspaces; improve workspace/session filters, loading states, long labels, goal descriptions and meaningful empty states. Doctor Goal selectors show only entries that have relevant results for each tab.
+- **Secure MCP Tunnel reliability:** do not reconnect over a matching managed runtime before a 45-second elapsed readiness grace period. Keep Tunnel identity, ownership protection, health polling and retry backoff; this avoids premature repeated `connect` calls but does not guarantee a fixed startup time.
+- **Bundled native runtime:** update the verified target-native `tunnel-client` to **0.0.16** and preserve native payload preparation for installation on supported platforms.
+- **Dependency updates and delivery checks:** use one managed dependency-update PR with conditional branch cleanup rather than duplicate updates. Keep functional tests and exact-commit target-native CI/build gates; Windows community artifacts can remain unsigned when no signing certificate exists, with SHA-256/provenance checks required.
 
-- **Additional upstream v5.8.0 detail:** MCP Call History, evidence-backed Goal Results, measured process resources, Context Economy observability, safer restore/audit visibility, typed CSV/XLSX workflows, expanded Git explorer, consistent Desktop controls, Command Prism status, modal fixes, Work Log/Doctor UX, 45-second Tunnel readiness grace, bundled tunnel-client 0.0.16, and dependency/release delivery checks.
+**ภาษาไทย — ต่างจาก 5.7.4:** เพิ่มเทมเพลต 6 แบบ, ประวัติ MCP และผลงาน Goal ที่มีหลักฐาน, RAM/CPU จริงของโปรเซสที่ตรวจเจ้าของได้, Context Economy แบบรวมระดับ Transport, ตรวจ CSV/XLSX, Git tree/preview ที่ครบขึ้น, UI และ dropdown กลาง, กากบาท Modal ขนาดชัดเจน, Work Log ที่กรองง่ายขึ้น, แก้ Tunnel reconnect ก่อนพร้อม และอัปเดต tunnel-client 0.0.16 พร้อมการทดสอบ/แพ็กเกจตาม SHA จริง ค่าไม่ทราบจะไม่แสดงเป็น 0 หรืออ้างว่าสำเร็จโดยไม่มีข้อมูล
 
-**ภาษาไทย — รายละเอียด upstream:** v5.8.0 เพิ่มรายละเอียดการตรวจ MCP/Goal/Resource ตามหลักฐานจริง, CSV/XLSX, Git explorer, UI, Work Log/Doctor, Tunnel readiness และ release/dependency checks โดยค่าที่ไม่มีหลักฐานยังเป็น unknown ไม่ถูกแทนด้วย 0
-
-Latest published release: **v5.8.1**. Windows, macOS, and Linux artifacts were published after the exact tagged main commit passed the target-native release gates described below.
-
-### What's new in v5.7.4
-
-- **High-risk approval details stay on screen across Windows, macOS, and Linux:** the complete command appears in a bounded lnwjud window with its own scrollable detail area. Cancel is focused by default, and closing the window or pressing Escape cancels the request.
-- **Other native alerts resist oversized error text:** variable Update, Tunnel, and shutdown error messages are bounded before they reach native dialogs.
-
-ภาษาไทย: v5.7.4 แก้กล่องยืนยันคำสั่งเสี่ยงสูงที่ยาวจนล้นจอ โดยยังดูคำสั่งฉบับเต็มผ่านพื้นที่เลื่อนได้เหมือนกันบน Windows, macOS และ Linux; ปุ่มยกเลิกเป็นค่าเริ่มต้น และยังจำกัด error text ที่ยาวผิดปกติใน native alert จุดอื่นด้วย
+Latest published release: **v5.8.3**. Windows, macOS, and Linux artifacts were published after the exact tagged main commit passed the target-native release gates described below.
 
 See [Thai Engineering Harness setup and workflow](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for details.
 
@@ -218,13 +230,13 @@ Choose the guide for the host you will run lnwjud on:
 
 1. Download the latest published installer from
    [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/latest).
-   Current published Windows 10/11 x64 v5.8.1 artifacts are `lnwjud-Setup-5.8.1.exe` (recommended installer) and `lnwjud-Portable-5.8.1.exe` (no installation required).
+   Current published Windows 10/11 x64 v5.8.3 artifacts are `lnwjud-Setup-5.8.3.exe` (recommended installer) and `lnwjud-Portable-5.8.3.exe` (no installation required).
 2. Run the NSIS installer and launch **lnwjud Agent Control Center**.
 3. Add or select the project/workspace you want lnwjud to operate on.
 4. Review **Settings** before attaching an AI client, especially Permission
    Profile and Unrestricted Mode.
 
-If you prefer not to install the app, run the currently published `lnwjud-Portable-5.8.1.exe` directly.
+If you prefer not to install the app, run the currently published `lnwjud-Portable-5.8.3.exe` directly.
 Portable mode uses the same per-user lnwjud data/settings location as the installer;
 it is a portable executable, not a keep-all-data-next-to-the-EXE mode.
 Automatic updates preserve the distribution you chose. Installer users read
@@ -342,12 +354,12 @@ Use lnwjud to list registered workspaces, report Git status for the selected pro
 
 ## Quick start: install the Windows release (ภาษาไทย)
 
-ส่วนนี้สำหรับผู้ใช้ Windows ที่ต้องการติดตั้ง lnwjud แล้วเชื่อมกับ ChatGPT แบบง่ายที่สุด โดย **วิธีหลักที่แนะนำสำหรับ v5.8.1 คือ Remote MCP ผ่าน ngrok + OAuth** ไม่ต้องมี OpenAI Tunnel ID และไม่ต้องสร้าง Runtime API key สำหรับขั้นตอนหลักนี้ ส่วน **Tunnel ID + Runtime API key** ยังคงรองรับ แต่เป็นทางเลือก/โหมดขั้นสูงสำหรับผู้ที่ต้องการ OpenAI Secure MCP Tunnel โดยเฉพาะ
+ส่วนนี้สำหรับผู้ใช้ Windows ที่ต้องการติดตั้ง lnwjud แล้วเชื่อมกับ ChatGPT แบบง่ายที่สุด โดย **วิธีหลักที่แนะนำสำหรับ v5.8.3 คือ Remote MCP ผ่าน ngrok + OAuth** ไม่ต้องมี OpenAI Tunnel ID และไม่ต้องสร้าง Runtime API key สำหรับขั้นตอนหลักนี้ ส่วน **Tunnel ID + Runtime API key** ยังคงรองรับ แต่เป็นทางเลือก/โหมดขั้นสูงสำหรับผู้ที่ต้องการ OpenAI Secure MCP Tunnel โดยเฉพาะ
 
 ### 1. ติดตั้ง lnwjud หรือใช้ Portable
 
-1. แบบแนะนำ: ดาวน์โหลด public release ล่าสุด `lnwjud-Setup-5.8.1.exe` แล้วติดตั้งตามปกติ
-2. ถ้าไม่ต้องการติดตั้ง: ดาวน์โหลด `lnwjud-Portable-5.8.1.exe` แล้วเปิดได้ทันที
+1. แบบแนะนำ: ดาวน์โหลด public release ล่าสุด `lnwjud-Setup-5.8.3.exe` แล้วติดตั้งตามปกติ
+2. ถ้าไม่ต้องการติดตั้ง: ดาวน์โหลด `lnwjud-Portable-5.8.3.exe` แล้วเปิดได้ทันที
 3. เปิด **lnwjud Agent Control Center**
 4. เพิ่มหรือเลือก Project/Workspace ที่ต้องการให้ ChatGPT ทำงานด้วย
 
@@ -380,7 +392,7 @@ public ngrok URL นี้ชี้เข้า OAuth gateway แยกต่า
 6. รอ Configure/Doctor ผ่าน แล้วกด **Start Tunnel**
 7. ใน ChatGPT เพิ่ม Connection แบบ **Tunnel** แล้วเลือก tunnel ที่สร้างไว้หรือใส่ `tunnel_id`
 
-`lnwjud-Setup-5.8.1.exe` และ `lnwjud-Portable-5.8.1.exe` รวม official OpenAI `tunnel-client` ที่ตรวจสอบเวอร์ชันและ provenance ตามไฟล์ Release มาให้แล้ว จึง **ไม่ต้องดาวน์โหลด `tunnel-client.exe` เอง** ช่อง path เป็น override สำหรับ troubleshooting เท่านั้น; หากต้องการกลับไปใช้ตัว bundled ให้ล้าง override แล้วเลือก **Use bundled** อย่างชัดเจน
+`lnwjud-Setup-5.8.3.exe` และ `lnwjud-Portable-5.8.3.exe` รวม official OpenAI `tunnel-client` ที่ตรวจสอบเวอร์ชันและ provenance ตามไฟล์ Release มาให้แล้ว จึง **ไม่ต้องดาวน์โหลด `tunnel-client.exe` เอง** ช่อง path เป็น override สำหรับ troubleshooting เท่านั้น; หากต้องการกลับไปใช้ตัว bundled ให้ล้าง override แล้วเลือก **Use bundled** อย่างชัดเจน
 
 `Persistent Tunnel Identity` จำ Tunnel ID แยกจาก Run/Stop intent. เมื่อผู้ใช้กด **Stop Tunnel** lnwjud จะคงสถานะ stopped ข้ามการ restart และจะไม่ auto-reconnect จนกด Start อีกครั้ง. หากเปลี่ยน custom/bundled client ขณะ runtime ทำงาน ระบบจะหยุดและยืนยัน owner เดิมก่อน commit path ใหม่เพื่อไม่ให้มี runtime ซ้อน
 
@@ -988,7 +1000,7 @@ This complete index is generated from `ToolRegistry.listAll()`, not copied from 
 | 17 | `get_file_info` | READ | default | operational | service_dispatch | Read metadata for one file or directory: size, created and modified times, file/directory/symlink kind, and permission bits, without loading any content. Absolute host paths do not require workspaceId. Use this before read_file when the size or kind of a target is unknown. |
 | 18 | `write_file` | WRITE | default | operational | service_dispatch | Create or replace a UTF-8 text file and missing parents. An absolute path outside every Active Project needs no prior registration: Full Access attaches that folder immediately, stricter profiles ask once and then attach it. Balanced/Safe refuse existing targets unless overwriteExisting is explicit; Full may replace an existing target without a confirmation prompt and still creates a checkpoint. Prefer edit_file for narrow repairs. Use this instead of shell scripts that call fs.writeFile, writeFileSync, Set-Content, or equivalent when the task is simply to create or replace guarded text. Do not use write_file to persist lnwjud continuation/recovery as USER_INSTRUCTIONS, user-instruction, or generic handoff-history files; use checkpoint_goal/session_handoff for that state. |
 | 19 | `apply_patch` | WRITE | default | operational | service_dispatch | Apply reviewed whole-file replacement content to at most twenty files. Existing targets are checkpointed first; Full profile does not prompt for non-destructive replacement. Prefer edit_file for narrow repairs. Use this instead of shell-generated whole-file rewrites when several reviewed text files must change. |
-| 20 | `edit_file` | WRITE | default | operational | service_dispatch | First choice for narrow source, config, and text repairs. Replaces exact text only when the expected occurrence count matches, checkpoints the original, and refuses conflicts instead of rewriting an unverified whole file. Exact-match conflicts are recoverable and include structured conflict kind, mismatch hints, candidate context when available, and a re-read/retry suggestion; never fuzzy-edit automatically. Use edit_file instead of shell, node -e, python -c, PowerShell Set-Content, or inline filesystem scripts when a guarded text edit can express the change. Full Access performs ordinary edits without a confirmation prompt; destructive deletion remains separately guarded. |
+| 20 | `edit_file` | WRITE | default | operational | service_dispatch | First choice for narrow source, config, and text repairs. Replaces exact text only when the expected occurrence count matches, checkpoints the original, and refuses conflicts instead of rewriting an unverified whole file. Exact-match conflicts are recoverable and include structured conflict kind, mismatch hints, candidate context when available, and a re-read/retry suggestion; never fuzzy-edit automatically. Use edit_file instead of shell, node -e, python -c, PowerShell Set-Content, or inline filesystem scripts when a guarded text edit can express the change. When skill_load for Ponytail used a goalId, include the matching goalLease on edit_file; otherwise load the skill with workspaceId only for unbound edits. Full Access performs ordinary edits without a confirmation prompt; destructive deletion remains separately guarded. |
 | 21 | `move_file` | WRITE | default | operational | service_dispatch | Move a file or directory, creating missing destination parents. With Full Bypass OFF, Full Access performs ordinary in-project moves without a confirmation prompt while conflicting or destructive forms remain policy-gated. Trusted Full Bypass skips lnwjud approval/scope checks for explicit absolute outside paths; OS/filesystem errors still apply. |
 | 22 | `copy_file` | WRITE | default | operational | service_dispatch | Copy a file or directory within one workspace, creating missing destination parents. |
 | 23 | `delete_file` | DANGEROUS | default | operational | service_dispatch | Delete one file or empty directory. With Full Bypass OFF, eligible in-project targets move to Recovery Trash and exact safe targets can use scoped auto-approval; critical paths, roots, non-empty directories, ambiguous paths, and mismatched workspaces remain guarded. Trusted Full Bypass skips lnwjud approval/scope checks and permits an exact absolute outside target, which is deleted without Recovery Trash; root and non-empty-directory input guards still apply. |

@@ -2,6 +2,19 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.8.3
+
+- **Ponytail ULTRA scope clarity (Issue #190):** When the bundled skill was loaded with `goalId`, code edits without `goalLease` report the missing context and give actionable alternatives; unbound edits do not inherit goal-scoped authorization. Regression coverage includes the safe impossible-match `edit_file` probe and sequential `tool_batch`.
+- **Doctor and Workflows:** Improve diagnostics, evidence copying, Goal task visibility and safe file-derived input choices; clarify the Code Review Git baseline.
+- **Release reliability:** Honor version-specific development-preview README highlights when generating release notes so a verified build is not blocked by its preview heading.
+
+### What's new in v5.8.2
+
+- **macOS update lifecycle:** Keep the Desktop runtime and IPC available while Squirrel.Mac validates a downloaded update. Only shut down for the native updater's accepted quit.
+- **Legacy macOS signing compatibility:** An ad-hoc-signed installation cannot satisfy another version's CDHash-bound designated requirement. Do not attempt an unsafe auto-update. Display Thai/English manual-upgrade instructions; future in-place auto-updates require a stable Developer ID Application signature. See [macOS manual migration guide](docs/INSTALL_MACOS.md).
+- **Linux AppImage failure recovery:** Stage a hard-linked backup before electron-updater's unlink-and-move installation. On failure, attempt to restore the original executable; unsupported/DEB install formats still do not self-update.
+- **Verification:** Targeted updater regression tests for signature eligibility, rollback after native unlink failure, and localized guidance. Native macOS/Linux release packaging and exact-SHA CI remain independent publication gates.
+
 ### What's new in v5.8.1
 
 This release hardens the ChatGPT-to-local automation path across session identity, workspace isolation, process ownership, reconnect persistence, mutation conflict protection, task outcomes, audit attribution, and media access, and incorporates upstream v5.8.1 UX fixes.
