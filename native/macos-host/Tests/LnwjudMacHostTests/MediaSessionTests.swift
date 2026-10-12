@@ -19,7 +19,16 @@ final class MediaSessionTests: XCTestCase {
     func testAdmissionNeverEvictsLiveStoppingOrQuarantinedSessions() {
         let now = Date(timeIntervalSince1970: 2_000)
         let cleaned: (MacMediaState) -> Date? = { $0.requiresRetention ? nil : now.addingTimeInterval(-1_000) }
-        var history = Dictionary(uniqueKeysWithValues: (0..<16).map { (String($0), $0 % 3 == 0 ? MacMediaState.running : $0 % 3 == 1 ? .stopping : .terminationUnverified) })
+        var history: [String: MacMediaState] = [:]
+        for index in 0..<16 {
+            let state: MacMediaState
+            switch index % 3 {
+            case 0: state = .running
+            case 1: state = .stopping
+            default: state = .terminationUnverified
+            }
+            history[String(index)] = state
+        }
         let original = history
         XCTAssertFalse(MacMediaHistory.admit(&history, now: now, cleanedAt: cleaned))
         XCTAssertEqual(history, original)

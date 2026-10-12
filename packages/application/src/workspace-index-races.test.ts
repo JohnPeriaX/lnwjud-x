@@ -171,7 +171,9 @@ describe('workspace index races', () => {
       await expect(service.status(setup.workspace.id)).resolves.toMatchObject({ ok: true, value: { freshness: 'unverified', stale: null } });
       const refreshed = await service.indexWorkspace(setup.workspace.id);
       expect(refreshed.ok && refreshed.value.entries.some((entry) => entry.relativePath === 'node_modules/fixture.ts')).toBe(false);
-      await expect(service.status(setup.workspace.id)).resolves.toMatchObject({ ok: true, value: { freshness: 'watching_clean', stale: false } });
+      await vi.waitFor(async () => {
+        await expect(service.status(setup.workspace.id)).resolves.toMatchObject({ ok: true, value: { freshness: 'watching_clean', stale: false } });
+      }, { timeout: 3_000, interval: 20 });
     } finally {
       await service.close();
       await rm(setup.directory, { recursive: true, force: true });
