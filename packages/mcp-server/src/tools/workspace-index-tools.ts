@@ -9,11 +9,12 @@ export function workspaceIndexTools(context: McpToolContext): McpToolDefinition[
       permission: 'READ',
       annotations: { readOnlyHint: true, destructiveHint: false },
       inputSchema: workspaceIndexSchema,
-      handler: async (input) => context.services.workspaceIndex === undefined
+      handler: async (input, signal) => context.services.workspaceIndex === undefined
         ? missingService()
         : context.services.workspaceIndex.indexWorkspace(input.workspaceId, {
           discovery: input.includeIgnored ? 'explicit' : 'automatic',
           rebuild: input.rebuild,
+          signal,
         }),
     }),
     defineTool({
@@ -32,11 +33,12 @@ export function workspaceIndexTools(context: McpToolContext): McpToolDefinition[
       permission: 'READ',
       annotations: { readOnlyHint: true, destructiveHint: false },
       inputSchema: workspaceIndexWatchSchema,
-      handler: async (input) => context.services.workspaceIndex === undefined
+      handler: async (input, signal) => context.services.workspaceIndex === undefined
         ? missingService()
         : context.services.workspaceIndex.startWatch(input.workspaceId, {
           ...(input.debounceMs === undefined ? {} : { debounceMs: input.debounceMs }),
           ...(input.concurrency === undefined ? {} : { concurrency: input.concurrency }),
+          signal,
         }),
     }),
     defineTool({

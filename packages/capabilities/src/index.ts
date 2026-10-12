@@ -96,3 +96,5 @@ export {
 } from './capability-descriptors.js';
 
 export { WINDOWS_CAPABILITY_BRIDGE_SHA256, WINDOWS_CAPABILITY_BRIDGE_SIZE_BYTES } from './windows-capability-integrity.generated.js';
+export { BoundedEventBuffer, type BufferedEvent, type EventPage } from './bounded-event-buffer.js';
+export { resolveNativeHostBridge } from './native-host-resolver.js';

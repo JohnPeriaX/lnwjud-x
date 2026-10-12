@@ -11,7 +11,7 @@ import { ToolRegistry, type WorkspaceScope, type McpApplicationServices } from '
 
 const roots: string[] = [];
 const actor: FileActor = { clientId: 'client-a', clientName: 'Client A', sessionId: 'session-a' };
-const goals = { validateGoalLease: async () => ok({ workspaceId: 'workspace-a' }) } as unknown as NonNullable<McpApplicationServices['goals']>;
+const goals = { validateGoalLease: async () => ok({ workspaceId: 'workspace-a', leaseGeneration: 1 }) } as unknown as NonNullable<McpApplicationServices['goals']>;
 
 afterEach(async () => {
   vi.restoreAllMocks();

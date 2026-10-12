@@ -48,6 +48,9 @@ describe('MCP tool registry', () => {
     expect(successes).toHaveLength(1);
     expect(successes[0]?.goalId).toBe('goal-verified');
     expect(captured.find((entry) => entry.phase === 'started')?.goalId).toBeUndefined();
+    const staleGeneration = await registry.invoke('edit_file', { ...input, goalLease: { ...input.goalLease, leaseGeneration: 7 } });
+    expect(staleGeneration).toMatchObject({ isError: true, structuredContent: { error: { code: 'CONFLICT' } } });
+    expect(editFile).toHaveBeenCalledTimes(1);
     valid = false;
     const denied = await registry.invoke('edit_file', input);
     expect(denied).toMatchObject({ isError: true, structuredContent: { error: { code: 'CONFLICT' } } });
@@ -746,6 +749,39 @@ describe('MCP tool registry', () => {
     expect(projectStarts).toBe(0);
   });
 
+  it.each(['shell', 'wsl_exec', 'task_create', 'process_start'])('rejects an explicit %s workspace conflict before creating an inaccessible owned handle', async (toolName) => {
+    const rootA = path.join(tmpdir(), 'lnwjud-explicit-owner-a');
+    const rootB = path.join(tmpdir(), 'lnwjud-explicit-owner-b');
+    const calls: Array<{ tool: string; input: unknown }> = [];
+    const registry = new ToolRegistry({
+      capabilities: {
+        async execute(tool, input): Promise<ReturnType<typeof ok<{ task_id: string; state: string }>>> {
+          calls.push({ tool, input });
+          return ok({ task_id: 'owned-task', state: 'running' });
+        },
+      },
+    }, actor, {
+      activeWorkspaceScopesProvider: async (): Promise<Array<{ workspaceId: string; rootPath: string }>> => [
+        { workspaceId: 'workspace-a', rootPath: rootA },
+        { workspaceId: 'workspace-b', rootPath: rootB },
+      ],
+      hostMutationApprovalProvider: approveMutation,
+      authorizationModeProvider: (): 'full_bypass' => 'full_bypass',
+    });
+
+    const response = await registry.invoke(toolName, {
+      workspaceId: 'workspace-a', executable: 'node.exe', cwd: rootB,
+      ...(toolName === 'process_start'
+        ? { args: ['--version'] }
+        : { ...(toolName === 'task_create' ? {} : { operation: 'run' }), arguments: ['--version'] }),
+    });
+    expect(response).toMatchObject({
+      isError: true,
+      structuredContent: { error: { code: 'INVALID_INPUT' } },
+    });
+    expect(calls).toEqual([]);
+  });
+
   it('routes absolute file, database, and command targets to any matching member of the active workspace set', async () => {
     const rawRootA = await mkdtemp(path.join(tmpdir(), 'lnwjud-active-a-'));
     const rawRootB = await mkdtemp(path.join(tmpdir(), 'lnwjud-active-b-'));
@@ -801,7 +837,6 @@ describe('MCP tool registry', () => {
       expect(queried).toMatchObject({ structuredContent: { result: [{ value: 'ok' }] } });
 
       const command = await registry.invoke('shell', {
-        workspaceId: 'workspace-a',
         operation: 'run',
         executable: 'node.exe',
         arguments: ['--version'],
@@ -816,6 +851,11 @@ describe('MCP tool registry', () => {
           metadata: { 'lnwjud.activeWorkspaceRoot.v1': rootB },
         },
       });
+      const matching = await registry.invoke('shell', {
+        workspaceId: 'workspace-b', operation: 'run',
+        executable: 'node.exe', arguments: ['--version'], cwd: rootB,
+      });
+      expect(matching.isError).not.toBe(true);
     } finally {
       await Promise.all([rm(rootA, { recursive: true, force: true }), rm(rootB, { recursive: true, force: true })]);
     }
@@ -979,7 +1019,7 @@ describe('MCP tool registry', () => {
     let aborted = false;
     const services: McpApplicationServices = {
       goalRequestCancellation: cancellation,
-      goals: { async validateGoalLease() { return ok({workspaceId:'workspace-1'}); } } as unknown as NonNullable<McpApplicationServices['goals']>,
+      goals: { async validateGoalLease() { return ok({workspaceId:'workspace-1', leaseGeneration: 1}); } } as unknown as NonNullable<McpApplicationServices['goals']>,
       file: {
         async writeFile(_actor, _workspaceId, _request, signal) {
           started = true;

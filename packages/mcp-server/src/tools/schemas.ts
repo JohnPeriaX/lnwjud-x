@@ -433,7 +433,9 @@ export const accessibilityCapabilitySchema = z.object({
 });
 
 export const inputEventCapabilitySchema = z.object({
-  operation: z.enum(['type_text', 'paste_text', 'press_key', 'hotkey', 'key_down', 'key_up', 'mouse_move', 'click', 'double_click', 'right_click', 'drag', 'scroll', 'button_down', 'button_up', 'release_all', 'sequence']),
+  workspaceId: optionalWorkspaceIdSchema,
+  operation: z.enum(['status', 'type_text', 'paste_text', 'press_key', 'hotkey', 'key_down', 'key_up', 'mouse_move', 'click', 'double_click', 'right_click', 'drag', 'scroll', 'button_down', 'button_up', 'release_all', 'sequence']),
+  session_id: z.string().min(1).max(512).optional(),
   parameters: capabilityParametersSchema.optional(),
   postcondition: nativePostconditionSchema.optional(),
   display_id: z.string().trim().min(1).max(128).optional(),
@@ -474,7 +476,9 @@ export const inputEventCapabilitySchema = z.object({
 });
 
 export const visionCapabilitySchema = z.object({
-  action: z.enum(['capture_display', 'capture_region', 'capture_window', 'annotate', 'ocr']),
+  workspaceId: optionalWorkspaceIdSchema,
+  action: z.enum(['status', 'capture_display', 'capture_region', 'capture_window', 'annotate', 'ocr']),
+  session_id: z.string().min(1).max(512).optional(),
   region: capabilityParametersSchema.optional(),
   app: capabilityParametersSchema.optional(),
   window_index: z.number().int().min(0).optional(),
@@ -619,16 +623,24 @@ export const webFetchCapabilitySchema = z.object({
 
 export const audioCapabilitySchema = z.object({
   workspaceId: optionalWorkspaceIdSchema,
-  action: z.enum(['record', 'play', 'stop']),
+  action: z.enum(['status', 'record', 'play', 'stop']),
+  handle: z.string().min(1).max(512).optional(),
+  cancel: z.boolean().optional(),
+  max_bytes: z.number().int().min(1024).max(67_108_864).optional(),
   output_path: z.string().max(MAX_PATH_LENGTH).optional(),
   file_path: z.string().max(MAX_PATH_LENGTH).optional(),
-  duration_seconds: z.number().int().min(1).max(600).optional(),
+  duration_seconds: z.number().min(0.1).max(600).optional(),
   ...capabilityRequestSchema,
 }).strict();
 
 export const screenRecordCapabilitySchema = z.object({
   workspaceId: optionalWorkspaceIdSchema,
   action: z.enum(['start', 'stop', 'status']),
+  handle: z.string().min(1).max(512).optional(),
+  session_id: z.string().min(1).max(512).optional(),
+  cancel: z.boolean().optional(),
+  duration_seconds: z.number().min(0.1).max(600).optional(),
+  max_bytes: z.number().int().min(1024).max(67_108_864).optional(),
   output_path: z.string().max(MAX_PATH_LENGTH).optional(),
   offset_x: z.number().int().min(-16_384).max(16_384).optional(),
   offset_y: z.number().int().min(-16_384).max(16_384).optional(),

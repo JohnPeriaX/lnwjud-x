@@ -2,6 +2,16 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.8.4
+
+- **Durable MCP Shell ownership (Issue #193):** Correct owner propagation across modern HTTP request replacement and legacy MCP reconnection, including provider/store replacement and retained terminal stdout/stderr/exit receipts. Exact client, session and workspace boundaries still deny unauthorized reads and cancellation.
+- **Agent Swarm non-interactive stdin and results:** Close stdin only for Codex CLI executions that receive prompts via argv, keep stdout/stderr piped, and detach running-agent result polling from the start request while preserving explicit swarm cancellation. Local real-process three-agent integration and regression checks pass. Remote Codex model execution remains account/model/quota-dependent and was unavailable during this candidate verification.
+- **Checked recipes and Goal authorization:** Keep preview side-effect-free, dispatch explicit recipe steps through the normal ToolRegistry permissions and current Goal leases, and retain per-step completed, failed, skipped or unavailable receipts.
+- **Workspace indexing, context and recovery:** Serialize index snapshot updates and return explicit partial/stale/provider error observations. Recovery and handoff keep durable Goal/task evidence when supplemental providers fail.
+- **Tool Catalog, native media and Office:** Synchronize the 285 declared built-in tools (273 advertised by default), preserve explicit dependencies and readiness rather than claiming every tool works on every host, improve native ownership, scoped output and terminal-artifact handling subject to platform/provider support.
+- **Verification scope:** Windows unit, HTTP lifecycle, Electron/Playwright, build, packaging-contract and release-gate tests ran successfully before publication. Actual platform-specific binaries, independent review, hosted Codex account availability and exact-SHA CI remain separate release acceptance requirements.
+- **ภาษาไทย:** แก้ Shell อ่านผลหลังเชื่อมต่อใหม่ตามสิทธิ์, แก้ Agent Swarm ค้างรอ stdin, ตรวจ Workflow/Goal Lease ตามขั้นตอนจริง และทำให้ Tool/Doctor รายงานสถานะ Provider อย่างตรงไปตรงมา
+
 ### What's new in v5.8.3
 
 - **Ponytail ULTRA scope clarity (Issue #190):** When the bundled skill was loaded with `goalId`, code edits without `goalLease` report the missing context and give actionable alternatives; unbound edits do not inherit goal-scoped authorization. Regression coverage includes the safe impossible-match `edit_file` probe and sequential `tool_batch`.
