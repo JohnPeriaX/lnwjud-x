@@ -46,7 +46,7 @@ describe.skipIf(process.platform !== 'win32')('Windows Office bridge boundary in
     const { stdout, stderr } = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script], { timeout: 30_000, windowsHide: true, maxBuffer: 1024 * 1024 });
     expect(stderr).toBe('');
     expect(stdout).toContain('Office bridge helper boundary, Unicode, macro/link policy, readback and lifecycle checks passed.');
-  });
+  }, 45_000);
   it('captures all Office account action effects without using a real account or sending', async () => {
     const script = fileURLToPath(new URL('../../../scripts/test-office-account-dispatch.ps1', import.meta.url));
     const { stdout, stderr } = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script], { timeout: 30_000, windowsHide: true, maxBuffer: 1024 * 1024 });
