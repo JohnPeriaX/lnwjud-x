@@ -47,8 +47,6 @@ describe('ShellCapabilityBackend', () => {
     expect(durableRun).toMatchObject({ ok: true, value: { task_id: expect.any(String) } });
     if (!durableRun.ok) return;
     const taskId = String(durableRun.value.task_id);
-    // Durable workers cross process boundaries; verify the supported bounded wait contract
-    // rather than imposing a four-second completion target on a shared CI runner.
     const waited = await durable.execute({ operation: 'wait', task_id: taskId, timeout_seconds: 15, ...owner });
     expect(waited).toMatchObject({ ok: true, value: { state: 'completed', exit_code: 0 } });
     const reopened = new ShellCapabilityBackend({ allowedRoots: [root], taskStateDirectory });
