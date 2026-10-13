@@ -58,8 +58,8 @@ and returns the response without opening a public inbound port on the host.
 ### What's new in v5.8.6
 
 - **Engineering Gate checkpoint compatibility (Issue #198):** Add `checkpoint_goal_engineering` with the same strict schema, Goal handler, lease/revision checks and evidence validation as `checkpoint_goal`. It follows the canonical tool's availability, so disabling `checkpoint_goal` disables both names.
-- **Verification boundary:** The local MCP SDK publishes both names with matching schemas and routes the alias to the same Goal service. A fresh Cloudflare/ChatGPT connector session was unavailable for this release check, so connector-side cache refresh is not claimed.
-- **ภาษาไทย:** เพิ่ม `checkpoint_goal_engineering` เป็นชื่อสำรองที่ใช้ schema และ Goal handler เดียวกับ `checkpoint_goal` พร้อมคงการตรวจ lease, revision, authorization และหลักฐานเดิม; ปิดเครื่องมือหลักแล้วชื่อสำรองจะถูกปิดด้วย โดยยังไม่ได้ยืนยัน schema จาก Cloudflare/ChatGPT session ใหม่
+- **Verification boundary:** The connected `@lnwjud-pc` plugin is running app v5.8.5. Its direct `checkpoint_goal` schema exposes both Engineering fields; a call with non-empty values and `get_goal` readback confirmed persistence. Fresh-session v5.8.6 inventory and alias call/readback remain post-install acceptance.
+- **ภาษาไทย:** `@lnwjud-pc` ที่เชื่อมต่ออยู่ใช้แอป v5.8.5; schema ของ `checkpoint_goal` ประกาศฟิลด์ Engineering ทั้งสองรายการ และเรียกด้วยค่าจริงพร้อมอ่านกลับผ่าน `get_goal` ได้แล้ว ส่วน inventory และการเรียก alias ใน fresh session หลังติดตั้ง v5.8.6 ยังเป็น acceptance ที่รออยู่
 
 ### What's new in v5.8.5
 
