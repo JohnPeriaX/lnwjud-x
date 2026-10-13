@@ -121,6 +121,15 @@
         { "file": "packages/application/src/workspace-query-service.ts", "contains": "this.guard.readTrust" }
       ],
       "proofTests": ["packages/application/src/workspace-query-service.test.ts"]
+    },
+    {
+      "id": "http-teardown-loop-sizing",
+      "summary": "The per-request teardown integration test asserts against its own request count instead of upstream's fixed 64 rounds, because 64 full per-request MCP server rebuilds exceed the test timeout on slower hosts. Taking upstream's side of this file reintroduces the timing flake, and a rerun would only hide it.",
+      "markers": [
+        { "file": "packages/mcp-server/src/mcp-http.integration.test.ts", "contains": "const requests = 16;" },
+        { "file": "packages/mcp-server/src/mcp-http.integration.test.ts", "contains": "expect(created).toBeGreaterThanOrEqual(requests);" }
+      ],
+      "proofTests": ["packages/mcp-server/src/mcp-http.integration.test.ts"]
     }
   ]
 }

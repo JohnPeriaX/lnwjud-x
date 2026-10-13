@@ -21,24 +21,45 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
-    version: '5.8.5',
+    version: '5.8.6',
     categories: [
       {
         id: 'safety',
         titleKey: 'whatsNew.category.safety',
         items: [
-          { id: 'goal-lease-scope', titleKey: 'whatsNew.585.lease.title', descriptionKey: 'whatsNew.585.lease.description', badge: 'fixed', tags: ['goalLease', 'Git', 'Active Project'] },
-          { id: 'path-attach', titleKey: 'whatsNew.585.attach.title', descriptionKey: 'whatsNew.585.attach.description', badge: 'new', tags: ['absolute path', 'Active Project', 'Full Access'] },
-          { id: 'denial-guidance', titleKey: 'whatsNew.585.denial.title', descriptionKey: 'whatsNew.585.denial.description', badge: 'fixed', tags: ['permission', 'retry', 'MCP'] },
+          { id: 'goal-lease-scope', titleKey: 'whatsNew.586.lease.title', descriptionKey: 'whatsNew.586.lease.description', badge: 'fixed', tags: ['goalLease', 'Git', 'Active Project'] },
+          { id: 'path-attach', titleKey: 'whatsNew.586.attach.title', descriptionKey: 'whatsNew.586.attach.description', badge: 'new', tags: ['absolute path', 'Active Project', 'Full Access'] },
+          { id: 'denial-guidance', titleKey: 'whatsNew.586.denial.title', descriptionKey: 'whatsNew.586.denial.description', badge: 'fixed', tags: ['permission', 'retry', 'MCP'] },
         ],
       },
       {
         id: 'experience',
         titleKey: 'whatsNew.category.experience',
         items: [
-          { id: 'tree-path-consistency', titleKey: 'whatsNew.585.tree.title', descriptionKey: 'whatsNew.585.tree.description', badge: 'fixed', tags: ['workspace_tree', 'absolute path'] },
-          { id: 'git-any-folder', titleKey: 'whatsNew.585.gitpath.title', descriptionKey: 'whatsNew.585.gitpath.description', badge: 'improved', tags: ['Git', 'cwd', 'git_status'] },
-          { id: 'get-file-info', titleKey: 'whatsNew.585.fileinfo.title', descriptionKey: 'whatsNew.585.fileinfo.description', badge: 'new', tags: ['get_file_info', 'metadata'] },
+          { id: 'tree-path-consistency', titleKey: 'whatsNew.586.tree.title', descriptionKey: 'whatsNew.586.tree.description', badge: 'fixed', tags: ['workspace_tree', 'absolute path'] },
+          { id: 'git-any-folder', titleKey: 'whatsNew.586.gitpath.title', descriptionKey: 'whatsNew.586.gitpath.description', badge: 'improved', tags: ['Git', 'cwd', 'git_status'] },
+          { id: 'get-file-info', titleKey: 'whatsNew.586.fileinfo.title', descriptionKey: 'whatsNew.586.fileinfo.description', badge: 'new', tags: ['get_file_info', 'metadata'] },
+        ],
+      },
+    ],
+  },
+  {
+    version: '5.8.5',
+    categories: [
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'engineering-audit-routing', titleKey: 'whatsNew.585.audit.title', descriptionKey: 'whatsNew.585.audit.description', badge: 'fixed', tags: ['Engineering Harness', 'audit', 'delivery scope'] },
+          { id: 'mcp-live-tool-availability', titleKey: 'whatsNew.585.inventory.title', descriptionKey: 'whatsNew.585.inventory.description', badge: 'fixed', tags: ['MCP', 'HTTP', 'tools/list', 'availability'] },
+          { id: 'mcp-checkpoint-schema-evidence', titleKey: 'whatsNew.585.schema.title', descriptionKey: 'whatsNew.585.schema.description', badge: 'improved', tags: ['MCP', 'checkpoint_goal', 'schema digest'] },
+        ],
+      },
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'engineering-goal-reconciliation', titleKey: 'whatsNew.585.goal.title', descriptionKey: 'whatsNew.585.goal.description', badge: 'fixed', tags: ['Engineering Harness', 'Durable Goal', 'lease', 'evidence'] },
         ],
       },
     ],
@@ -90,26 +111,14 @@ const RELEASE_NOTES: readonly ReleaseNote[] = [
   },
   {
     version: '5.8.1',
-    categories: [
-      {
-        id: 'experience',
-        titleKey: 'whatsNew.category.experience',
-        items: [
-          { id: 'chatgpt-session-isolation', titleKey: 'whatsNew.581.session.title', descriptionKey: 'whatsNew.581.session.description', badge: 'new', tags: ['ChatGPT', 'session', 'workspace', 'reconnect'] },
-          { id: 'concurrent-processes', titleKey: 'whatsNew.581.process.title', descriptionKey: 'whatsNew.581.process.description', badge: 'improved', tags: ['process', 'concurrency', 'ownership', 'PID'] },
-          { id: 'dropdown-overlay', titleKey: 'whatsNew.581.dropdown.title', descriptionKey: 'whatsNew.581.dropdown.description', badge: 'fixed', tags: ['dropdown', 'Work Log', 'overlay', 'scroll'] },
-          { id: 'tunnel-filter', titleKey: 'whatsNew.581.tunnelFilter.title', descriptionKey: 'whatsNew.581.tunnelFilter.description', badge: 'fixed', tags: ['Live Logs', 'Tunnel', 'workspace', 'session'] },
-        ],
-      },
-      {
-        id: 'safety',
-        titleKey: 'whatsNew.category.safety',
-        items: [
-          { id: 'mutation-task-audit', titleKey: 'whatsNew.581.safety.title', descriptionKey: 'whatsNew.581.safety.description', badge: 'improved', tags: ['mutation', 'task', 'audit', 'permissions'] },
-          { id: 'media-read', titleKey: 'whatsNew.581.media.title', descriptionKey: 'whatsNew.581.media.description', badge: 'new', tags: ['media_read', 'image', 'video', 'FFmpeg'] },
-        ],
-      },
-    ],
+    categories: [{
+      id: 'experience',
+      titleKey: 'whatsNew.category.experience',
+      items: [
+        { id: 'dropdown-overlay', titleKey: 'whatsNew.581.dropdown.title', descriptionKey: 'whatsNew.581.dropdown.description', badge: 'fixed', tags: ['dropdown', 'Work Log', 'overlay', 'scroll'] },
+        { id: 'tunnel-filter', titleKey: 'whatsNew.581.tunnelFilter.title', descriptionKey: 'whatsNew.581.tunnelFilter.description', badge: 'fixed', tags: ['Live Logs', 'Tunnel', 'workspace', 'session'] },
+      ],
+    }],
   },
   {
     version: '5.8.0',

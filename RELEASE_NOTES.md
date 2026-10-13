@@ -2,6 +2,15 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.8.5
+
+- **Engineering Harness audit routing (Issue #194):** Classify read-only source audits and reviews of existing deployments or release history as local review work. Detect affirmative delivery actions independently from nearby prohibitions, so explicit requests such as “do not deploy, but publish a release” retain release scope and gates.
+- **Existing Goal metadata recovery:** Reconcile an active Engineering Goal from the lease-acquired snapshot when task classification, gate contracts, or requested source scope change, even if the policy digest stays the same. Preserve compatible findings, tracked tasks and gate evidence; mark scope-dependent checks stale when they were completed against a different source scope.
+- **Modern MCP HTTP tool inventory:** Keep an endpoint-lifetime availability listener and publish `notifications/tools/list_changed` to subscribed modern clients. Verify that the next `tools/list` reflects the current host state and that listener cleanup follows endpoint shutdown.
+- **`checkpoint_goal` schema evidence (Issue #198):** The local SDK `tools/list` response includes the optional strict `engineeringGateUpdates` and `engineeringReviewFindings` fields. `tool_describe` now reports a SHA-256 digest of the schema from the active ToolRegistry and clearly marks the remote connector schema as unavailable. The reported Cloudflare connector transformation/cache remains unverified and is not claimed as fixed by this release.
+- **Local verification:** `@lnwjud/application` passed 315 tests across 42 files. `@lnwjud/mcp-server` passed 1,403 tests across 86 files with 3 skipped. Exact-SHA hosted CI, native release packaging, post-publication updater acceptance and the external Cloudflare connector remain separate release gates.
+- **ภาษาไทย:** แก้การจัดประเภท Full Audit และการตรวจย้อนหลังไม่ให้กลายเป็น delivery โดยไม่มีคำสั่ง, reconcile Goal เดิมจาก acquired snapshot ภายใต้ lease โดยรักษาหลักฐานที่ยังใช้ได้และ stale เฉพาะ gate ที่เปลี่ยน, และแจ้ง tools/list change ให้ modern MCP client; `tool_describe` แสดง SHA-256 ของ schema จาก ToolRegistry และระบุชัดว่าอ่าน schema ของ connector ภายนอกไม่ได้ จึงยังไม่ยืนยันการแปลง schema ของ Cloudflare
+
 ### What's new in v5.8.4
 
 - **Durable MCP Shell ownership (Issue #193):** Correct owner propagation across modern HTTP request replacement and legacy MCP reconnection, including provider/store replacement and retained terminal stdout/stderr/exit receipts. Exact client, session and workspace boundaries still deny unauthorized reads and cancellation.

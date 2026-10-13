@@ -90,6 +90,10 @@ importers:
       '@lnwjud/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace
+    devDependencies:
+      '@modelcontextprotocol/client':
+        specifier: 2.0.0
+        version: 2.0.0
 
   apps/desktop:
     dependencies:
