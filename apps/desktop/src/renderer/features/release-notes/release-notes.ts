@@ -21,6 +21,27 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.5',
+    categories: [
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'engineering-audit-routing', titleKey: 'whatsNew.585.audit.title', descriptionKey: 'whatsNew.585.audit.description', badge: 'fixed', tags: ['Engineering Harness', 'audit', 'delivery scope'] },
+          { id: 'mcp-live-tool-availability', titleKey: 'whatsNew.585.inventory.title', descriptionKey: 'whatsNew.585.inventory.description', badge: 'fixed', tags: ['MCP', 'HTTP', 'tools/list', 'availability'] },
+          { id: 'mcp-checkpoint-schema-evidence', titleKey: 'whatsNew.585.schema.title', descriptionKey: 'whatsNew.585.schema.description', badge: 'improved', tags: ['MCP', 'checkpoint_goal', 'schema digest'] },
+        ],
+      },
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'engineering-goal-reconciliation', titleKey: 'whatsNew.585.goal.title', descriptionKey: 'whatsNew.585.goal.description', badge: 'fixed', tags: ['Engineering Harness', 'Durable Goal', 'lease', 'evidence'] },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.8.4',
     categories: [
       {

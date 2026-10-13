@@ -64,4 +64,5 @@ export interface McpRegistryRuntimePort {
   preview(name: string, input: unknown, envelope?: CheckedInvocationEnvelope): Promise<RegistryPermissionPreview>;
   validate(name: string, input: unknown): Result<unknown>;
   invoke(name: string, input: unknown, signal?: AbortSignal, envelope?: CheckedInvocationEnvelope): Promise<McpToolResponse>;
+  describeInputJsonSchema?(name: string): Record<string, unknown> | undefined;
 }

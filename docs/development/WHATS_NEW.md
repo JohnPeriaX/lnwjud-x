@@ -26,7 +26,17 @@ Before packaging a new public version:
 
 `scripts/set-version.mjs` synchronizes version surfaces but intentionally does **not** invent release notes. The release-note entry is a reviewed product artifact.
 
-## Current v5.8.0 release-note coverage
+## Current source v5.8.5 release-note coverage
+
+The `5.8.5` entry provides localized Thai and English notes for:
+
+- Engineering Harness routing that keeps read-only audits and historical deployment or release topics in the local review workflow while retaining explicit delivery actions;
+- safe resume of an existing Engineering Goal after metadata or required-platform contracts change, preserving compatible findings, task tracking and evidence;
+- modern MCP HTTP notifications when host tool availability changes, followed by a fresh `tools/list` response.
+
+The direct local SDK `tools/list` contract includes the optional checkpoint engineering fields. `tool_describe` reports a canonical SHA-256 digest from the active ToolRegistry schema and marks the remote connector schema unavailable. Issue #198 reports a Cloudflare connector schema discrepancy. The connector-side transformation and refresh behavior remain external acceptance and must not be described as fixed until verified in that connector.
+
+## Historical v5.8.0 release-note coverage
 
 The exact `5.8.0` in-app registry provides localized Thai and English entries for:
 
