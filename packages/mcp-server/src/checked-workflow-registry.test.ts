@@ -274,7 +274,7 @@ async function createFixture(): Promise<{ directory: string; workspace: Workspac
     async insert(value) { workspaces.set(value.id, value); },
     async delete(id) { workspaces.delete(id); },
   };
-  await writeFile(path.join(root, 'package.json'), JSON.stringify({ scripts: { benchmark: 'node fixture.mjs' } }));
+  await writeFile(path.join(root, 'package.json'), JSON.stringify({ packageManager: 'pnpm@10.15.0', scripts: { benchmark: 'node fixture.mjs' } }));
   await writeFile(path.join(root, 'fixture.mjs'), "import { writeFile } from 'node:fs/promises'; await writeFile('benchmark-result.txt', '  ผลทดสอบ 😀  \\n');\n");
   await promisify(execFile)('git', ['init', '--quiet', root], { windowsHide: true });
   const file = new FileService(repository);
