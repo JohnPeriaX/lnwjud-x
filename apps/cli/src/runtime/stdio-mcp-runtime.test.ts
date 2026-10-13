@@ -345,7 +345,21 @@ describe('stdio MCP runtime', { timeout: STDIO_RUNTIME_TEST_TIMEOUT_MS }, () => 
           expect(stale).toMatchObject({ isError: true, structuredContent: { error: { code: 'CONFLICT' } } });
           staleRevisionRejected = true;
         }
-        await new Promise((resolve) => setTimeout(resolve, 25));
+        if (boundary === 0) {
+          const taskId = (advanced.structuredContent as { taskId?: unknown } | undefined)?.taskId;
+          expect(taskId).toEqual(expect.any(String));
+          if (typeof taskId !== 'string') throw new Error('Automation dispatch omitted its durable task ID');
+          const task = await registry.invoke('shell', {
+            workspaceId: durableWorkspace.id,
+            operation: 'wait',
+            task_id: taskId,
+            timeout_seconds: 5,
+            goalLease: proof,
+            userConfirmed: true,
+          });
+          expect(task.isError).not.toBe(true);
+          expect(task.structuredContent).toMatchObject({ task_id: taskId, state: 'completed', exit_code: 0 });
+        }
       }
       expect(staleRevisionRejected).toBe(true);
 
