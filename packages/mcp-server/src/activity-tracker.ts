@@ -611,7 +611,7 @@ function readStringArray(value: unknown): readonly string[] | undefined {
 }
 
 function goalActivitySummary(toolName: string, input: Readonly<Record<string, unknown>>): string | undefined {
-  if (!['run_goal', 'get_goal', 'checkpoint_goal', 'finish_goal', 'list_goals'].includes(toolName)) return undefined;
+  if (!['run_goal', 'get_goal', 'checkpoint_goal', 'checkpoint_goal_engineering', 'finish_goal', 'list_goals'].includes(toolName)) return undefined;
   const goalId = firstString(input, ['goalId']);
   if (goalId !== undefined) return `goal=${goalId}`;
   const goalKey = firstString(input, ['goalKey']);

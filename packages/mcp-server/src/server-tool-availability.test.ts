@@ -31,7 +31,10 @@ describe('MCP server live tool availability', () => {
 
       const listed = await client.listTools();
       const checkpoint = listed.tools.find((tool) => tool.name === 'checkpoint_goal');
+      const engineeringCheckpoint = listed.tools.find((tool) => tool.name === 'checkpoint_goal_engineering');
       expect(checkpoint).toBeDefined();
+      expect(engineeringCheckpoint).toBeDefined();
+      expect(engineeringCheckpoint?.inputSchema).toEqual(checkpoint?.inputSchema);
       const schema = checkpoint?.inputSchema as unknown as Record<string, unknown>;
       const properties = schema.properties as Record<string, unknown>;
       const required = schema.required as string[];
@@ -100,9 +103,19 @@ describe('MCP server live tool availability', () => {
           engineeringGateUpdates, engineeringReviewFindings,
         },
       });
+      const aliasCall = await client.callTool({
+        name: 'checkpoint_goal_engineering',
+        arguments: {
+          goalId: 'goal-1', leaseToken: 'lease-1', expectedRevision: 2, currentPhase: 'verify', summary: 'Record compatibility evidence.',
+          stepUpdates: [], nextAction: 'Read back the checkpoint.', blockers: [], evidence: [], trackedTasks: [],
+          engineeringGateUpdates, engineeringReviewFindings,
+        },
+      });
 
       expect(directCall.isError).not.toBe(true);
-      expect(checkpointGoal).toHaveBeenCalledWith(actor, expect.objectContaining({ engineeringGateUpdates, engineeringReviewFindings }));
+      expect(aliasCall.isError).not.toBe(true);
+      expect(checkpointGoal).toHaveBeenNthCalledWith(1, actor, expect.objectContaining({ engineeringGateUpdates, engineeringReviewFindings }));
+      expect(checkpointGoal).toHaveBeenNthCalledWith(2, actor, expect.objectContaining({ engineeringGateUpdates, engineeringReviewFindings }));
     } finally {
       await client.close().catch(() => undefined);
       await server.close().catch(() => undefined);
@@ -128,9 +141,12 @@ describe('MCP server live tool availability', () => {
 
       const listed = await client.listTools();
       expect(listed.tools.map((tool) => tool.name)).not.toContain('checkpoint_goal');
+      expect(listed.tools.map((tool) => tool.name)).not.toContain('checkpoint_goal_engineering');
 
       const response = await client.callTool({ name: 'tool_describe', arguments: { name: 'checkpoint_goal' } });
       expect(readStructuredToolResult(response)).toEqual({ found: false, name: 'checkpoint_goal' });
+      const aliasResponse = await client.callTool({ name: 'tool_describe', arguments: { name: 'checkpoint_goal_engineering' } });
+      expect(readStructuredToolResult(aliasResponse)).toEqual({ found: false, name: 'checkpoint_goal_engineering' });
     } finally {
       await client.close().catch(() => undefined);
       await server.close().catch(() => undefined);

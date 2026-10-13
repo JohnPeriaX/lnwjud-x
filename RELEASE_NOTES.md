@@ -2,6 +2,14 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.8.6
+
+- **Engineering Gate checkpoint compatibility (Issue #198):** Publish `checkpoint_goal_engineering` as a second public MCP name with the same strict input schema and authenticated Goal handler as `checkpoint_goal`. Preserve lease/revision comparison, authorization, host-receipt verification, and required-gate enforcement. Alias availability follows the canonical tool, so a user-disabled `checkpoint_goal` cannot be called through the alias.
+- **Local wire contract:** The in-memory MCP SDK `tools/list` response contains both names with matching schemas; a direct alias call forwards Engineering Gate updates and review findings to the same Goal service. Existing HTTP inventory-change tests verify notification and refresh behavior.
+- **Issue #194:** The read-only audit classification and active Goal reconciliation fixes remain in v5.8.5. This release adds no bypass for required Gates.
+- **Acceptance boundary:** The local Cloudflare/ChatGPT connector and a fresh updated installation were unavailable for this run. The release verifies the local MCP publication path, but does not claim that an external imported schema or cache was refreshed.
+- **ภาษาไทย:** เพิ่ม `checkpoint_goal_engineering` เป็นชื่อ MCP สำรองที่ใช้ strict schema และ Goal handler เดียวกับ `checkpoint_goal` โดยคง lease/revision, authorization, การตรวจ host receipt และ required gate; ปิดเครื่องมือหลักแล้วชื่อสำรองจะถูกปิดด้วย ตรวจ local SDK `tools/list` และการส่งข้อมูลผ่าน handler เดียวแล้ว แต่ยังไม่ได้ยืนยัน Cloudflare/ChatGPT connector หรือการติดตั้งจริงแบบ session ใหม่
+
 ### What's new in v5.8.5
 
 - **Engineering Harness audit routing (Issue #194):** Classify read-only source audits and reviews of existing deployments or release history as local review work. Detect affirmative delivery actions independently from nearby prohibitions, so explicit requests such as “do not deploy, but publish a release” retain release scope and gates.

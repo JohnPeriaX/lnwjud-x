@@ -21,6 +21,18 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.6',
+    categories: [
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'engineering-checkpoint-schema-compatibility', titleKey: 'whatsNew.586.schema.title', descriptionKey: 'whatsNew.586.schema.description', badge: 'improved', tags: ['MCP', 'checkpoint_goal_engineering', 'Engineering Gates', 'schema compatibility'] },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.8.5',
     categories: [
       {

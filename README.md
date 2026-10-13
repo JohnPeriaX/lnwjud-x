@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Cross-platform local AI-agent runtime and MCP gateway</strong><br />
-  <em>285 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 273 are advertised by default and all 285 when Codex delegation plus Agent Swarm is enabled.</em>
+  <em>286 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 274 are advertised by default and all 286 when Codex delegation plus Agent Swarm is enabled.</em>
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D4" />
   <img alt="Node" src="https://img.shields.io/badge/Node.js-24.x-339933" />
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-285%20tools-6f42c1" />
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-286%20tools-6f42c1" />
 </p>
 
 <h2 align="center">Download lnwjud</h2>
@@ -53,7 +53,13 @@
 
 ## Current published version: v5.8.5
 
-## Current source version: v5.8.5
+## Current source version: v5.8.6
+
+### What's new in v5.8.6
+
+- **Engineering Gate checkpoint compatibility (Issue #198):** Add `checkpoint_goal_engineering` with the same strict schema, Goal handler, lease/revision checks and evidence validation as `checkpoint_goal`. It follows the canonical tool's availability, so disabling `checkpoint_goal` disables both names.
+- **Verification boundary:** The local MCP SDK publishes both names with matching schemas and routes the alias to the same Goal service. A fresh Cloudflare/ChatGPT connector session was unavailable for this release check, so connector-side cache refresh is not claimed.
+- **ภาษาไทย:** เพิ่ม `checkpoint_goal_engineering` เป็นชื่อสำรองที่ใช้ schema และ Goal handler เดียวกับ `checkpoint_goal` พร้อมคงการตรวจ lease, revision, authorization และหลักฐานเดิม; ปิดเครื่องมือหลักแล้วชื่อสำรองจะถูกปิดด้วย โดยยังไม่ได้ยืนยัน schema จาก Cloudflare/ChatGPT session ใหม่
 
 ### What's new in v5.8.5
 
@@ -72,12 +78,12 @@
 
 ### What's new in v5.8.3
 
-- **Ponytail ULTRA Goal context (Issue #190):** Code mutations without `goalLease` now explain when Ponytail was loaded for a Goal, and tell users to supply that Goal's lease or load the bundled skill in workspace scope. Goal-scoped activation never silently authorizes unbound edits.
-- **Doctor MCP history and Results:** Improved tables and full-detail JSON copy; all visible dates use Gregorian DD/MM/YYYY, Asia/Bangkok (UTC+07:00), 24-hour time. Copied timestamp fields use offset-aware ISO 8601 without changing the underlying instant.
-- **Doctor Resources:** Tracked Goal tasks remain visible even when CPU/RAM cannot be measured; show ownership and why cancellation is unavailable. Only verified active owned blocking jobs can request native-approved cancellation.
-- **Workflows guided inputs:** Detect actual workbook sheets/columns, choose real Git branches and a project package version, and generate a new, workspace-bound report mapping when requested. Advanced manual input remains available; no AI workflow starts automatically.
-- **Code Review:** Default Git comparison base is HEAD, with clear guidance for main/dev/commit refs.
-- **ภาษาไทย:** ตาราง Doctor อ่านง่ายขึ้น ข้อมูลวันที่ทุกหน้าจอเป็นปี ค.ศ. เวลาไทย 24 ชั่วโมง และ JSON ที่คัดลอกใช้ +07:00; หน้ารีวิวโค้ดอธิบายฐานเปรียบเทียบ Git และมีค่า HEAD เริ่มต้น
+- Ponytail ULTRA now explains missing `goalLease` for goal-scoped skill loads. Pass the active Goal's lease to code edits, or load the bundled skill without `goalId` for workspace-only edits; a different Goal's activation cannot authorize an unbound mutation (Issue #190).
+- Doctor MCP history, Results, and Resources have readable tables and complete JSON copy actions. Visible dates use Gregorian DD/MM/YYYY, Asia/Bangkok (UTC+07:00) and 24-hour clock; copied ISO evidence timestamps use Bangkok's +07:00 offset, preserving the instant.
+- Resource diagnostics show all tracked Goal tasks, including those without CPU/RAM samples; missing measurements remain unknown rather than zero. Cancellation only appears for verified owned running blocking jobs and requires native authorization.
+- Workflows guided mode derives Sheet and column choices from the selected workspace-bound XLSX/CSV file, real Git branches and project package version. Explicit mapping generation writes only a new JSON file, appending the report below existing template rows; Advanced mode keeps manual fields and unsupported files visible.
+- Code Review workflow now defaults baseRef to HEAD and explains Git branch/commit comparison choices.
+- ภาษาไทย: ทุกหน้าจอแสดงปี ค.ศ. เขตเวลา Asia/Bangkok และเวลา 24 ชั่วโมง รวมทั้ง JSON ที่คัดลอกเป็น timestamp +07:00; ฐานเปรียบเทียบรีวิวโค้ดมีคำอธิบายและค่าเริ่มต้น HEAD
 
 ### Earlier release highlights — v5.8.0
 
@@ -150,7 +156,7 @@ For the Thai setup and workflow guide, see [docs/USAGE_TH.md](docs/USAGE_TH.md#8
 
 ## What can lnwjud do?
 
-lnwjud exposes **285 tool definitions** through one local runtime and MCP gateway. The default advertised set is 273; all 285 are available when Codex delegation plus Agent Swarm is enabled.
+lnwjud exposes **286 tool definitions** through one local runtime and MCP gateway. The default advertised set is 274; all 286 are available when Codex delegation plus Agent Swarm is enabled.
 
 | Area | Examples |
 | --- | --- |
