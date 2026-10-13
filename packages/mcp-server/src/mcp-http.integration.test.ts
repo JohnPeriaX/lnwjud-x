@@ -315,8 +315,8 @@ describe('MCP localhost HTTP transport', () => {
       // rebuilds a full per-request MCP server (~117ms alone, far slower under whole-suite CPU
       // contention), so the loop is sized to prove repetition without turning the assertion into a
       // race against the test timeout.
-      const requests = 16;
-      for (let index = 0; index < requests; index += 1) {
+      const requestCount = 16;
+      for (let index = 0; index < requestCount; index += 1) {
         const tools = await client.listTools();
         expect(tools.tools.length).toBeGreaterThan(0);
       }
@@ -325,7 +325,7 @@ describe('MCP localhost HTTP transport', () => {
         expect(listeners.size).toBe(1);
         expect(closed).toBe(created - 1);
       });
-      expect(created).toBeGreaterThanOrEqual(requests);
+      expect(created).toBeGreaterThanOrEqual(requestCount);
       await handle.close();
       expect(listeners.size).toBe(0);
       expect(closed).toBe(created);
