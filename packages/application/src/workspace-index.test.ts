@@ -192,7 +192,11 @@ describe('WorkspaceIndexService', () => {
       expect((await service.indexWorkspace(workspace.id, { rebuild: true })).ok).toBe(true);
       const recovered = await store.load(workspace.id);
       expect(recovered?.entries.find((entry) => entry.relativePath === 'a.ts')?.symbols).toContain('updated');
-      await expect(service.status(workspace.id)).resolves.toMatchObject({ ok: true, value: { freshness: 'watching_clean', stale: false, watcher: { failedEvents: expect.any(Number) } } });
+      // Native file watchers can enqueue additional events while the manual rebuild finishes.
+      // Recovery must become clean once those events have drained; failure history stays visible.
+      await vi.waitFor(async () => {
+        await expect(service.status(workspace.id)).resolves.toMatchObject({ ok: true, value: { freshness: 'watching_clean', stale: false, watcher: { failedEvents: expect.any(Number) } } });
+      }, { timeout: 3_000, interval: 20 });
     } finally {
       rejectCommits = false;
       await service.close();
