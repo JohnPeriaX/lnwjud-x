@@ -240,6 +240,15 @@ jobs:
             libnss3 libasound2t64 libgtk-3-0t64 libgbm1 libxss1 \
             libatk-bridge2.0-0t64 libdrm2 libxkbcommon0
 
+      - name: Install ripgrep for macOS package verification
+        if: matrix.platform == 'darwin'
+        shell: bash
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            brew install ripgrep
+          fi
+          rg --version
+
       - name: Install native ARM64 Debian packager
         if: matrix.platform == 'linux' && matrix.arch == 'arm64'
         shell: bash
