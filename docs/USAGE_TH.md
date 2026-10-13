@@ -1,8 +1,8 @@
-# คู่มือใช้งาน lnwjud v5.8.4 (ภาษาไทย)
+# คู่มือใช้งาน lnwjud v5.8.5 (ภาษาไทย)
 
 lnwjud คือ cross-platform local AI-agent runtime / MCP gateway สำหรับให้ ChatGPT, Codex และ MCP client อื่นทำงานกับเครื่องของคุณ เช่น อ่าน/ค้น/แก้ไฟล์, Git, รันโปรเซส และเครื่องมือพัฒนาอื่น ๆ โดยงานจริงยังทำบนเครื่องของคุณ ความสามารถ Windows-only เช่น WSL, Registry และ Windows Sandbox จะไม่แสดงเป็นพร้อมใช้งานบน macOS/Linux
 
-คู่มือนี้อัปเดตตาม source `v5.8.4`; public release `v5.8.4` คือรุ่นที่เผยแพร่แล้วบน [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/tag/v5.8.4)
+คู่มือนี้อัปเดตตาม source `v5.8.5`; public release `v5.8.4` คือรุ่นที่เผยแพร่แล้วบน [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/tag/v5.8.4)
 
 > สำหรับผู้ใช้ package ของ lnwjud **ไม่ต้องติดตั้ง Node.js และไม่ต้องดาวน์โหลด `tunnel-client` เอง** ตัว build จาก source `v5.8.1` รวม official OpenAI `tunnel-client v0.0.16` ที่ตรงกับ OS/architecture พร้อม SHA-256/provenance ส่วน release รุ่นก่อนหน้าอาจ bundle เวอร์ชันต่างกัน ให้ยึดหลักฐานของไฟล์ที่ดาวน์โหลดจริง
 
@@ -296,6 +296,8 @@ Engineering Harness เป็น workflow สำหรับงานเขี�
 6. Requirement ใหม่จะเพิ่ม `userIntentRevision` และทำให้เฉพาะ gate ที่ได้รับผลกระทบเป็น `stale`; งานที่พิสูจน์แล้วและไม่เกี่ยวข้องยังคงอยู่
 7. `finish_goal(completed)` จะถูกบล็อกถ้ายังมี required gate Pending/Running/Failed/Blocked/Stale หรือมี blocking review finding ที่ยังไม่ resolve
 
+ตั้งแต่ source v5.8.5 การ resume Goal เดิมจะ reconcile workflow classification และ gate contract จาก acquired snapshot ภายใต้ Goal lease แม้ policy digest ไม่เปลี่ยน. Gate ที่สัญญาไม่เปลี่ยนจะเก็บ evidence ที่ยังใช้ได้ ส่วน gate ที่เปลี่ยนจะกลับเป็น stale. การตรวจ source, deployment ที่มีอยู่ หรือ release history แบบอ่านอย่างเดียวไม่ใช่คำสั่งให้ deploy หรือ release; ระบุ action ปลายทางแยกให้ชัดเมื่อร้องขอ delivery.
+
 หน้า Settings แสดง Effective policy, เหตุผลที่ Harness inactive, Task kind, Risk, Phase, Next action และ Required checks พร้อมสถานะ **Pending / Running / Passed / Failed / Blocked / Needs re-check**. สี/สถานะ Passed ต้องมาจากหลักฐานจริง ไม่ใช่เพราะมีข้อความสรุปว่า “เสร็จแล้ว”.
 
 **ขอบเขต enforcement ใน v5.7.0:** first-party development routes ถูก guard เชิงกล แต่ `mcp_call` ไป external MCP, Office ทั่วไป, web และ native UI routes ยังเป็น advisory ของ Engineering Harness และยังคงใช้ permission/security control เดิมของ lnwjud. Engineering Harness ไม่ได้เพิ่มสิทธิ์และไม่ข้าม Active Project, Recovery, approval, Full Bypass semantics หรือ rolling `goalLease` ownership fence.
@@ -445,8 +447,8 @@ corepack pnpm@10.15.0 package:windows
 ไฟล์ที่ได้จะอยู่ที่:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.8.4.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.8.4.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.8.5.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.8.5.exe
 apps/desktop/dist/installers/latest.yml
 apps/desktop/dist/installers/portable.yml
 ```

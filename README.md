@@ -53,7 +53,14 @@
 
 ## Current published version: v5.8.4
 
-## Current source version: v5.8.4
+## Current source version: v5.8.5
+
+### What's new in v5.8.5
+
+- **Engineering Harness audit routing (Issue #194):** Keep Full Audit requests and read-only reviews of existing deployments or release history in the local review workflow. Explicit deploy, release, commit, push, PR and merge requests retain their matching delivery scope and gates.
+- **Existing Engineering Goals:** Reconcile workflow classification, gate contracts and source scope from the lease-acquired Goal snapshot. Preserve compatible findings, task tracking and proof; revalidate scope-dependent checks when the requested source scope changes.
+- **Modern MCP HTTP inventory and schema evidence:** Notify subscribed clients when host tool availability changes, then serve the current tools/list on the next request. `tool_describe` reports a SHA-256 digest from the active ToolRegistry schema and identifies remote connector schema as unavailable.
+- **ภาษาไทย:** แยก Full Audit และการตรวจประวัติ deployment/release แบบอ่านอย่างเดียวออกจากคำสั่งปล่อยงาน, reconcile metadata ของ Goal เดิมจาก snapshot ที่ acquire ภายใต้ lease, แจ้ง MCP client เมื่อ tool availability เปลี่ยน และแสดง digest ของ local schema โดยไม่อ้างว่าอ่าน schema ของ connector ภายนอกได้
 
 ### What's new in v5.8.4
 
@@ -71,12 +78,6 @@
 - **Workflows guided inputs:** Detect actual workbook sheets/columns, choose real Git branches and a project package version, and generate a new, workspace-bound report mapping when requested. Advanced manual input remains available; no AI workflow starts automatically.
 - **Code Review:** Default Git comparison base is HEAD, with clear guidance for main/dev/commit refs.
 - **ภาษาไทย:** ตาราง Doctor อ่านง่ายขึ้น ข้อมูลวันที่ทุกหน้าจอเป็นปี ค.ศ. เวลาไทย 24 ชั่วโมง และ JSON ที่คัดลอกใช้ +07:00; หน้ารีวิวโค้ดอธิบายฐานเปรียบเทียบ Git และมีค่า HEAD เริ่มต้น
-
-### What's new in v5.8.2
-
-- **macOS updater:** Prevent the IPC shutdown that previously occurred before Squirrel.Mac completed native package verification. Existing ad-hoc-signed installs cannot update safely in place; download and replace the app manually. Developer ID signing is needed for future seamless automatic updates.
-- **Linux AppImage:** Keep a local rollback link to the old AppImage and restore it if the native installer fails after deleting the previous path. DEB updates remain managed by the system package manager.
-- **What’s New:** Includes bilingual v5.8.2 notes above the v5.8.1 and v5.8.0 history.
 
 ### Earlier release highlights — v5.8.0
 
