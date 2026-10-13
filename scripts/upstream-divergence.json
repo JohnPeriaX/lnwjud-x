@@ -11,6 +11,18 @@
   "upstreamRemote": "upstream",
   "customizations": [
     {
+      "id": "upstream-sync-tooling",
+      "summary": "The fork's sync commands and the release-gate registration of its guard tests live in the root package.json. Resolving that file as version noise during a merge deletes the commands and silently drops upstream-divergence and native-active-project-wiring from test:release-gate, so the guard stops running while CI still reports green.",
+      "markers": [
+        { "file": "package.json", "contains": "\"upstream:plan\": \"node scripts/sync-upstream.mjs\"" },
+        { "file": "package.json", "contains": "tests/release/upstream-divergence.test.ts" },
+        { "file": "scripts/sync-upstream.mjs", "contains": "apply: argv.includes('--apply') && !simulate" }
+      ],
+      "proofTests": [
+        "tests/release/upstream-divergence.test.ts"
+      ]
+    },
+    {
       "id": "project-attach",
       "summary": "An absolute path outside every Active Project is attached as a project by the host instead of being refused with 'not registered'.",
       "markers": [
