@@ -1,4 +1,5 @@
 import { err, ok, type InvocationAuthorization, type Result } from '@lnwjud/domain';
+import type { CheckedInvocationEnvelope, McpRegistryRuntimePort } from '../registry-runtime-port.js';
 import type { CapabilityService, EventLogBackendOptions } from '@lnwjud/capabilities';
 import type { ExtensionsService } from '@lnwjud/extensions';
 import type {
@@ -39,6 +40,7 @@ import { z } from 'zod';
 import type { ContextEconomyRuntime } from '../context-economy.js';
 import type { OfficeDataWorkflowService } from '../office-data-workflow.js';
 import type { EccRuntimeOptions } from '../ecc-provider.js';
+import type { DapSessionService } from '../dap-session-service.js';
 
 export interface WorkspaceInfoPort {
   info(actor: FileActor, workspaceId: string): Promise<Result<unknown>>;
@@ -91,6 +93,7 @@ export interface McpApplicationServices {
   readonly eventLogRuntimeOptions?: EventLogBackendOptions;
   readonly localProviders?: () => { readonly pdfProvider?: string; readonly lspCommands?: Readonly<Record<string, string>> };
   readonly capabilities?: CapabilityService;
+  readonly debugSessions?: Pick<DapSessionService, 'attach' | 'request' | 'status' | 'disconnect'>;
   readonly extensions?: ExtensionsService;
   readonly workspaceInfo?: WorkspaceInfoPort;
   readonly workspaceQuery?: Pick<WorkspaceQueryService, 'tree'>;
@@ -179,12 +182,15 @@ export interface McpToolDefinition {
 
 export interface McpInternalInvocationContext {
   readonly automationDispatch?: AutomationDispatchContext;
+  readonly checkedInvocation?: CheckedInvocationEnvelope;
+  readonly recipeCancellation?: { register(snapshot: () => unknown): void };
 }
 
 export interface McpToolContext {
   readonly actor: FileActor;
   readonly services: McpApplicationServices;
   readonly contextEconomy: ContextEconomyRuntime;
+  readonly registryRuntime?: McpRegistryRuntimePort;
   /** Dynamic registry exposure predicate used by discovery/ranking helpers. */
   readonly isToolExposed?: (name: string) => boolean;
   /** Session-scoped Ponytail suppression owned by the current ToolRegistry/transport ledger. */

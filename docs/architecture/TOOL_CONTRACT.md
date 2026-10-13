@@ -1,6 +1,6 @@
 # lnwjud tool contract
 
-Status: God-Tier Wave 0–8 additive contract snapshot synchronized for `v5.8.4`.
+Status: God-Tier Wave 0–8 additive contract snapshot synchronized for `v5.8.5`.
 
 This is the compatibility contract for the current MCP surface. The runtime
 advertises the JSON Schema for every input through `tools/list`; the TypeScript
@@ -249,7 +249,7 @@ Run `pnpm docs:tools` after intentionally changing the registry; CI runs `pnpm d
 | 206 | `execution_plan` | READ | default | operational | deterministic_operation | yes | no |
 | 207 | `repo_map` | READ | default | operational | service_dispatch | yes | no |
 | 208 | `context_expand` | READ | default | operational | service_dispatch | yes | no |
-| 209 | `recovery_status` | READ | default | operational | deterministic_operation | yes | no |
+| 209 | `recovery_status` | READ | default | operational | service_dispatch | yes | no |
 | 210 | `tool_schema_list` | READ | default | operational | deterministic_operation | yes | no |
 | 211 | `tool_schema_register` | WRITE | default | operational | deterministic_operation | no | no |
 | 212 | `capabilities` | READ | default | operational | deterministic_operation | yes | no |

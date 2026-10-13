@@ -52,6 +52,7 @@ import {
 import {
   ActivityTracker,
   ContextEconomyRuntime,
+  DapSessionService,
   OfficeDataWorkflowService,
   LNWJUD_MCP_IDENTITY_PATH,
   RuntimeEngineeringEvidenceVerifier,
@@ -745,6 +746,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
     callTimeoutMs: readSettings().mcpCallTimeoutMs,
     idleTimeoutMs: readSettings().mcpIdleTimeoutMs,
   });
+  const debugSessions = new DapSessionService();
   const mcpServices: McpApplicationServices = {
     platform: process.platform,
     runtimeStatePath: path.join(dataPath, 'upgrade-runtime.json'),
@@ -759,6 +761,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
       };
     },
     capabilities: capabilityRuntime.service,
+    debugSessions,
     extensions: extensionsService,
     workspaceInfo: workspaceInfoService,
     workspaceQuery: workspaceQueryService,
@@ -1701,8 +1704,13 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
         workspaceRoot: workspace.realRootPath,
       });
       const backup = await backupService.create('manual');
-      await workspaceIndex.forgetWorkspace(workspace.id);
       await workspaceRepository.delete(workspace.id);
+      try {
+        await workspaceIndex.forgetWorkspace(workspace.id);
+      } catch (error: unknown) {
+        await repairSelectedWorkspace(workspace.id);
+        throw new Error('The workspace registration was removed, but its index cleanup failed. Reload the workspace list before retrying cleanup.', { cause: error });
+      }
       await repairSelectedWorkspace(workspace.id);
       return { deleted: true, workspaceId: workspace.id, rootPath: workspace.realRootPath, backupId: backup.id };
     },
@@ -2314,6 +2322,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
     }
     logHub.stop();
     await mcpLifecycle.close();
+    debugSessions.close();
     await extensionsService.close().catch(() => undefined);
     await workspaceIndex.close().catch(() => undefined);
     await startupBackup;

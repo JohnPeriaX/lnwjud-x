@@ -26,13 +26,19 @@ describe('path-bearing native Active Project wiring', () => {
     const registry = await source('packages/mcp-server/src/tool-registry.ts');
     expect(registry).toContain("const NATIVE_ACTIVE_SCOPE_TOOLS = new Set(['dom_cdp', 'office', 'audio', 'screen_record', ...OFFICE_SEMANTIC_TOOL_NAMES]);");
     expect(registry).toContain('const nativePathScopeRequired = requiresNativePathScope(tool.name, activeRoutedInput);');
-    expect(registry).toContain('await this.routeInputToActiveWorkspace(goalBoundInput, {');
+    // Upstream moved routing into the shared assessInvocationPolicy helper, so the routing call and
+    // the attach approval flag now live there. A preview is advisory and must pass allowAttach=false,
+    // otherwise merely previewing a call would register a project and consume a folder's first
+    // confirmation; the real invocation passes true.
+    expect(registry).toContain('const routed = await this.routeInputToActiveWorkspace(input, { toolName: tool.name, autoAttachApproved });');
+    expect(registry).toContain('this.assessInvocationPolicy(tool, goalBound.value, profile, fullBypass, true)');
+    expect(registry).toContain('this.assessInvocationPolicy(tool, goalBound.value, profile, fullBypass, false)');
     expect(registry).toContain('const matched = commonActiveWorkspaceScope(scopes, absolutePaths);');
     expect(registry).toContain('const attached = await this.attachExternalProject(absolutePaths, context.toolName, context.autoAttachApproved);');
     expect(registry).toContain('[CAPABILITY_ACTIVE_WORKSPACE_ROOT_METADATA_KEY]: normalizedRoot');
     // Routing and the native scope fence must read one shared key list. A field that is scope-
     // enforced but never routable dead-ends a valid absolute path instead of attaching its folder.
-    expect(registry).toContain("const NATIVE_PATH_SCOPE_KEYS = ['file_path', 'target_path', 'output_path', 'source_path', 'image_path'] as const;");
+    expect(registry).toContain("const NATIVE_PATH_SCOPE_KEYS = ['file_path', 'target_path', 'output_path', 'source_path', 'image_path', 'theme_path'] as const;");
     expect(registry).toContain('for (const key of PATH_SCOPE_KEYS) {');
     expect(registry).toContain('for (const key of NATIVE_PATH_SCOPE_KEYS) {');
     const declaredKeys = /const PATH_SCOPE_KEYS = \[([\s\S]*?)\] as const;/.exec(registry)?.[1] ?? '';

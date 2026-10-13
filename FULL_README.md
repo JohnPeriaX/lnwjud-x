@@ -51,18 +51,17 @@ The tunnel is outbound-only: `tunnel-client` runs beside lnwjud, reaches OpenAI
 over outbound HTTPS, forwards MCP work to lnwjud's Desktop loopback HTTP MCP,
 and returns the response without opening a public inbound port on the host.
 
-## Current published version: v5.8.3
+## Current published version: v5.8.4
 
-## Current source version: v5.8.4
+## Current source version: v5.8.5
 
-### Current source changes in v5.8.4
+### What's new in v5.8.4
 
-- **Cross-project work while a durable goal runs:** a `goalLease` belonging to another project no longer blocks ordinary Git and file mutations in a workspace that carries no rolling goal, while per-workspace ownership checks remain required and fail closed when fence state cannot be read.
-- **Absolute paths attach their own project:** an absolute folder path outside every Active Project is registered as a project scope by the host bridge, silently on the Full profile and after one confirmation per folder on stricter profiles, without moving the primary project.
-- **Consistent absolute-path reads:** `workspace_tree` honours the same host explicit-absolute-read grant as the file read path instead of refusing targets it already accepted.
-- **Fork stays upstream-mergeable:** an upstream divergence registry with marker guard tests, plus `upstream:plan`/`upstream:merge` tooling that classifies a merge into fork-critical, needs-review and mechanical version noise and can simulate it before touching history.
-
-ภาษาไทย: v5.8.4 เปิดให้สั่ง Git/ไฟล์ในโปรเจกต์อื่นได้แม้ session มี durable goal ค้างอยู่ โดยยังตรวจความเป็นเจ้าของแบบต่อ-workspace และ fail closed เมื่ออ่านสถานะ fence ไม่ได้, วาง absolute path แล้วผูกเป็นโปรเจกต์ได้อัตโนมัติโดยไม่ย้ายโปรเจกต์หลัก, ทำให้ workspace_tree ยอมรับ path เดียวกับที่ read_file รับ, และเพิ่มทะเบียนความต่างจาก lnwjud ต้นฉบับพร้อมเครื่องมือ plan/merge/simulate เพื่ออัปเดตจาก upstream ได้โดยไม่เสียงานของ fork
+- **Issue #193 durable Shell identity:** Keep stable authorized client/session/workspace ownership across modern HTTP requests, legacy reconnects and capability provider replacement; read retained outputs and terminal receipts without granting foreign readers access.
+- **Checked recipe, recovery and workspace context:** Preview side-effect-free recipes, execute only explicitly requested steps through the same permission and current Goal-lease boundaries, and keep honest partial/unknown results if dependencies or an index update fail.
+- **Agent Swarm CLI non-interactive fix:** Supply the Codex prompt via argv with stdin closed; detach result collection from the transient start-request abort while retaining explicit cancellation of owned work. A three-agent real subprocess fixture verifies EOF and result collection, not availability of a remote model.
+- **MCP tool/provider improvements:** Audit the current 285 tool definitions and supported action paths (273 advertised without Codex). Report provider/platform prerequisites and native media handles and terminal artifact evidence explicitly; do not present undeployed macOS/Linux features as universally available.
+- **ภาษาไทย:** การอ่านผล Shell หลังเปลี่ยนการเชื่อมต่อถูกตรวจเจ้าของ, Workflow เช็กสิทธิ์ทุกขั้นตอน, Agent Swarm ไม่รอ stdin เพิ่ม และ Tool/Doctor ระบุสาเหตุที่ Provider ยังไม่พร้อมโดยไม่รายงานความสำเร็จเกินจริง
 
 ### What's new in v5.8.3
 
@@ -78,14 +77,6 @@ and returns the response without opening a public inbound port on the host.
 - macOS Squirrel.Mac updater preserves IPC until native validation and refuses incompatible ad-hoc automatic installs; existing users must migrate by manually replacing the application. Future auto-updates require stable Developer ID signing.
 - Linux AppImage update staging retains a rollback link and restores the old file on native replacement failure; DEB remains package-manager owned.
 - In-app Thai/English What's New now includes the v5.8.2 fixes plus prior 5.8.x history.
-
-### What's new in v5.8.1
-
-- **Dropdown overlay fix:** Opening Workspace, Session, and other shared dropdowns no longer changes page padding, compresses scrollable Work Log tables, or auto-scrolls the underlying content. Menus remain anchored below their fields with bounded internal scrolling.
-- **What's New history:** The in-app modal now shows all installed-or-earlier patches in the active series, newest first (5.8.x, then 5.9.x after upgrading, with 6.x.x grouped by major), each with its own heading and a scrollable list.
-- **Tunnel Live Logs:** Hide ineffective Workspace and Session filters and their scoped-clear actions from the Tunnel tab only; keep search, pause, clear tab and export. MCP activity and Processes retain their functional filters.
-
-**ภาษาไทย:** แก้ dropdown ไม่บีบตาราง Work Log หรือเลื่อนหน้าเอง; What's New รวมประวัติของชุดเวอร์ชันปัจจุบัน เรียงใหม่ก่อนและเลื่อนอ่านได้; Live Logs แท็บ Tunnel เอา Workspace/Session Filter ที่ไม่สามารถกรองได้จริงออก โดยยังคงฟิลเตอร์ของ MCP activity และ Processes ตามเดิม
 
 ### Earlier release highlights — v5.8.0
 
@@ -109,7 +100,7 @@ and returns the response without opening a public inbound port on the host.
 
 **ภาษาไทย — ต่างจาก 5.7.4:** เพิ่มเทมเพลต 6 แบบ, ประวัติ MCP และผลงาน Goal ที่มีหลักฐาน, RAM/CPU จริงของโปรเซสที่ตรวจเจ้าของได้, Context Economy แบบรวมระดับ Transport, ตรวจ CSV/XLSX, Git tree/preview ที่ครบขึ้น, UI และ dropdown กลาง, กากบาท Modal ขนาดชัดเจน, Work Log ที่กรองง่ายขึ้น, แก้ Tunnel reconnect ก่อนพร้อม และอัปเดต tunnel-client 0.0.16 พร้อมการทดสอบ/แพ็กเกจตาม SHA จริง ค่าไม่ทราบจะไม่แสดงเป็น 0 หรืออ้างว่าสำเร็จโดยไม่มีข้อมูล
 
-Latest published release: **v5.8.3**. Windows, macOS, and Linux artifacts were published after the exact tagged main commit passed the target-native release gates described below.
+Latest published release: **v5.8.4**. Windows, macOS, and Linux artifacts were published after the exact tagged main commit passed the target-native release gates described below.
 
 See [Thai Engineering Harness setup and workflow](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for details.
 
@@ -230,13 +221,13 @@ Choose the guide for the host you will run lnwjud on:
 
 1. Download the latest published installer from
    [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/latest).
-   Current published Windows 10/11 x64 v5.8.3 artifacts are `lnwjud-Setup-5.8.3.exe` (recommended installer) and `lnwjud-Portable-5.8.3.exe` (no installation required).
+   Current published Windows 10/11 x64 v5.8.4 artifacts are `lnwjud-Setup-5.8.4.exe` (recommended installer) and `lnwjud-Portable-5.8.4.exe` (no installation required).
 2. Run the NSIS installer and launch **lnwjud Agent Control Center**.
 3. Add or select the project/workspace you want lnwjud to operate on.
 4. Review **Settings** before attaching an AI client, especially Permission
    Profile and Unrestricted Mode.
 
-If you prefer not to install the app, run the currently published `lnwjud-Portable-5.8.3.exe` directly.
+If you prefer not to install the app, run the currently published `lnwjud-Portable-5.8.4.exe` directly.
 Portable mode uses the same per-user lnwjud data/settings location as the installer;
 it is a portable executable, not a keep-all-data-next-to-the-EXE mode.
 Automatic updates preserve the distribution you chose. Installer users read
@@ -282,7 +273,7 @@ A few operating-system boundaries still apply:
 
 ### 2. Connect ChatGPT with Remote MCP + OAuth (recommended)
 
-For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.8.4 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
+For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.8.5 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
 
 1. Open **lnwjud → Settings → Remote MCP & Tunnel**.
 2. Check the ngrok status. If lnwjud shows **READY**, keep the detected installation. If it is not ready, lnwjud shows only the installation path supported by the current host: Windows may use Microsoft Store/WinGet, macOS may use Homebrew when available, and hosts without a verified automatic installer get the official ngrok download link instead. Runtime discovery itself is cross-platform and verifies `ngrok version` before use.
@@ -354,12 +345,12 @@ Use lnwjud to list registered workspaces, report Git status for the selected pro
 
 ## Quick start: install the Windows release (ภาษาไทย)
 
-ส่วนนี้สำหรับผู้ใช้ Windows ที่ต้องการติดตั้ง lnwjud แล้วเชื่อมกับ ChatGPT แบบง่ายที่สุด โดย **วิธีหลักที่แนะนำสำหรับ v5.8.3 คือ Remote MCP ผ่าน ngrok + OAuth** ไม่ต้องมี OpenAI Tunnel ID และไม่ต้องสร้าง Runtime API key สำหรับขั้นตอนหลักนี้ ส่วน **Tunnel ID + Runtime API key** ยังคงรองรับ แต่เป็นทางเลือก/โหมดขั้นสูงสำหรับผู้ที่ต้องการ OpenAI Secure MCP Tunnel โดยเฉพาะ
+ส่วนนี้สำหรับผู้ใช้ Windows ที่ต้องการติดตั้ง lnwjud แล้วเชื่อมกับ ChatGPT แบบง่ายที่สุด โดย **วิธีหลักที่แนะนำสำหรับ v5.8.4 คือ Remote MCP ผ่าน ngrok + OAuth** ไม่ต้องมี OpenAI Tunnel ID และไม่ต้องสร้าง Runtime API key สำหรับขั้นตอนหลักนี้ ส่วน **Tunnel ID + Runtime API key** ยังคงรองรับ แต่เป็นทางเลือก/โหมดขั้นสูงสำหรับผู้ที่ต้องการ OpenAI Secure MCP Tunnel โดยเฉพาะ
 
 ### 1. ติดตั้ง lnwjud หรือใช้ Portable
 
-1. แบบแนะนำ: ดาวน์โหลด public release ล่าสุด `lnwjud-Setup-5.8.3.exe` แล้วติดตั้งตามปกติ
-2. ถ้าไม่ต้องการติดตั้ง: ดาวน์โหลด `lnwjud-Portable-5.8.3.exe` แล้วเปิดได้ทันที
+1. แบบแนะนำ: ดาวน์โหลด public release ล่าสุด `lnwjud-Setup-5.8.4.exe` แล้วติดตั้งตามปกติ
+2. ถ้าไม่ต้องการติดตั้ง: ดาวน์โหลด `lnwjud-Portable-5.8.4.exe` แล้วเปิดได้ทันที
 3. เปิด **lnwjud Agent Control Center**
 4. เพิ่มหรือเลือก Project/Workspace ที่ต้องการให้ ChatGPT ทำงานด้วย
 
@@ -392,7 +383,7 @@ public ngrok URL นี้ชี้เข้า OAuth gateway แยกต่า
 6. รอ Configure/Doctor ผ่าน แล้วกด **Start Tunnel**
 7. ใน ChatGPT เพิ่ม Connection แบบ **Tunnel** แล้วเลือก tunnel ที่สร้างไว้หรือใส่ `tunnel_id`
 
-`lnwjud-Setup-5.8.3.exe` และ `lnwjud-Portable-5.8.3.exe` รวม official OpenAI `tunnel-client` ที่ตรวจสอบเวอร์ชันและ provenance ตามไฟล์ Release มาให้แล้ว จึง **ไม่ต้องดาวน์โหลด `tunnel-client.exe` เอง** ช่อง path เป็น override สำหรับ troubleshooting เท่านั้น; หากต้องการกลับไปใช้ตัว bundled ให้ล้าง override แล้วเลือก **Use bundled** อย่างชัดเจน
+`lnwjud-Setup-5.8.4.exe` และ `lnwjud-Portable-5.8.4.exe` รวม official OpenAI `tunnel-client` ที่ตรวจสอบเวอร์ชันและ provenance ตามไฟล์ Release มาให้แล้ว จึง **ไม่ต้องดาวน์โหลด `tunnel-client.exe` เอง** ช่อง path เป็น override สำหรับ troubleshooting เท่านั้น; หากต้องการกลับไปใช้ตัว bundled ให้ล้าง override แล้วเลือก **Use bundled** อย่างชัดเจน
 
 `Persistent Tunnel Identity` จำ Tunnel ID แยกจาก Run/Stop intent. เมื่อผู้ใช้กด **Stop Tunnel** lnwjud จะคงสถานะ stopped ข้ามการ restart และจะไม่ auto-reconnect จนกด Start อีกครั้ง. หากเปลี่ยน custom/bundled client ขณะ runtime ทำงาน ระบบจะหยุดและยืนยัน owner เดิมก่อน commit path ใหม่เพื่อไม่ให้มี runtime ซ้อน
 
@@ -653,8 +644,8 @@ corepack pnpm@10.15.0 package:windows
 The Windows 10/11 x64 artifacts are written to:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.8.4.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.8.4.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.8.5.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.8.5.exe
 ```
 
 The installer is per-user by default. The portable executable needs no installation but uses the same per-user lnwjud data/settings location. A common installed executable path is:
@@ -1041,9 +1032,9 @@ This complete index is generated from `ToolRegistry.listAll()`, not copied from 
 | 58 | `file_dialog` | EXECUTE | default | operational | service_dispatch | Open a host-native file open/save dialog and return the chosen path(s). The dialog does not read or write files itself; use the guarded file tools afterwards. |
 | 59 | `clipboard` | EXECUTE | default | operational | service_dispatch | Read or write the host clipboard (text or PNG image as base64). Use get_text/get_image to read and set_text to write. |
 | 60 | `web_fetch` | READ | default | operational | service_dispatch | Fetch an http/https URL (GET/POST/PUT/DELETE/HEAD) with bounded size and timeout. In standard mode every POST, PUT, or DELETE requires explicit chat confirmation and host approval; trusted Full Bypass skips lnwjud approval. dry_run remains safe. Returns status, headers, and text or base64 body. |
-| 61 | `audio` | EXECUTE | default | operational | service_dispatch | Record the microphone to a WAV file or play a local audio file through the host media provider. In standard mode recording requires an Active Project (an absolute output_path outside every Active Project attaches that folder after one confirmation) and explicit confirmation; trusted Full Bypass skips lnwjud approval/scope checks. Existing in-workspace outputs use Recovery Trash before replacement when available. record is synchronous and limited to 600 seconds. Use stop to abort an ongoing record/play. |
-| 62 | `screen_record` | EXECUTE | default | operational | service_dispatch | Record the screen to an MP4 using the host-native media provider. In standard mode starting a recording requires an Active Project (an absolute output_path outside every Active Project attaches that folder after one confirmation) and explicit confirmation; trusted Full Bypass skips lnwjud approval/scope checks. Existing in-workspace outputs use Recovery Trash before replacement when available. start spawns a background capture, status checks it, stop finalizes the file. Recording stops automatically after 3600 seconds. |
-| 63 | `office` | WRITE | default | operational | service_dispatch | Automate a supported spreadsheet/document provider when installed. In standard mode every write, replace, merge, or save_as action requires an Active Project (an absolute file_path/target_path outside every Active Project attaches that folder after one confirmation), explicit chat confirmation, and host approval. Trusted Full Bypass skips lnwjud approval/scope checks without forging userConfirmed. Existing in-workspace targets use Recovery Trash before replacement when available. Unsupported app/action pairs are dependency-gated rather than approximated. |
+| 61 | `audio` | EXECUTE | default | operational | service_dispatch | Record microphone audio or play a scoped local file through the native media provider. Native macOS/Linux starts return an owned handle; use status to observe it and stop to finalize or cancel it. An initial running receipt does not prove an artifact exists. Terminal artifacts include verification evidence. Duration is bounded to 600 seconds and max_bytes to 64 MiB. Windows delivery behavior is reported by its provider. Recording requires application authorization and a scoped output; existing outputs use Recovery Trash when available. Cancellation of a macOS/Linux native request closes that owner process and its resources while preserving other owners. |
+| 62 | `screen_record` | EXECUTE | default | operational | service_dispatch | Start a bounded native screen recording and retain its returned owned handle. Use status to observe the handle and stop to finalize or cancel it. macOS/Linux artifacts are published only after terminal content verification, with a duration limit of 600 seconds and max_bytes of 64 MiB. Linux Wayland capture requires a granted session_id and reports denial or revocation. Application authorization, Active Project paths and replacement recovery apply to capture output. Cancellation of a macOS/Linux native request closes that owner process and its resources while preserving other owners. |
+| 63 | `office` | WRITE | default | operational | service_dispatch | Automate a supported spreadsheet/document provider when installed. In standard mode every write, replace, merge, or save_as action requires an Active Project workspaceId, explicit chat confirmation, and host approval. Trusted Full Bypass skips lnwjud approval/scope checks without forging userConfirmed. Existing in-workspace targets use Recovery Trash before replacement when available. Unsupported app/action pairs are dependency-gated rather than approximated. |
 | 64 | `scheduler` | EXECUTE | default | operational | service_dispatch | Manage host-native scheduled tasks. list is read-only; in standard mode create, run, and delete require explicit chat confirmation and host approval. Trusted Full Bypass skips lnwjud approval without forging userConfirmed. The provider uses the current OS scheduler and never silently falls back to another scheduler. |
 | 65 | `wsl_exec` | EXECUTE | default | operational | service_dispatch | Non-blocking WSL2 developer runner for one Linux executable plus argv; shell command strings are not accepted. cwd accepts either an absolute Windows workspace path or an absolute WSL path such as /mnt/e/project returned by wsl_fs. Do not use wsl_exec as a source/config/text editor. For any direct text-file change, call edit_file first; use apply_patch for reviewed whole-file or multi-file replacements and write_file for file creation/replacement. Inline Node/Python/PowerShell-style rewrites and sed in-place edits are rejected before native approval so the client can route to guarded file tools. MCP run calls are ALWAYS forced to execution=background, even if a client requests foreground or auto, and return a task_id immediately. Follow with status/logs/result; wait uses the user-configurable MCP poll window (5-60 seconds, default 5). When the user requires babysitting until completion, keep using bounded waits and do not report completion until the terminal result is inspected. Otherwise, if the host turn must yield while a durable task is still running, checkpoint it as trackedTasks {taskId, provider: shell, role: blocking_job, cancelWithGoal: true} and use the active scheduled-continuation handoff instead of abandoning the goal. With Full Bypass OFF, Full Access runs ordinary WSL commands without confirmation while destructive, broad, recursive, outside-project, or unparseable forms retain normal approval/command policy. Trusted Full Bypass skips lnwjud approval, command-policy, Active Project, and allowed-root checks; an active rolling scheduled goal still requires the current goalLease ownership proof. Full Bypass may still use an explicitly requested external cwd; WSL availability, argv validation, Linux permissions, and process failures still apply. |
 | 66 | `wsl_fs` | READ | default | operational | service_dispatch | Translate paths and inspect metadata between a registered Windows workspace and WSL without exposing raw \\wsl$ read/write access. |
@@ -1053,12 +1044,12 @@ This complete index is generated from `ToolRegistry.listAll()`, not copied from 
 | 70 | `mcp_list` | READ | default | operational | service_dispatch | List local MCP servers discovered from Cursor, Claude Desktop, and lnwjud settings. This inspection is read-only and does not flatten child tools into the lnwjud catalog. |
 | 71 | `mcp_describe` | READ | default | operational | service_dispatch | Connect to one local MCP server (if needed) and return its tool names, descriptions, and input schemas. This operation only inspects the child tool catalog. |
 | 72 | `mcp_call` | DANGEROUS | default | operational | service_dispatch | Call a tool on a discovered local MCP server. Child side effects and filesystem/network scope are controlled by that child server, so standard mode treats every mcp_call as opaque mutation and requires explicit chat plus host exact-action approval. Trusted Full Bypass skips lnwjud application approval; the child server still enforces its own policy. |
-| 73 | `workspace_context` | READ | default | operational | service_dispatch | Aggregate ranked workspace context with snippets, symbols, Git/test relevance, economy metadata, and continuation; automatic discovery can be explicitly expanded. |
+| 73 | `workspace_context` | READ | default | operational | service_dispatch | Aggregate ranked workspace context with snippets, symbols, Git/test relevance and continuation. Preserve per-source observations and explicit completeness when a provider fails or search is truncated. |
 | 74 | `workspace_context_continue` | READ | default | operational | service_dispatch | Continue a workspace_context result without discarding unreturned candidates. |
-| 75 | `workspace_full_scan` | READ | default | operational | service_dispatch | Enumerate workspace files with full access by default; set includeIgnored false to use the persistent automatic index. |
+| 75 | `workspace_full_scan` | READ | default | operational | service_dispatch | Enumerate workspace files with per-source completeness. With includeIgnored false, use a fresh clean automatic index for prefix scans; stale or unavailable indexes and glob requests fall back to real filename search. |
 | 76 | `workspace_full_scan_continue` | READ | default | operational | deterministic_operation | Continue a workspace_full_scan result page. |
-| 77 | `workspace_snapshot` | READ | default | operational | service_dispatch | Return workspace identity and project snapshot metadata without source contents. |
-| 78 | `search_all` | READ | default | operational | service_dispatch | Search text and filenames across one or all registered workspaces with automatic economy filters or an explicit includeIgnored override. |
+| 77 | `workspace_snapshot` | READ | default | operational | service_dispatch | Return workspace identity and project snapshot metadata without source contents, retaining successful providers and explicit missing or unknown observations. |
+| 78 | `search_all` | READ | default | operational | service_dispatch | Search text and filenames across registered workspaces, retaining each source observation and explicit truncation or partial completeness. Automatic economy filters can be expanded with includeIgnored. |
 | 79 | `read_many_files` | READ | default | operational | service_dispatch | Read many workspace files in parallel while preserving one result or error per requested path. |
 | 80 | `read_file_page` | READ | default | operational | service_dispatch | Preferred reader for large files after search_text identifies the relevant area. Reads a deterministic line chunk with explicit continuation instead of silently truncating or loading the whole file. |
 | 81 | `read_file_page_continue` | READ | default | operational | service_dispatch | Continue read_file_page from the next deterministic line chunk only when more surrounding context is needed; avoid re-reading earlier pages. |
@@ -1189,7 +1180,7 @@ This complete index is generated from `ToolRegistry.listAll()`, not copied from 
 | 206 | `execution_plan` | READ | default | operational | deterministic_operation | Return the cheapest deterministic execution plan and reason. |
 | 207 | `repo_map` | READ | default | operational | service_dispatch | Return a traversable repository structural map. |
 | 208 | `context_expand` | READ | default | operational | service_dispatch | Return optional import, caller, type, test, and change references. |
-| 209 | `recovery_status` | READ | default | operational | deterministic_operation | Return reconnect, retry, continuation, cache, and worker recovery state. |
+| 209 | `recovery_status` | READ | default | operational | service_dispatch | Return reconnect, retry, continuation, cache, and worker recovery state. |
 | 210 | `tool_schema_list` | READ | default | operational | deterministic_operation | List versioned tool schema metadata. |
 | 211 | `tool_schema_register` | WRITE | default | operational | deterministic_operation | Register a validated backward-compatible versioned tool schema descriptor in the local runtime registry. |
 | 212 | `capabilities` | READ | default | operational | deterministic_operation | Discover capability categories without requiring every full schema. |
@@ -1215,7 +1206,7 @@ This complete index is generated from `ToolRegistry.listAll()`, not copied from 
 | 232 | `compare_pdf_pages` | READ | default | dependency_gated | truthful_unavailable | Compare two PDFs by bounded page/text metadata through the local PDF provider. |
 | 233 | `project_profile_get` | READ | default | operational | service_dispatch | Read the validated workspace project-intelligence profile. |
 | 234 | `project_profile_set` | WRITE | default | operational | deterministic_operation | Persist validated workspace project-intelligence conventions through the guarded file boundary. |
-| 235 | `handoff_context` | READ | default | operational | service_dispatch | Build a structured cross-agent handoff bundle from real workspace, Git, and context services. |
+| 235 | `handoff_context` | READ | default | operational | service_dispatch | Recover the durable Goal, checkpoint, capsule and owned task receipts first, then observe optional workspace context with explicit provider states. Missing Git or search preserves available recovery state. |
 | 236 | `benchmark_run` | EXECUTE | default | dependency_gated | service_dispatch | Preview or start the detected managed benchmark project command and retain bounded run evidence. |
 | 237 | `regression_report` | READ | default | operational | deterministic_operation | Return retained local benchmark run evidence and regression comparisons for the current runtime session. |
 | 238 | `sandbox_exec` | EXECUTE | default | dependency_gated | truthful_unavailable | Run an artifact-based Windows Sandbox job with networking disabled and read-only mapped input. |
@@ -1223,8 +1214,8 @@ This complete index is generated from `ToolRegistry.listAll()`, not copied from 
 | 240 | `crash_trace` | READ | default | dependency_gated | deterministic_operation | Return bounded crash and service-diagnostic context from allowlisted user-mode sources. |
 | 241 | `lsp_diagnostics` | READ | default | dependency_gated | truthful_unavailable | Read diagnostics from an owned language-server child process. |
 | 242 | `lsp_rename` | WRITE | default | dependency_gated | truthful_unavailable | Create a cross-file LSP rename edit plan before any workspace write. |
-| 243 | `debug_attach` | EXECUTE | default | dependency_gated | truthful_unavailable | Validate and register an owned loopback DAP endpoint for a workspace debug session; connection details remain session-scoped. |
-| 244 | `debug_step` | EXECUTE | default | dependency_gated | truthful_unavailable | Perform a bounded DAP request against a registered owned loopback debug session. |
+| 243 | `debug_attach` | EXECUTE | default | dependency_gated | truthful_unavailable | Attach to an already running numeric-loopback TCP DAP adapter with bounded initialization and attach-only configuration. The host retains sockets under the actual client, MCP session and registered workspace. dryRun validates without connecting. No debugger process is launched. |
+| 244 | `debug_step` | EXECUTE | default | dependency_gated | truthful_unavailable | Read bounded owned-session status/events by cursor, disconnect the adapter without terminating the debuggee, or issue a validated DAP command. Adapter replies and output retain their exact values. Event overflow and connection gaps are explicit. Control/evaluation uses current host permission, Engineering and Goal lease admission. dryRun sends no frame. |
 | 245 | `git_worktree_spawn` | WRITE | default | dependency_gated | deterministic_operation | Create a confined, ledger-owned Git worktree for isolated agent work with collision metadata. |
 | 246 | `git_worktree_remove` | DANGEROUS | default | dependency_gated | deterministic_operation | Remove a ledger-owned Git worktree after dry-run and standard-mode confirmation; trusted Full Bypass skips lnwjud approval. |
 | 247 | `db_inspect` | READ | default | dependency_gated | truthful_unavailable | Inspect a local database schema through a configured, read-only connection. |

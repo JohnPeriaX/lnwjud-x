@@ -36,6 +36,25 @@ describe('ProcessManager', () => {
     ]));
   });
 
+  it('delivers immediate stdin EOF to non-interactive Codex-style children without losing output', async () => {
+    const manager = new ProcessManager();
+    const started = await manager.start({
+      executable: process.execPath,
+      args: ['-e', "process.stdin.resume(); process.stdin.on('end', () => process.stdout.write('stdin-eof-marker'))"],
+      cwd: process.cwd(),
+      stdinMode: 'ignore',
+      timeoutMs: 3000,
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    await waitForState(manager, started.value.processId, 'exited');
+    expect(manager.logs(started.value.processId, {})).toMatchObject({
+      ok: true,
+      value: { entries: [expect.objectContaining({ text: 'stdin-eof-marker' })] },
+    });
+  });
+
   it('exposes a native PID only while the owned child is active for resource sampling', async () => {
     const manager = new ProcessManager();
     const started = await manager.start({ executable: process.execPath,

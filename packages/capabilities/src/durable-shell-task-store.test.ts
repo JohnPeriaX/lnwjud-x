@@ -378,7 +378,9 @@ describe('durable shell background tasks', () => {
     setTimeout(() => controller.abort(), 100);
 
     const submitted = await running;
-    expect(submitted).toMatchObject({ ok: true, value: { state: 'running', task_id: expect.any(String), durable: true } });
+    // A fast host may complete the durable child before the auto response is observed.
+    // Either state must retain a durable identity and the successful terminal receipt.
+    expect(submitted).toMatchObject({ ok: true, value: { state: expect.stringMatching(/^(running|completed)$/), task_id: expect.any(String), durable: true } });
     if (!submitted.ok) return;
     const taskId = String((submitted.value as Record<string, unknown>).task_id);
 

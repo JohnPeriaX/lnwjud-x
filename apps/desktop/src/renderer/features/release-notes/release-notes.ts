@@ -21,24 +21,45 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
-    version: '5.8.4',
+    version: '5.8.5',
     categories: [
       {
         id: 'safety',
         titleKey: 'whatsNew.category.safety',
         items: [
-          { id: 'goal-lease-scope', titleKey: 'whatsNew.584.lease.title', descriptionKey: 'whatsNew.584.lease.description', badge: 'fixed', tags: ['goalLease', 'Git', 'Active Project'] },
-          { id: 'path-attach', titleKey: 'whatsNew.584.attach.title', descriptionKey: 'whatsNew.584.attach.description', badge: 'new', tags: ['absolute path', 'Active Project', 'Full Access'] },
-          { id: 'denial-guidance', titleKey: 'whatsNew.584.denial.title', descriptionKey: 'whatsNew.584.denial.description', badge: 'fixed', tags: ['permission', 'retry', 'MCP'] },
+          { id: 'goal-lease-scope', titleKey: 'whatsNew.585.lease.title', descriptionKey: 'whatsNew.585.lease.description', badge: 'fixed', tags: ['goalLease', 'Git', 'Active Project'] },
+          { id: 'path-attach', titleKey: 'whatsNew.585.attach.title', descriptionKey: 'whatsNew.585.attach.description', badge: 'new', tags: ['absolute path', 'Active Project', 'Full Access'] },
+          { id: 'denial-guidance', titleKey: 'whatsNew.585.denial.title', descriptionKey: 'whatsNew.585.denial.description', badge: 'fixed', tags: ['permission', 'retry', 'MCP'] },
         ],
       },
       {
         id: 'experience',
         titleKey: 'whatsNew.category.experience',
         items: [
-          { id: 'tree-path-consistency', titleKey: 'whatsNew.584.tree.title', descriptionKey: 'whatsNew.584.tree.description', badge: 'fixed', tags: ['workspace_tree', 'absolute path'] },
-          { id: 'git-any-folder', titleKey: 'whatsNew.584.gitpath.title', descriptionKey: 'whatsNew.584.gitpath.description', badge: 'improved', tags: ['Git', 'cwd', 'git_status'] },
-          { id: 'get-file-info', titleKey: 'whatsNew.584.fileinfo.title', descriptionKey: 'whatsNew.584.fileinfo.description', badge: 'new', tags: ['get_file_info', 'metadata'] },
+          { id: 'tree-path-consistency', titleKey: 'whatsNew.585.tree.title', descriptionKey: 'whatsNew.585.tree.description', badge: 'fixed', tags: ['workspace_tree', 'absolute path'] },
+          { id: 'git-any-folder', titleKey: 'whatsNew.585.gitpath.title', descriptionKey: 'whatsNew.585.gitpath.description', badge: 'improved', tags: ['Git', 'cwd', 'git_status'] },
+          { id: 'get-file-info', titleKey: 'whatsNew.585.fileinfo.title', descriptionKey: 'whatsNew.585.fileinfo.description', badge: 'new', tags: ['get_file_info', 'metadata'] },
+        ],
+      },
+    ],
+  },
+  {
+    version: '5.8.4',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'durable-shell-ownership', titleKey: 'whatsNew.584.shell.title', descriptionKey: 'whatsNew.584.shell.description', badge: 'fixed', tags: ['Shell', 'HTTP', 'task result', 'ownership'] },
+          { id: 'checked-workflows', titleKey: 'whatsNew.584.workflow.title', descriptionKey: 'whatsNew.584.workflow.description', badge: 'improved', tags: ['Workflows', 'Goal lease', 'permission', 'recovery'] },
+        ],
+      },
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'agent-swarm-stdin', titleKey: 'whatsNew.584.swarm.title', descriptionKey: 'whatsNew.584.swarm.description', badge: 'fixed', tags: ['Agent Swarm', 'Codex', 'stdin', 'results'] },
+          { id: 'tool-provider-readiness', titleKey: 'whatsNew.584.tools.title', descriptionKey: 'whatsNew.584.tools.description', badge: 'improved', tags: ['Tools', 'Doctor', 'providers', 'availability'] },
         ],
       },
     ],

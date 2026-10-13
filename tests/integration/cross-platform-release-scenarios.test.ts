@@ -184,7 +184,10 @@ const nativeCiScenarios: readonly Scenario[] = [
     expect(workflow).toContain('desktop-test-shards:');
     expect(workflow).toContain('--shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}');
     expect(workflow).toContain("--filter '@lnwjud/cli...' build");
-    expect(workflow).not.toContain("if: matrix.name != 'Windows'");
+    // OS-specific dependency setup is allowed, but the native acceptance suite itself must run on every OS.
+    const nativeSuiteStep = workflow.split('      - name: Run complete native unit and service acceptance suites')[1]?.split('\n      - name:')[0];
+    expect(nativeSuiteStep).toBeDefined();
+    expect(nativeSuiteStep ?? '').not.toMatch(/(?:^|\n)\s+if:/);
   }],
   ['098 packaged Electron E2E exercises a real MCP client', () => expectWorkflowContains('desktop-mcp-client.e2e.ts')],
   ['099 native macOS host protocol runs Swift tests', () => expectWorkflowContains('swift test --package-path native/macos-host')],

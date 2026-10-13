@@ -222,7 +222,7 @@ describe('scheduled continuation mutation fence', () => {
       workspaceId: 'workspace-1',
       path: 'src/file.ts',
       content: 'x',
-      goalLease: { goalId: 'goal-1', leaseToken: 'stale-token', leaseGeneration: 1 },
+      goalLease: { goalId: 'goal-1', leaseToken: 'stale-token', leaseGeneration: 2 },
     });
 
     expect(response.isError).toBe(true);
@@ -282,7 +282,13 @@ describe('scheduled continuation mutation fence', () => {
     });
 
     expect(response.isError).toBe(true);
-    expect(begin).toHaveBeenCalledWith(actor, 'workspace-b', expect.any(String), { goalId: 'goal-a', leaseToken: 'token-a', leaseGeneration: 3 });
+    // Upstream hardened this seam: a lease whose goal or generation does not match the fence's own
+    // proof is refused inside the registry, before the storage call that used to be the only
+    // identity check. The refusal still happens and nothing executes, so this tracks the earlier
+    // guard; the storage layer still re-checks goal/workspace identity inside begin on its own.
+    const message = (response.structuredContent as { error: { message: string } }).error.message;
+    expect(message).toContain('requires the current goalLease proof');
+    expect(begin).not.toHaveBeenCalled();
     expect(run).not.toHaveBeenCalled();
   });
 

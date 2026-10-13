@@ -46,7 +46,7 @@ import {
   createLocalExtensionsService,
   type ExtensionsService,
 } from '@lnwjud/extensions';
-import { OfficeDataWorkflowService, ActivityTracker, RuntimeEngineeringEvidenceVerifier, createEngineeringArtifactVerifier, createEngineeringSourceStateProvider, RuntimeGoalManagedTaskStateReader, SharedActivitySnapshotLease, composeActivitySinks, createFileActivitySink, currentSharedActivityOwner, mcpActivityLogPath, type ActivitySink, type ActivitySinkEvent, type ExternalProjectAttachRequest, type McpApplicationServices, type WorkspaceScope } from '@lnwjud/mcp-server';
+import { DapSessionService, OfficeDataWorkflowService, ActivityTracker, RuntimeEngineeringEvidenceVerifier, createEngineeringArtifactVerifier, createEngineeringSourceStateProvider, RuntimeGoalManagedTaskStateReader, SharedActivitySnapshotLease, composeActivitySinks, createFileActivitySink, currentSharedActivityOwner, mcpActivityLogPath, type ActivitySink, type ActivitySinkEvent, type ExternalProjectAttachRequest, type McpApplicationServices, type WorkspaceScope } from '@lnwjud/mcp-server';
 import { permissionProfiles, type PermissionProfile, type PermissionProfileName } from '@lnwjud/permissions';
 import {
   AesGcmCheckpointCipher,
@@ -307,6 +307,7 @@ export function createStdioMcpRuntime(
       });
     },
   });
+  const debugSessions = new DapSessionService();
   const services: McpApplicationServices = {
     platform: process.platform,
     runtimeStatePath: path.join(dataPath, 'upgrade-runtime.json'),
@@ -318,6 +319,7 @@ export function createStdioMcpRuntime(
       lspCommands: parseStringRecordSetting(settingsRepository.get(USER_SETTING_KEYS.lspCommands)),
     }),
     capabilities: capabilityRuntime.service,
+    debugSessions,
     extensions,
     workspaceInfo: new WorkspaceInfoService(workspaceRepository, workspaceService, effectiveUnrestricted),
     workspaceQuery,
@@ -376,6 +378,7 @@ export function createStdioMcpRuntime(
     engineeringHarnessSettingsProvider: () => parseEngineeringHarnessSettings(settingsRepository.get(USER_SETTING_KEYS.engineeringHarnessSettings)),
     toolAvailabilityService,
     close: async (): Promise<void> => {
+      debugSessions.close();
       stopToolAvailabilityWatch();
       await (await sharedActivityLease)?.close();
       await extensions.close().catch(() => undefined);

@@ -22,27 +22,27 @@
 </p>
 
 <h2 align="center">Download lnwjud</h2>
-<p align="center">Choose your platform and download the current v5.8.3 release directly.</p>
+<p align="center">Choose your platform and download the current v5.8.4 release directly.</p>
 
 <table align="center">
   <tr>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Setup-5.8.3.exe">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Setup-5.8.4.exe">
         <img src="assets/download/download-windows.svg" width="300" alt="Download lnwjud for Windows" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Portable-5.8.3.exe">Portable x64</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Portable-5.8.4.exe">Portable x64</a></sub>
     </td>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.3-arm64.dmg">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.4-arm64.dmg">
         <img src="assets/download/download-macos.svg" width="300" alt="Download lnwjud for macOS" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.3-x64.dmg">Intel x64 DMG</a> · <a href="docs/INSTALL_MACOS.md">Install guide</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.4-x64.dmg">Intel x64 DMG</a> · <a href="docs/INSTALL_MACOS.md">Install guide</a></sub>
     </td>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.3-x64.deb">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.4-x64.deb">
         <img src="assets/download/download-linux.svg" width="300" alt="Download lnwjud for Linux" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.3-x64.AppImage">x64 AppImage</a> · <a href="docs/INSTALL_LINUX.md">Other architectures</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.4-x64.AppImage">x64 AppImage</a> · <a href="docs/INSTALL_LINUX.md">Other architectures</a></sub>
     </td>
   </tr>
 </table>
@@ -51,16 +51,17 @@
 
 ---
 
-## Current published version: v5.8.3
+## Current published version: v5.8.4
 
-## Current source version: v5.8.4
+## Current source version: v5.8.5
 
-### Current source changes in v5.8.4
+### What's new in v5.8.4
 
-- **Cross-project work while a durable goal runs:** a `goalLease` belonging to another project no longer blocks ordinary Git and file mutations in a workspace that carries no rolling goal, while per-workspace ownership checks remain required and fail closed when fence state cannot be read.
-- **Absolute paths attach their own project:** an absolute folder path outside every Active Project is registered as a project scope by the host bridge, silently on the Full profile and after one confirmation per folder on stricter profiles, without moving the primary project.
-- **Consistent absolute-path reads:** `workspace_tree` honours the same host explicit-absolute-read grant as the file read path instead of refusing targets it already accepted.
-- **Fork stays upstream-mergeable:** an upstream divergence registry with marker guard tests, plus `upstream:plan`/`upstream:merge` tooling that classifies a merge into fork-critical, needs-review and mechanical version noise and can simulate it before touching history.
+- **Durable MCP Shell results (Issue #193):** Preserve exact client/session/workspace ownership when a modern HTTP request or legacy MCP transport is replaced. Authorized owners can retrieve retained task status, stdout/stderr and terminal receipts; foreign owners remain denied.
+- **Checked workflows and recovery:** Execute reviewed recipe steps only when requested, evaluate each step under current permissions and Goal leases, and distinguish unavailable provider evidence from completed work. Workspace indexing and context reporting retain explicit error/completeness states.
+- **Agent Swarm:** Fix non-interactive Codex CLI waiting for extra stdin and keep monitoring spawned agents after a start request ends. Verified with real local child-process fixtures; hosted Codex results still depend on account quota and provider availability.
+- **Tool and native provider contracts:** Synchronize all 285 declared MCP tools (273 default), improve truthful Doctor readiness and native media lifecycle boundaries. macOS/Linux capabilities remain subject to platform permissions and target-native verification.
+- **ภาษาไทย:** แก้การอ่านผล Shell หลัง reconnect ตามสิทธิ์เจ้าของ ตรวจ Goal Lease ระหว่างรัน Workflow และแก้ Agent Swarm รอ stdin โดยไม่อ้างว่าบริการหรือฟีเจอร์ทุกแพลตฟอร์มพร้อมใช้เมื่อยังขาดสิทธิ์หรือ Provider
 
 ### What's new in v5.8.3
 
@@ -76,14 +77,6 @@
 - **macOS updater:** Prevent the IPC shutdown that previously occurred before Squirrel.Mac completed native package verification. Existing ad-hoc-signed installs cannot update safely in place; download and replace the app manually. Developer ID signing is needed for future seamless automatic updates.
 - **Linux AppImage:** Keep a local rollback link to the old AppImage and restore it if the native installer fails after deleting the previous path. DEB updates remain managed by the system package manager.
 - **What’s New:** Includes bilingual v5.8.2 notes above the v5.8.1 and v5.8.0 history.
-
-### What's new in v5.8.1
-
-- **Dropdown overlay fix:** Opening Workspace, Session, and other shared dropdowns no longer changes page padding, compresses scrollable Work Log tables, or auto-scrolls the underlying content. Menus remain anchored below their fields with bounded internal scrolling.
-- **What's New history:** The in-app modal now shows all installed-or-earlier patches in the active series, newest first (5.8.x, then 5.9.x after upgrading, with 6.x.x grouped by major), each with its own heading and a scrollable list.
-- **Tunnel Live Logs:** Hide ineffective Workspace and Session filters and their scoped-clear actions from the Tunnel tab only; keep search, pause, clear tab and export. MCP activity and Processes retain their functional filters.
-
-**ภาษาไทย:** แก้ dropdown ไม่บีบตาราง Work Log หรือเลื่อนหน้าเอง; What's New รวมประวัติของชุดเวอร์ชันปัจจุบัน เรียงใหม่ก่อนและเลื่อนอ่านได้; Live Logs แท็บ Tunnel เอา Workspace/Session Filter ที่ไม่สามารถกรองได้จริงออก โดยยังคงฟิลเตอร์ของ MCP activity และ Processes ตามเดิม
 
 ### Earlier release highlights — v5.8.0
 
@@ -107,7 +100,7 @@
 
 **ภาษาไทย — ต่างจาก 5.7.4:** เพิ่มเทมเพลต 6 แบบ, ประวัติ MCP และผลงาน Goal ที่มีหลักฐาน, RAM/CPU จริงของโปรเซสที่ตรวจเจ้าของได้, Context Economy แบบรวมระดับ Transport, ตรวจ CSV/XLSX, Git tree/preview ที่ครบขึ้น, UI และ dropdown กลาง, กากบาท Modal ขนาดชัดเจน, Work Log ที่กรองง่ายขึ้น, แก้ Tunnel reconnect ก่อนพร้อม และอัปเดต tunnel-client 0.0.16 พร้อมการทดสอบ/แพ็กเกจตาม SHA จริง ค่าไม่ทราบจะไม่แสดงเป็น 0 หรืออ้างว่าสำเร็จโดยไม่มีข้อมูล
 
-Latest published release: **v5.8.3**. The download buttons above point directly to the verified v5.8.3 assets. The release was published after the exact tagged main commit passed the target-native release gates.
+Latest published release: **v5.8.4**. The download buttons above point directly to the verified v5.8.4 assets. The release was published after the exact tagged main commit passed the target-native release gates.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for previous releases and the complete release history.
 
