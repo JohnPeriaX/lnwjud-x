@@ -322,11 +322,13 @@ test('Git page supports real vertical page scrolling plus X/Y diff scrolling', a
 
     const fileList = page.locator('.git-file-list');
     await page.setViewportSize({ width: 900, height: 650 });
-    const fileListMetrics = await fileList.evaluate((element) => ({
-      scrollHeight: element.scrollHeight,
-      clientHeight: element.clientHeight,
-    }));
-    expect(fileListMetrics.scrollHeight).toBeGreaterThan(fileListMetrics.clientHeight);
+    // The scrollable overflow only exists after the viewport change has reflowed the panel. Before
+    // the resize the list is fully visible (measured scrollHeight === clientHeight === 432), so
+    // waiting for this condition cannot pass vacuously; sampling layout once raced the reflow and
+    // intermittently observed the pre-resize geometry under whole-suite load.
+    await expect
+      .poll(() => fileList.evaluate((element) => element.scrollHeight - element.clientHeight), { timeout: 10_000 })
+      .toBeGreaterThan(0);
     const fileListScrollTop = await fileList.evaluate((element) => {
       element.scrollTop = 120;
       return element.scrollTop;

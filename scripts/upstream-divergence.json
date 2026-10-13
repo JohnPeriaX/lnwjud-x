@@ -130,6 +130,14 @@
         { "file": "packages/mcp-server/src/mcp-http.integration.test.ts", "contains": "expect(created).toBeGreaterThanOrEqual(requests);" }
       ],
       "proofTests": ["packages/mcp-server/src/mcp-http.integration.test.ts"]
+    },
+    {
+      "id": "dashboard-reflow-wait",
+      "summary": "The dashboard e2e waits for the post-resize reflow before asserting the file list overflows, instead of sampling layout exactly once. Upstream's single sample intermittently read the pre-resize geometry (measured 432/432, which is deliberately non-overflowing) under whole-suite load and failed the release gate on an unrelated merge.",
+      "markers": [
+        { "file": "apps/desktop/e2e/desktop-dashboard.e2e.ts", "contains": "element.scrollHeight - element.clientHeight" }
+      ],
+      "proofTests": ["apps/desktop/e2e/desktop-dashboard.e2e.ts"]
     }
   ]
 }
