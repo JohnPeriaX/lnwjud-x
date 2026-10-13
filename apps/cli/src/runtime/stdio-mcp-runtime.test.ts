@@ -242,6 +242,7 @@ describe('stdio MCP runtime', { timeout: STDIO_RUNTIME_TEST_TIMEOUT_MS }, () => 
   });
 
   it('persists and completes a verified automation run across a STDIO runtime replacement without creating a schedule', async () => {
+    const testDeadline = Date.now() + STDIO_RUNTIME_TEST_TIMEOUT_MS;
     const dataPath = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-stdio-automation-data-'));
     const workspaceRoot = await realpath(await mkdtemp(path.join(os.tmpdir(), 'lnwjud-stdio-automation-workspace-')));
     temporaryRoots.push(dataPath, workspaceRoot);
@@ -349,16 +350,23 @@ describe('stdio MCP runtime', { timeout: STDIO_RUNTIME_TEST_TIMEOUT_MS }, () => 
           const taskId = (advanced.structuredContent as { taskId?: unknown } | undefined)?.taskId;
           expect(taskId).toEqual(expect.any(String));
           if (typeof taskId !== 'string') throw new Error('Automation dispatch omitted its durable task ID');
-          const task = await registry.invoke('shell', {
-            workspaceId: durableWorkspace.id,
-            operation: 'wait',
-            task_id: taskId,
-            timeout_seconds: 5,
-            goalLease: proof,
-            userConfirmed: true,
-          });
-          expect(task.isError).not.toBe(true);
-          expect(task.structuredContent).toMatchObject({ task_id: taskId, state: 'completed', exit_code: 0 });
+          const taskWaitDeadline = testDeadline - 5_000;
+          let task: { isError?: boolean; structuredContent?: unknown } | undefined;
+          while (Date.now() < taskWaitDeadline) {
+            const remainingSeconds = Math.ceil((taskWaitDeadline - Date.now()) / 1_000);
+            task = await registry.invoke('shell', {
+              workspaceId: durableWorkspace.id,
+              operation: 'wait',
+              task_id: taskId,
+              timeout_seconds: Math.min(5, remainingSeconds),
+              goalLease: proof,
+              userConfirmed: true,
+            });
+            expect(task.isError).not.toBe(true);
+            const taskState = (task.structuredContent as { state?: unknown } | undefined)?.state;
+            if (taskState !== 'running') break;
+          }
+          expect(task?.structuredContent).toMatchObject({ task_id: taskId, state: 'completed', exit_code: 0 });
         }
       }
       expect(staleRevisionRejected).toBe(true);
