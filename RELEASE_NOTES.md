@@ -32,8 +32,12 @@ Release highlights are listed newest first. The [README](README.md) shows the th
 ### What's new in v5.8.3
 
 - **Ponytail ULTRA scope clarity (Issue #190):** When the bundled skill was loaded with `goalId`, code edits without `goalLease` report the missing context and give actionable alternatives; unbound edits do not inherit goal-scoped authorization. Regression coverage includes the safe impossible-match `edit_file` probe and sequential `tool_batch`.
-- **Doctor and Workflows:** Improve diagnostics, evidence copying, Goal task visibility and safe file-derived input choices; clarify the Code Review Git baseline.
+- **Doctor history, Results, and Resources:** Present MCP history, Goal Results, and Resource data in readable tables with complete JSON copy actions. Use Gregorian DD/MM/YYYY dates, Asia/Bangkok (UTC+07:00), and a 24-hour clock. Copy ISO evidence timestamps with the Bangkok offset while preserving the instant.
+- **Resource diagnostics and cancellation:** Show all tracked Goal tasks, including tasks without CPU or RAM samples. Keep unavailable measurements unknown instead of zero. Show cancellation only for verified, owned, running blocking jobs and require native authorization.
+- **Guided Workflows:** Derive Sheet and column choices from the selected workspace-bound XLSX or CSV file, Git branches, and package version. Write explicit mapping generation to a new JSON file and append reports below existing template rows. Keep manual fields and unsupported files visible in Advanced mode.
+- **Code Review workflow:** Default `baseRef` to `HEAD` and explain Git branch and commit comparison choices.
 - **Release reliability:** Honor version-specific development-preview README highlights when generating release notes so a verified build is not blocked by its preview heading.
+- **ภาษาไทย:** ทุกหน้าจอแสดงปี ค.ศ. เขตเวลา Asia/Bangkok และเวลา 24 ชั่วโมง รวมทั้ง JSON ที่คัดลอกเป็น timestamp +07:00; ฐานเปรียบเทียบรีวิวโค้ดมีคำอธิบายและค่าเริ่มต้น HEAD
 
 ### What's new in v5.8.2
 
