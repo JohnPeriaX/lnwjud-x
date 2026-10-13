@@ -1,9 +1,13 @@
+import { watch, type FSWatcher } from 'node:fs';
+import { EventEmitter } from 'node:events';
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { Workspace, WorkspaceRepository } from '@lnwjud/workspace';
 import { JsonWorkspaceIndexStore, WorkspaceIndexService, type WorkspaceIndexSnapshot, type WorkspaceIndexStore, type WorkspaceIndexMutation } from './workspace-index.js';
+
+vi.mock('node:fs', { spy: true });
 
 function fixtureRepository(workspace: Workspace): WorkspaceRepository {
   return {
@@ -177,12 +181,18 @@ describe('WorkspaceIndexService', () => {
         if (rejectCommits) throw new Error('Fixture failed commit');
     });
     const service = new WorkspaceIndexService(fixtureRepository(workspace), store);
+    let notify: ((event: 'change' | 'rename', filename: string | null) => void) | undefined;
+    const watcher = new EventEmitter() as FSWatcher;
+    watcher.close = (): void => { watcher.emit('close'); };
+    vi.mocked(watch).mockImplementation((_root, _options, callback) => { notify = callback; return watcher; });
     try {
       await writeFile(path.join(root, 'a.ts'), 'export const original = 1;');
       expect((await service.indexWorkspace(workspace.id)).ok).toBe(true);
       expect((await service.startWatch(workspace.id, { debounceMs: 0 })).ok).toBe(true);
       rejectCommits = true;
       await writeFile(path.join(root, 'a.ts'), 'export const updated = 2;');
+      expect(notify).toBeDefined();
+      notify?.('change', 'a.ts');
       await vi.waitFor(async () => {
         const status = await service.status(workspace.id);
         expect(status).toMatchObject({ ok: true, value: { freshness: 'watching_degraded', watcher: { completedEvents: 0, failedEvents: expect.any(Number) } } });
@@ -200,6 +210,7 @@ describe('WorkspaceIndexService', () => {
     } finally {
       rejectCommits = false;
       await service.close();
+      vi.mocked(watch).mockReset();
       await rm(root, { recursive: true, force: true });
     }
   });

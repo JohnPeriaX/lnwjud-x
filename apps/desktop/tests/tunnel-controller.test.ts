@@ -1042,8 +1042,8 @@ describe('TunnelController lifecycle', () => {
   });
 
   it.runIf(process.platform === 'win32')('uses the injected Windows graceful-stop bound and retains ownership when no child exit is observed', async () => {
-    vi.useFakeTimers();
     const fixture = await ownedController(() => true, 20);
+    vi.useFakeTimers();
     let stoppedWith: unknown;
     const stopping = fixture.controller.stop().catch((error: unknown) => { stoppedWith = error; });
 
