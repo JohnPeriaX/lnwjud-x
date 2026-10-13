@@ -15,7 +15,7 @@ import {
 import type { FileActor } from '@lnwjud/application';
 import { capabilityDescriptors, EventLogCapabilityBackend, type CapabilityDescriptor } from '@lnwjud/capabilities';
 import { createProcessTreeTerminator } from '@lnwjud/process';
-import { normalizeProjectProfile } from '@lnwjud/shared';
+import { APP_VERSION, normalizeProjectProfile } from '@lnwjud/shared';
 import { hostPathApi, isAbsoluteHostPath, normalizeHostPath } from '@lnwjud/workspace';
 import type { McpApplicationServices, McpInternalInvocationContext } from './tools/tool-types.js';
 import type { McpRegistryRuntimePort } from './registry-runtime-port.js';
@@ -237,6 +237,39 @@ const ENGINEERING_PRIMITIVE_SCHEMAS: Readonly<Record<string, Record<string, unkn
     additionalProperties: false,
   },
 };
+
+type ToolInputSchemaDiagnostic =
+  | {
+      readonly status: 'unavailable';
+      readonly toolName: string;
+      readonly schemaSource: 'lnwjud_tool_registry';
+      readonly publicationTarget: 'mcp.tools/list.inputSchema';
+      readonly reason: string;
+      readonly connectorSchema: { readonly status: 'unavailable'; readonly digest: null };
+    }
+  | {
+      readonly status: 'available';
+      readonly appVersion: string;
+      readonly toolName: string;
+      readonly schemaSource: 'lnwjud_tool_registry';
+      readonly publicationTarget: 'mcp.tools/list.inputSchema';
+      readonly digestAlgorithm: 'SHA-256';
+      readonly digestFormatVersion: 1;
+      readonly inputMode: 'sdk_input';
+      readonly transport: null;
+      readonly protocolVersion: null;
+      readonly inputSchemaSha256: string;
+      readonly observedAt: string;
+      readonly fieldPresence: {
+        readonly engineeringGateUpdates: boolean;
+        readonly engineeringReviewFindings: boolean;
+      };
+      readonly connectorSchema: {
+        readonly status: 'unavailable';
+        readonly digest: null;
+        readonly reason: string;
+      };
+    };
 
 export class UpgradeRuntimeService {
   private readonly contextEngine: ContextEngine;
@@ -721,7 +754,20 @@ export class UpgradeRuntimeService {
 
   private describeTool(name: string | undefined): unknown {
     const entry = SEARCH_CATALOG.find((candidate) => candidate.name === name && this.isToolExposed(candidate.name));
-    if (entry === undefined) return { found: false, name: name ?? null };
+    if (entry === undefined) {
+      if (name === undefined || !this.isToolExposed(name)) return { found: false, name: name ?? null };
+      const registrySchema = this.registryRuntime?.describeInputJsonSchema?.(name);
+      if (registrySchema === undefined) return { found: false, name };
+      return {
+        found: true,
+        name,
+        schema: registrySchema,
+        inputSchema: registrySchema,
+        schemaDiagnostic: this.describeInputSchemaDiagnostic(name),
+        contractSource: 'tool-registry',
+        authorizationUnchanged: true,
+      };
+    }
     const upgradeEntry = UPGRADE_TOOL_CATALOG.find((candidate) => candidate.name === entry.name);
     if (upgradeEntry === undefined) {
       const explicitSchema = ENGINEERING_PRIMITIVE_SCHEMAS[entry.name];
@@ -730,6 +776,7 @@ export class UpgradeRuntimeService {
         ...entry,
         schema: explicitSchema ?? { type: 'object', additionalProperties: true },
         ...(explicitSchema === undefined ? {} : { inputSchema: explicitSchema }),
+        schemaDiagnostic: this.describeInputSchemaDiagnostic(entry.name),
         contractSource: 'primitive-registry',
         authorizationUnchanged: true,
       };
@@ -741,11 +788,63 @@ export class UpgradeRuntimeService {
       schema: inputSchema,
       inputSchema,
       outputSchema: upgradeToolOutputJsonSchema(),
+      schemaDiagnostic: this.describeInputSchemaDiagnostic(entry.name),
       annotations: upgradeToolAnnotations(upgradeEntry),
       execution: upgradeToolExecution(upgradeEntry),
       contractSource: 'upgrade-tool-contracts',
       authorizationUnchanged: true,
     };
+  }
+
+  private describeInputSchemaDiagnostic(toolName: string): ToolInputSchemaDiagnostic {
+    const inputSchema = this.registryRuntime?.describeInputJsonSchema?.(toolName);
+    if (inputSchema === undefined) {
+      return {
+        status: 'unavailable',
+        toolName,
+        schemaSource: 'lnwjud_tool_registry',
+        publicationTarget: 'mcp.tools/list.inputSchema',
+        reason: 'The current ToolRegistry input schema is unavailable.',
+        connectorSchema: { status: 'unavailable', digest: null },
+      };
+    }
+
+    const properties = isRecord(inputSchema.properties) ? inputSchema.properties : {};
+    return {
+      status: 'available',
+      appVersion: APP_VERSION,
+      toolName,
+      schemaSource: 'lnwjud_tool_registry',
+      publicationTarget: 'mcp.tools/list.inputSchema',
+      digestAlgorithm: 'SHA-256',
+      digestFormatVersion: 1,
+      inputMode: 'sdk_input',
+      transport: null,
+      protocolVersion: null,
+      inputSchemaSha256: createHash('sha256').update(this.canonicalSchemaJson(inputSchema), 'utf8').digest('hex'),
+      observedAt: new Date().toISOString(),
+      fieldPresence: {
+        engineeringGateUpdates: Object.prototype.hasOwnProperty.call(properties, 'engineeringGateUpdates'),
+        engineeringReviewFindings: Object.prototype.hasOwnProperty.call(properties, 'engineeringReviewFindings'),
+      },
+      connectorSchema: {
+        status: 'unavailable',
+        digest: null,
+        reason: 'The MCP server cannot observe a schema imported by a remote connector.',
+      },
+    };
+  }
+
+  private canonicalSchemaJson(value: unknown): string {
+    if (Array.isArray(value)) return `[${value.map((item) => this.canonicalSchemaJson(item)).join(',')}]`;
+    if (typeof value !== 'object' || value === null) {
+      const serialized = JSON.stringify(value);
+      if (serialized === undefined) throw new Error('MCP input schema contains a non-JSON value');
+      return serialized;
+    }
+    const record = value as Record<string, unknown>;
+    const entries = Object.keys(record).filter((key) => record[key] !== undefined).sort();
+    return `{${entries.map((key) => `${JSON.stringify(key)}:${this.canonicalSchemaJson(record[key])}`).join(',')}}`;
   }
 
   private categories(): { readonly categories: readonly { readonly category: string; readonly tools: number }[] } {

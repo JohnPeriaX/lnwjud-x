@@ -283,6 +283,7 @@ export class ToolRegistry {
           return tool === undefined ? err(appError('INVALID_INPUT', 'Unknown MCP tool')) : tool.parse(input);
         },
         invoke: (name, input, signal, envelope) => this.invoke(name, this.withCheckedEnvelope(name, input, envelope), undefined, signal),
+        describeInputJsonSchema: (name) => this.describeInputJsonSchema(name),
       },
       isToolExposed: (name) => this.isEffectivelyExposed(name),
       setPonytailSessionSuppressed: (workspaceId, goalId, suppressed) => this.setPonytailSessionSuppressed(workspaceId, goalId, suppressed),
@@ -352,7 +353,7 @@ export class ToolRegistry {
     const inputSchema = this.schemaRegistry.describe(name)?.inputSchema;
     if (!(inputSchema instanceof z.ZodType)) return undefined;
     try {
-      const jsonSchema = z.toJSONSchema(inputSchema);
+      const jsonSchema = z.toJSONSchema(inputSchema, { io: 'input', target: 'draft-2020-12' });
       return typeof jsonSchema === 'object' && jsonSchema !== null && !Array.isArray(jsonSchema)
         ? jsonSchema as Record<string, unknown>
         : undefined;
