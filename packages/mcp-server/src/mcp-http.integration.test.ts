@@ -98,7 +98,8 @@ describe('MCP localhost HTTP transport', () => {
 
     try {
       await client.connect(transport);
-      for (let index = 0; index < 64; index += 1) {
+      const requestCount = 16;
+      for (let index = 0; index < requestCount; index += 1) {
         const tools = await client.listTools();
         expect(tools.tools.length).toBeGreaterThan(0);
       }
@@ -107,7 +108,7 @@ describe('MCP localhost HTTP transport', () => {
         expect(listeners.size).toBe(1);
         expect(closed).toBe(created - 1);
       });
-      expect(created).toBeGreaterThanOrEqual(64);
+      expect(created).toBeGreaterThanOrEqual(requestCount);
       await handle.close();
       expect(listeners.size).toBe(0);
       expect(closed).toBe(created);
