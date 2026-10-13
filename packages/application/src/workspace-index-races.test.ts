@@ -91,6 +91,10 @@ describe('workspace index races', () => {
   it('preserves an existing watcher when a replacement is cancelled during lookup', async () => {
     const setup = await fixture();
     const service = new WorkspaceIndexService(setup.repository, setup.store);
+    const watcher = new EventEmitter() as FSWatcher;
+    const closeWatcher = vi.fn((): void => { watcher.emit('close'); });
+    watcher.close = closeWatcher;
+    vi.mocked(watch).mockImplementation(() => watcher);
     const entered = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
     const controller = new AbortController();
@@ -102,7 +106,7 @@ describe('workspace index races', () => {
     };
     try {
       await writeFile(path.join(setup.root, 'a.ts'), 'export const original = 1;');
-      expect((await service.startWatch(setup.workspace.id)).ok).toBe(true);
+      expect(await service.startWatch(setup.workspace.id)).toMatchObject({ ok: true, value: { freshness: 'watching_clean' } });
       hold = true;
       const replacing = service.startWatch(setup.workspace.id, { signal: controller.signal });
       await entered.promise;
@@ -113,9 +117,12 @@ describe('workspace index races', () => {
       const status = await service.status(setup.workspace.id);
       expect(status.ok && status.value.watcher).not.toBeNull();
       expect(status.ok && status.value.freshness).toBe('watching_clean');
+      expect(watch).toHaveBeenCalledTimes(1);
+      expect(closeWatcher).not.toHaveBeenCalled();
     } finally {
       release.resolve();
       await service.close();
+      vi.mocked(watch).mockReset();
       await rm(setup.directory, { recursive: true, force: true });
     }
   });
