@@ -21,6 +21,27 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.4',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'durable-shell-ownership', titleKey: 'whatsNew.584.shell.title', descriptionKey: 'whatsNew.584.shell.description', badge: 'fixed', tags: ['Shell', 'HTTP', 'task result', 'ownership'] },
+          { id: 'checked-workflows', titleKey: 'whatsNew.584.workflow.title', descriptionKey: 'whatsNew.584.workflow.description', badge: 'improved', tags: ['Workflows', 'Goal lease', 'permission', 'recovery'] },
+        ],
+      },
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'agent-swarm-stdin', titleKey: 'whatsNew.584.swarm.title', descriptionKey: 'whatsNew.584.swarm.description', badge: 'fixed', tags: ['Agent Swarm', 'Codex', 'stdin', 'results'] },
+          { id: 'tool-provider-readiness', titleKey: 'whatsNew.584.tools.title', descriptionKey: 'whatsNew.584.tools.description', badge: 'improved', tags: ['Tools', 'Doctor', 'providers', 'availability'] },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.8.3',
     categories: [{
       id: 'experience',

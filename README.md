@@ -53,7 +53,15 @@
 
 ## Current published version: v5.8.3
 
-## Current source version: v5.8.3
+## Current source version: v5.8.4
+
+### What's new in v5.8.4
+
+- **Durable MCP Shell results (Issue #193):** Preserve exact client/session/workspace ownership when a modern HTTP request or legacy MCP transport is replaced. Authorized owners can retrieve retained task status, stdout/stderr and terminal receipts; foreign owners remain denied.
+- **Checked workflows and recovery:** Execute reviewed recipe steps only when requested, evaluate each step under current permissions and Goal leases, and distinguish unavailable provider evidence from completed work. Workspace indexing and context reporting retain explicit error/completeness states.
+- **Agent Swarm:** Fix non-interactive Codex CLI waiting for extra stdin and keep monitoring spawned agents after a start request ends. Verified with real local child-process fixtures; hosted Codex results still depend on account quota and provider availability.
+- **Tool and native provider contracts:** Synchronize all 285 declared MCP tools (273 default), improve truthful Doctor readiness and native media lifecycle boundaries. macOS/Linux capabilities remain subject to platform permissions and target-native verification.
+- **ภาษาไทย:** แก้การอ่านผล Shell หลัง reconnect ตามสิทธิ์เจ้าของ ตรวจ Goal Lease ระหว่างรัน Workflow และแก้ Agent Swarm รอ stdin โดยไม่อ้างว่าบริการหรือฟีเจอร์ทุกแพลตฟอร์มพร้อมใช้เมื่อยังขาดสิทธิ์หรือ Provider
 
 ### What's new in v5.8.3
 
@@ -69,14 +77,6 @@
 - **macOS updater:** Prevent the IPC shutdown that previously occurred before Squirrel.Mac completed native package verification. Existing ad-hoc-signed installs cannot update safely in place; download and replace the app manually. Developer ID signing is needed for future seamless automatic updates.
 - **Linux AppImage:** Keep a local rollback link to the old AppImage and restore it if the native installer fails after deleting the previous path. DEB updates remain managed by the system package manager.
 - **What’s New:** Includes bilingual v5.8.2 notes above the v5.8.1 and v5.8.0 history.
-
-### What's new in v5.8.1
-
-- **Dropdown overlay fix:** Opening Workspace, Session, and other shared dropdowns no longer changes page padding, compresses scrollable Work Log tables, or auto-scrolls the underlying content. Menus remain anchored below their fields with bounded internal scrolling.
-- **What's New history:** The in-app modal now shows all installed-or-earlier patches in the active series, newest first (5.8.x, then 5.9.x after upgrading, with 6.x.x grouped by major), each with its own heading and a scrollable list.
-- **Tunnel Live Logs:** Hide ineffective Workspace and Session filters and their scoped-clear actions from the Tunnel tab only; keep search, pause, clear tab and export. MCP activity and Processes retain their functional filters.
-
-**ภาษาไทย:** แก้ dropdown ไม่บีบตาราง Work Log หรือเลื่อนหน้าเอง; What's New รวมประวัติของชุดเวอร์ชันปัจจุบัน เรียงใหม่ก่อนและเลื่อนอ่านได้; Live Logs แท็บ Tunnel เอา Workspace/Session Filter ที่ไม่สามารถกรองได้จริงออก โดยยังคงฟิลเตอร์ของ MCP activity และ Processes ตามเดิม
 
 ### Earlier release highlights — v5.8.0
 
