@@ -144,6 +144,16 @@
         "apps/desktop/tests/release-notes.test.ts",
         "tests/release/release-notes.test.ts"
       ]
+    },
+    {
+      "id": "tunnel-lock-fixture-warmup-budget",
+      "summary": "The Windows tunnel-lock acceptance fixture reads this process's own creation timestamp once and reuses it. Probing it per call costs a PowerShell cold start plus a WMI query (measured 1.4-1.9s each), and three probes inside one test made the observable total 15.8s against the test's own 15s non-CI budget, so the release gate failed on fixture warmup rather than on lock behavior. Restoring the uncached probe re-introduces a load-dependent timeout that no assertion can catch.",
+      "markers": [
+        { "file": "apps/desktop/tests/session-resilience-acceptance.test.ts", "contains": "selfProcessStartedAt ??=" }
+      ],
+      "proofTests": [
+        "apps/desktop/tests/session-resilience-acceptance.test.ts"
+      ]
     }
   ]
 }

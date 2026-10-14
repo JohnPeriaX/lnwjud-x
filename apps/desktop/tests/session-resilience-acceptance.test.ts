@@ -24,6 +24,7 @@ const lockHelper = path.join(repositoryRoot, 'scripts', 'lib', 'lnwjud-tunnel-lo
 const tunnelStarter = path.join(repositoryRoot, 'scripts', 'start-lnwjud-tunnel.ps1');
 const temporaryRoots: string[] = [];
 const fixtureProcesses = new Set<ChildProcess>();
+let selfProcessStartedAt: string | undefined;
 
 afterEach(async () => {
   vi.useRealTimers();
@@ -397,9 +398,12 @@ async function temporaryDirectory(): Promise<string> {
 }
 
 async function currentOwner(): Promise<TunnelLockOwner> {
-  const result = await runPowerShell("$p = Get-CimInstance Win32_Process -Filter \"ProcessId = $env:LNWJUD_ACCEPTANCE_PID\"; $p.CreationDate.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [Globalization.CultureInfo]::InvariantCulture)", { LNWJUD_ACCEPTANCE_PID: String(process.pid) });
-  const startedAt = result.stdout;
-  return { pid: process.pid, processStartedAt: startedAt, acquiredAt: new Date().toISOString() };
+  // Measured on this host: one PowerShell cold start plus its WMI query costs 1.4-1.9s, and asking
+  // for this process's creation time three times in one test made the observable total 15.8s against
+  // the 15s local budget - the fixture was spending the timeout, not the lock. The value cannot
+  // change while this process lives, so probe it once and reuse it.
+  selfProcessStartedAt ??= (await runPowerShell("$p = Get-CimInstance Win32_Process -Filter \"ProcessId = $env:LNWJUD_ACCEPTANCE_PID\"; $p.CreationDate.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [Globalization.CultureInfo]::InvariantCulture)", { LNWJUD_ACCEPTANCE_PID: String(process.pid) })).stdout;
+  return { pid: process.pid, processStartedAt: selfProcessStartedAt, acquiredAt: new Date().toISOString() };
 }
 
 async function runPowerShellFile(file: string, args: readonly string[], env: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string }> {
