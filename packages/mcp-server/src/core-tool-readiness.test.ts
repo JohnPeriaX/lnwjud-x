@@ -43,11 +43,12 @@ function coreToolNames(registry: ToolRegistry): string[] {
 describe('core tool readiness', () => {
   it('tracks one representative contract for every core tool in the complete inventory', () => {
     const registry = coreRegistry();
-    expect(registry.listAll()).toHaveLength(288);
+    // 289 total = 118 core tools (117 fork + upstream's checkpoint_goal_engineering alias) + 171 upgrade catalog entries.
+    expect(registry.listAll()).toHaveLength(289);
     const advertisedUpgradeCount = UPGRADE_TOOL_CATALOG.filter((entry) => entry.deliveryState !== 'feature_disabled' && entry.deliveryState !== 'planned').length;
     expect(registry.list()).toHaveLength(coreToolNames(registry).length + advertisedUpgradeCount);
     expect(UPGRADE_TOOL_CATALOG).toHaveLength(171);
-    expect(coreToolNames(registry)).toHaveLength(117);
+    expect(coreToolNames(registry)).toHaveLength(118);
     expect(Object.keys(CORE_TOOL_SMOKE_INPUTS).sort()).toEqual(coreToolNames(registry));
   });
 
@@ -113,7 +114,7 @@ describe('core tool readiness', () => {
     expect(calls).toContain('capabilities.accessibility');
   });
 
-  it('keeps the exhaustive success matrix aligned with all 115 core tools', () => {
+  it('keeps the exhaustive success matrix aligned with all 116 core tools', () => {
     const registry = coreRegistry();
     const generic = Object.keys(CORE_TOOL_SMOKE_INPUTS).filter((name) => !STATEFUL_CORE_SUCCESS_TOOLS.has(name));
     expect([...generic, ...STATEFUL_CORE_SUCCESS_TOOLS].sort()).toEqual(coreToolNames(registry));

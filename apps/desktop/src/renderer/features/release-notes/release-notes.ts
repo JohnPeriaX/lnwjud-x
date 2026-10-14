@@ -21,24 +21,36 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
-    version: '5.8.6',
+    version: '5.8.7',
     categories: [
       {
         id: 'safety',
         titleKey: 'whatsNew.category.safety',
         items: [
-          { id: 'goal-lease-scope', titleKey: 'whatsNew.586.lease.title', descriptionKey: 'whatsNew.586.lease.description', badge: 'fixed', tags: ['goalLease', 'Git', 'Active Project'] },
-          { id: 'path-attach', titleKey: 'whatsNew.586.attach.title', descriptionKey: 'whatsNew.586.attach.description', badge: 'new', tags: ['absolute path', 'Active Project', 'Full Access'] },
-          { id: 'denial-guidance', titleKey: 'whatsNew.586.denial.title', descriptionKey: 'whatsNew.586.denial.description', badge: 'fixed', tags: ['permission', 'retry', 'MCP'] },
+          { id: 'goal-lease-scope', titleKey: 'whatsNew.587.lease.title', descriptionKey: 'whatsNew.587.lease.description', badge: 'fixed', tags: ['goalLease', 'Git', 'Active Project'] },
+          { id: 'path-attach', titleKey: 'whatsNew.587.attach.title', descriptionKey: 'whatsNew.587.attach.description', badge: 'new', tags: ['absolute path', 'Active Project', 'Full Access'] },
+          { id: 'denial-guidance', titleKey: 'whatsNew.587.denial.title', descriptionKey: 'whatsNew.587.denial.description', badge: 'fixed', tags: ['permission', 'retry', 'MCP'] },
         ],
       },
       {
         id: 'experience',
         titleKey: 'whatsNew.category.experience',
         items: [
-          { id: 'tree-path-consistency', titleKey: 'whatsNew.586.tree.title', descriptionKey: 'whatsNew.586.tree.description', badge: 'fixed', tags: ['workspace_tree', 'absolute path'] },
-          { id: 'git-any-folder', titleKey: 'whatsNew.586.gitpath.title', descriptionKey: 'whatsNew.586.gitpath.description', badge: 'improved', tags: ['Git', 'cwd', 'git_status'] },
-          { id: 'get-file-info', titleKey: 'whatsNew.586.fileinfo.title', descriptionKey: 'whatsNew.586.fileinfo.description', badge: 'new', tags: ['get_file_info', 'metadata'] },
+          { id: 'tree-path-consistency', titleKey: 'whatsNew.587.tree.title', descriptionKey: 'whatsNew.587.tree.description', badge: 'fixed', tags: ['workspace_tree', 'absolute path'] },
+          { id: 'git-any-folder', titleKey: 'whatsNew.587.gitpath.title', descriptionKey: 'whatsNew.587.gitpath.description', badge: 'improved', tags: ['Git', 'cwd', 'git_status'] },
+          { id: 'get-file-info', titleKey: 'whatsNew.587.fileinfo.title', descriptionKey: 'whatsNew.587.fileinfo.description', badge: 'new', tags: ['get_file_info', 'metadata'] },
+        ],
+      },
+    ],
+  },
+  {
+    version: '5.8.6',
+    categories: [
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'engineering-checkpoint-schema-compatibility', titleKey: 'whatsNew.586.schema.title', descriptionKey: 'whatsNew.586.schema.description', badge: 'improved', tags: ['MCP', 'checkpoint_goal_engineering', 'Engineering Gates', 'schema compatibility'] },
         ],
       },
     ],

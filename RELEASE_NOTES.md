@@ -2,6 +2,25 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.8.7
+
+- **Path access parity with DesktopCommanderMCP:** an absolute path outside the Active Project is routed to that workspace instead of being denied. Preview calls cannot register a project; only a real tool call attaches, Full Access attaches silently, and stricter permission profiles request one confirmation per new folder. Attaching never relocates the primary Active Project.
+- **Read-trust consistency:** `workspace_tree` resolves the same host read trust that `read_file` already used, so the two tools no longer disagree about one path. Paths the host does not allow remain denied.
+- **Per-workspace goal leases:** ownership proof for a mutation is evaluated against the workspace being touched. A `goalLease` held by another project no longer blocks ordinary Git or file work in a project without an active rolling goal, while a live or unreadable fence in the target workspace still fails closed.
+- **Actionable scope denials:** every Active Project scope mismatch names the path or retry shape that will succeed, replacing bare "does not match the Active Project" text that led assistants to tell users to register folders manually.
+- **Git against any repository:** `git_status`, `git_diff` and `git_log` accept an absolute `cwd` for a repository that is not the active project, without requiring that project's `workspaceId`.
+- **`get_file_info`:** returns size, type, creation/modification times and permissions for a file or folder without reading its contents, so large files can be inspected before deciding to open them.
+- **Local verification:** `@lnwjud/mcp-server` core-readiness, external project attach, path-scope field coverage and scheduled-continuation fence suites pass on this tree; the ToolRegistry catalog is 289 declared tools (277 default-advertised). Exact-SHA hosted CI, publisher signing and post-install acceptance remain separate gates.
+- **ภาษาไทย:** เวอร์ชันนี้รวมการเข้าถึงด้วย absolute path โดยไม่ต้องลงทะเบียนโฟลเดอร์ก่อน, `workspace_tree` ใช้สิทธิ์การอ่านเดียวกับ `read_file`, goal lease ตรวจแบบต่อ-workspace, ข้อความปฏิเสธบอกวิธีเรียกที่ใช้ได้จริง, คำสั่ง Git รับ `cwd` จาก repository ใดก็ได้ และเพิ่มเครื่องมือ `get_file_info` สำหรับอ่าน metadata โดยไม่ดึงเนื้อหาไฟล์
+
+### What's new in v5.8.6
+
+- **Engineering Gate checkpoint compatibility (Issue #198):** Publish `checkpoint_goal_engineering` as a second public MCP name with the same strict input schema and authenticated Goal handler as `checkpoint_goal`. Preserve lease/revision comparison, authorization, host-receipt verification, and required-gate enforcement. Alias availability follows the canonical tool, so a user-disabled `checkpoint_goal` cannot be called through the alias.
+- **Local wire contract:** The in-memory MCP SDK `tools/list` response contains both names with matching schemas; a direct alias call forwards Engineering Gate updates and review findings to the same Goal service. Existing HTTP inventory-change tests verify notification and refresh behavior.
+- **Issue #194:** The read-only audit classification and active Goal reconciliation fixes remain in v5.8.5. This release adds no bypass for required Gates.
+- **Acceptance boundary:** The connected `@lnwjud-pc` plugin is running app v5.8.5. Its direct `checkpoint_goal` schema exposes both Engineering fields; a call with non-empty values and `get_goal` readback confirmed persistence. Fresh-session v5.8.6 inventory refresh and alias call/readback remain post-install acceptance.
+- **ภาษาไทย:** `@lnwjud-pc` ที่เชื่อมต่ออยู่ใช้แอป v5.8.5; schema ของ `checkpoint_goal` ประกาศฟิลด์ Engineering ทั้งสองรายการ และเรียกด้วยค่าจริงพร้อมอ่านกลับผ่าน `get_goal` ได้แล้ว ส่วน inventory และการเรียก alias ใน fresh session หลังติดตั้ง v5.8.6 ยังเป็น acceptance ที่รออยู่
+
 ### What's new in v5.8.5
 
 - **Engineering Harness audit routing (Issue #194):** Classify read-only source audits and reviews of existing deployments or release history as local review work. Detect affirmative delivery actions independently from nearby prohibitions, so explicit requests such as “do not deploy, but publish a release” retain release scope and gates.
@@ -24,8 +43,12 @@ Release highlights are listed newest first. The [README](README.md) shows the th
 ### What's new in v5.8.3
 
 - **Ponytail ULTRA scope clarity (Issue #190):** When the bundled skill was loaded with `goalId`, code edits without `goalLease` report the missing context and give actionable alternatives; unbound edits do not inherit goal-scoped authorization. Regression coverage includes the safe impossible-match `edit_file` probe and sequential `tool_batch`.
-- **Doctor and Workflows:** Improve diagnostics, evidence copying, Goal task visibility and safe file-derived input choices; clarify the Code Review Git baseline.
+- **Doctor history, Results, and Resources:** Present MCP history, Goal Results, and Resource data in readable tables with complete JSON copy actions. Use Gregorian DD/MM/YYYY dates, Asia/Bangkok (UTC+07:00), and a 24-hour clock. Copy ISO evidence timestamps with the Bangkok offset while preserving the instant.
+- **Resource diagnostics and cancellation:** Show all tracked Goal tasks, including tasks without CPU or RAM samples. Keep unavailable measurements unknown instead of zero. Show cancellation only for verified, owned, running blocking jobs and require native authorization.
+- **Guided Workflows:** Derive Sheet and column choices from the selected workspace-bound XLSX or CSV file, Git branches, and package version. Write explicit mapping generation to a new JSON file and append reports below existing template rows. Keep manual fields and unsupported files visible in Advanced mode.
+- **Code Review workflow:** Default `baseRef` to `HEAD` and explain Git branch and commit comparison choices.
 - **Release reliability:** Honor version-specific development-preview README highlights when generating release notes so a verified build is not blocked by its preview heading.
+- **ภาษาไทย:** ทุกหน้าจอแสดงปี ค.ศ. เขตเวลา Asia/Bangkok และเวลา 24 ชั่วโมง รวมทั้ง JSON ที่คัดลอกเป็น timestamp +07:00; ฐานเปรียบเทียบรีวิวโค้ดมีคำอธิบายและค่าเริ่มต้น HEAD
 
 ### What's new in v5.8.2
 

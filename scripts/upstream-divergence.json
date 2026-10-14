@@ -129,6 +129,21 @@
         { "file": "apps/desktop/e2e/desktop-dashboard.e2e.ts", "contains": "element.scrollHeight - element.clientHeight" }
       ],
       "proofTests": ["apps/desktop/e2e/desktop-dashboard.e2e.ts"]
+    },
+    {
+      "id": "whats-new-fork-entry",
+      "summary": "The fork's own release items live in the in-app What's New registry and its i18n copy. Both files conflict on nearly every upstream sync because upstream publishes the version number this fork already used locally, so resolving them by taking upstream's side deletes the fork notes while still merging, type-checking and shipping empty-state text for the fork build. Markers are version-independent values, not the version-prefixed keys that set-version and the entry rename move.",
+      "markers": [
+        { "file": "apps/desktop/src/renderer/features/release-notes/release-notes.ts", "contains": "id: 'goal-lease-scope'" },
+        { "file": "apps/desktop/src/renderer/features/release-notes/release-notes.ts", "contains": "id: 'path-attach'" },
+        { "file": "apps/desktop/src/renderer/features/release-notes/release-notes.ts", "contains": "id: 'get-file-info'" },
+        { "file": "apps/desktop/src/renderer/i18n/messages.ts", "contains": "ทำงานกับโปรเจกต์อื่นได้แม้มี durable goal ค้างอยู่" },
+        { "file": "apps/desktop/src/renderer/i18n/messages.ts", "contains": "วาง path เต็มแล้วทำงานได้เลย ไม่ต้องลงทะเบียนโฟลเดอร์ก่อน" }
+      ],
+      "proofTests": [
+        "apps/desktop/tests/release-notes.test.ts",
+        "tests/release/release-notes.test.ts"
+      ]
     }
   ]
 }

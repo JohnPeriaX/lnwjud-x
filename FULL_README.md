@@ -8,7 +8,7 @@
 
 <p align="center">
   <strong>Cross-platform local AI-agent runtime and MCP gateway</strong><br />
-  <em>285 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 273 are advertised by default and all 285 when Codex delegation plus Agent Swarm is enabled.</em>
+  <em>286 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 274 are advertised by default and all 286 when Codex delegation plus Agent Swarm is enabled.</em>
 
   <em>อ่านที่เหลือใน Readme ได้เลยครับ ติดปัญหาทักมาได้ใน FB: Adisorn NM ได้ตลอดครับ / กำลังพัฒนาให้เรื่อยๆครับ ท่านที่ถามหาช่องสนับสนุนค่ากาแฟ แปะลิงค์ ไว้ให้แล้วครับ ขอบคุณครับ</em>
  https://easydonate.app/abcz
@@ -25,7 +25,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D4" />
   <img alt="Node" src="https://img.shields.io/badge/Node.js-24.x-339933" />
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-285%20tools-6f42c1" />
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-286%20tools-6f42c1" />
 </p>
 
 ---
@@ -51,9 +51,23 @@ The tunnel is outbound-only: `tunnel-client` runs beside lnwjud, reaches OpenAI
 over outbound HTTPS, forwards MCP work to lnwjud's Desktop loopback HTTP MCP,
 and returns the response without opening a public inbound port on the host.
 
-## Current published version: v5.8.5
+## Current published version: v5.8.6
 
-## Current source version: v5.8.6
+## Current source version: v5.8.7
+
+### What's new in v5.8.7
+
+- **Absolute paths work without registering the folder first:** a tool call that names another folder attaches it as the project for that call instead of failing. Full Access attaches silently; stricter profiles ask once per new folder and the primary Active Project never moves. `workspace_tree` now applies the same read trust the host already grants `read_file`, and `git_status`, `git_diff` and `git_log` accept any repository through `cwd`.
+- **Goal leases are per project:** a durable goal owned by a different project no longer rejects ordinary Git or file work in a project that has no rolling goal. Ownership is still enforced per workspace, and an unreadable fence state fails closed with a call that actually works.
+- **Denials name a usable retry:** scope denials return the path or retry form that will succeed instead of only reporting a mismatch with the Active Project, so the assistant no longer tells you to register folders by hand. The new `get_file_info` tool reports size, type, timestamps and permissions without pulling file content into the conversation.
+- **Fork source build:** the ToolRegistry catalog is synchronized at 289 declared tools (277 default-advertised), and this version is built from the fork tree that also carries upstream v5.8.6 and v5.8.5.
+- **ภาษาไทย:** วาง absolute path แล้วทำงานได้ทันทีโดยโปรเจกต์หลักไม่ถูกย้าย, durable goal ของโปรเจกต์อื่นไม่บล็อกงานปกติในโปรเจกต์ที่ไม่มี goal ค้างอยู่, ข้อความปฏิเสธบอกวิธีเรียกที่ใช้ได้จริง, `workspace_tree` ใช้สิทธิ์การอ่านเดียวกับ `read_file`, คำสั่ง Git รับ `cwd` จาก repository ใดก็ได้ และเพิ่มเครื่องมือใหม่ `get_file_info`
+
+### What's new in v5.8.6
+
+- **Engineering Gate checkpoint compatibility (Issue #198):** Add `checkpoint_goal_engineering` with the same strict schema, Goal handler, lease/revision checks and evidence validation as `checkpoint_goal`. It follows the canonical tool's availability, so disabling `checkpoint_goal` disables both names.
+- **Verification boundary:** The connected `@lnwjud-pc` plugin is running app v5.8.5. Its direct `checkpoint_goal` schema exposes both Engineering fields; a call with non-empty values and `get_goal` readback confirmed persistence. Fresh-session v5.8.6 inventory and alias call/readback remain post-install acceptance.
+- **ภาษาไทย:** `@lnwjud-pc` ที่เชื่อมต่ออยู่ใช้แอป v5.8.5; schema ของ `checkpoint_goal` ประกาศฟิลด์ Engineering ทั้งสองรายการ และเรียกด้วยค่าจริงพร้อมอ่านกลับผ่าน `get_goal` ได้แล้ว ส่วน inventory และการเรียก alias ใน fresh session หลังติดตั้ง v5.8.6 ยังเป็น acceptance ที่รออยู่
 
 ### What's new in v5.8.5
 
@@ -61,23 +75,6 @@ and returns the response without opening a public inbound port on the host.
 - **Existing Engineering Goals:** Reconcile workflow classification, gate contracts and source scope from the lease-acquired Goal snapshot. Preserve compatible findings, task tracking and proof; revalidate scope-dependent checks when the requested source scope changes.
 - **Modern MCP HTTP inventory:** Notify subscribed clients when host tool availability changes, then serve the current tools/list on the next request.
 - **ภาษาไทย:** แยก Full Audit และการตรวจประวัติ deployment/release แบบอ่านอย่างเดียวออกจากคำสั่งปล่อยงาน, reconcile metadata ของ Goal เดิมจาก snapshot ที่ acquire ภายใต้ lease และแจ้ง MCP client เมื่อ tool availability เปลี่ยน
-
-### What's new in v5.8.4
-
-- **Issue #193 durable Shell identity:** Keep stable authorized client/session/workspace ownership across modern HTTP requests, legacy reconnects and capability provider replacement; read retained outputs and terminal receipts without granting foreign readers access.
-- **Checked recipe, recovery and workspace context:** Preview side-effect-free recipes, execute only explicitly requested steps through the same permission and current Goal-lease boundaries, and keep honest partial/unknown results if dependencies or an index update fail.
-- **Agent Swarm CLI non-interactive fix:** Supply the Codex prompt via argv with stdin closed; detach result collection from the transient start-request abort while retaining explicit cancellation of owned work. A three-agent real subprocess fixture verifies EOF and result collection, not availability of a remote model.
-- **MCP tool/provider improvements:** Audit the current 285 tool definitions and supported action paths (273 advertised without Codex). Report provider/platform prerequisites and native media handles and terminal artifact evidence explicitly; do not present undeployed macOS/Linux features as universally available.
-- **ภาษาไทย:** การอ่านผล Shell หลังเปลี่ยนการเชื่อมต่อถูกตรวจเจ้าของ, Workflow เช็กสิทธิ์ทุกขั้นตอน, Agent Swarm ไม่รอ stdin เพิ่ม และ Tool/Doctor ระบุสาเหตุที่ Provider ยังไม่พร้อมโดยไม่รายงานความสำเร็จเกินจริง
-
-### What's new in v5.8.3
-
-- Ponytail ULTRA now explains missing `goalLease` for goal-scoped skill loads. Pass the active Goal's lease to code edits, or load the bundled skill without `goalId` for workspace-only edits; a different Goal's activation cannot authorize an unbound mutation (Issue #190).
-- Doctor MCP history, Results, and Resources have readable tables and complete JSON copy actions. Visible dates use Gregorian DD/MM/YYYY, Asia/Bangkok (UTC+07:00) and 24-hour clock; copied ISO evidence timestamps use Bangkok's +07:00 offset, preserving the instant.
-- Resource diagnostics show all tracked Goal tasks, including those without CPU/RAM samples; missing measurements remain unknown rather than zero. Cancellation only appears for verified owned running blocking jobs and requires native authorization.
-- Workflows guided mode derives Sheet and column choices from the selected workspace-bound XLSX/CSV file, real Git branches and project package version. Explicit mapping generation writes only a new JSON file, appending the report below existing template rows; Advanced mode keeps manual fields and unsupported files visible.
-- Code Review workflow now defaults baseRef to HEAD and explains Git branch/commit comparison choices.
-- ภาษาไทย: ทุกหน้าจอแสดงปี ค.ศ. เขตเวลา Asia/Bangkok และเวลา 24 ชั่วโมง รวมทั้ง JSON ที่คัดลอกเป็น timestamp +07:00; ฐานเปรียบเทียบรีวิวโค้ดมีคำอธิบายและค่าเริ่มต้น HEAD
 
 ### Earlier release highlights — v5.8.0
 
@@ -101,7 +98,7 @@ and returns the response without opening a public inbound port on the host.
 
 **ภาษาไทย — ต่างจาก 5.7.4:** เพิ่มเทมเพลต 6 แบบ, ประวัติ MCP และผลงาน Goal ที่มีหลักฐาน, RAM/CPU จริงของโปรเซสที่ตรวจเจ้าของได้, Context Economy แบบรวมระดับ Transport, ตรวจ CSV/XLSX, Git tree/preview ที่ครบขึ้น, UI และ dropdown กลาง, กากบาท Modal ขนาดชัดเจน, Work Log ที่กรองง่ายขึ้น, แก้ Tunnel reconnect ก่อนพร้อม และอัปเดต tunnel-client 0.0.16 พร้อมการทดสอบ/แพ็กเกจตาม SHA จริง ค่าไม่ทราบจะไม่แสดงเป็น 0 หรืออ้างว่าสำเร็จโดยไม่มีข้อมูล
 
-Latest published release: **v5.8.5**. Windows, macOS, and Linux artifacts were published after the exact tagged main commit passed the target-native release gates described below.
+Latest published release: **v5.8.6**. Windows, macOS, and Linux artifacts were published after the exact tagged main commit passed the target-native release gates described below.
 
 See [Thai Engineering Harness setup and workflow](docs/USAGE_TH.md#8a-engineering-harness--senior-coding-workflow) for details.
 
@@ -222,13 +219,13 @@ Choose the guide for the host you will run lnwjud on:
 
 1. Download the latest published installer from
    [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/latest).
-   Current published Windows 10/11 x64 v5.8.5 artifacts are `lnwjud-Setup-5.8.5.exe` (recommended installer) and `lnwjud-Portable-5.8.5.exe` (no installation required).
+   Current published Windows 10/11 x64 v5.8.6 artifacts are `lnwjud-Setup-5.8.6.exe` (recommended installer) and `lnwjud-Portable-5.8.6.exe` (no installation required).
 2. Run the NSIS installer and launch **lnwjud Agent Control Center**.
 3. Add or select the project/workspace you want lnwjud to operate on.
 4. Review **Settings** before attaching an AI client, especially Permission
    Profile and Unrestricted Mode.
 
-If you prefer not to install the app, run the currently published `lnwjud-Portable-5.8.5.exe` directly.
+If you prefer not to install the app, run the currently published `lnwjud-Portable-5.8.6.exe` directly.
 Portable mode uses the same per-user lnwjud data/settings location as the installer;
 it is a portable executable, not a keep-all-data-next-to-the-EXE mode.
 Automatic updates preserve the distribution you chose. Installer users read
@@ -274,7 +271,7 @@ A few operating-system boundaries still apply:
 
 ### 2. Connect ChatGPT with Remote MCP + OAuth (recommended)
 
-For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.8.6 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
+For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.8.7 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
 
 1. Open **lnwjud → Settings → Remote MCP & Tunnel**.
 2. Check the ngrok status. If lnwjud shows **READY**, keep the detected installation. If it is not ready, lnwjud shows only the installation path supported by the current host: Windows may use Microsoft Store/WinGet, macOS may use Homebrew when available, and hosts without a verified automatic installer get the official ngrok download link instead. Runtime discovery itself is cross-platform and verifies `ngrok version` before use.
@@ -282,7 +279,7 @@ For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was
 4. **Business Admin/Owner setup:** in Workspace Settings → Apps → Create, add the public `https://.../mcp` URL, select **OAuth**, complete Scan Tools, create the app, then **Publish** it. Ordinary workspace members do not need Developer mode and do not paste the Server URL again.
 5. **Member connection:** open the published custom lnwjud app in ChatGPT and press **Connect**. For the exact supported ChatGPT OAuth callback paths, the browser is handed once to a random short-lived `http://127.0.0.1:<ephemeral>/...` approval listener owned by the running lnwjud Desktop, then lnwjud completes DCR + Authorization Code + PKCE and redirects back to ChatGPT — **no manual code entry and no extra approval click**. The public ngrok endpoint cannot redeem that localhost ticket. OAuth clients outside the supported ChatGPT callback contract are rejected with `403 access_denied`.
 6. lnwjud remembers the trusted registered ChatGPT client and valid refresh grant in the host secure-storage provider. Ordinary app restarts or **Start Remote MCP** do not require another authorization. An explicit **Stop** disables auto-start but preserves the trusted OAuth relationship; use **Reconnect ChatGPT** only when you intentionally want to reset that relationship.
-7. Confirm the connection discovers **276 tools by default** (or **288** when Codex delegation plus Agent Swarm is explicitly enabled), then run a read-only smoke test before writes.
+7. Confirm the connection discovers **277 tools by default** (or **289** when Codex delegation plus Agent Swarm is explicitly enabled), then run a read-only smoke test before writes.
 
 The public ngrok URL is not the raw loopback MCP endpoint: requests must pass OAuth and bearer-token validation at the separate gateway. Do not publish `http://127.0.0.1:<port>/mcp` directly through a generic reverse proxy.
 
@@ -346,12 +343,12 @@ Use lnwjud to list registered workspaces, report Git status for the selected pro
 
 ## Quick start: install the Windows release (ภาษาไทย)
 
-ส่วนนี้สำหรับผู้ใช้ Windows ที่ต้องการติดตั้ง lnwjud แล้วเชื่อมกับ ChatGPT แบบง่ายที่สุด โดย **วิธีหลักที่แนะนำสำหรับ v5.8.5 คือ Remote MCP ผ่าน ngrok + OAuth** ไม่ต้องมี OpenAI Tunnel ID และไม่ต้องสร้าง Runtime API key สำหรับขั้นตอนหลักนี้ ส่วน **Tunnel ID + Runtime API key** ยังคงรองรับ แต่เป็นทางเลือก/โหมดขั้นสูงสำหรับผู้ที่ต้องการ OpenAI Secure MCP Tunnel โดยเฉพาะ
+ส่วนนี้สำหรับผู้ใช้ Windows ที่ต้องการติดตั้ง lnwjud แล้วเชื่อมกับ ChatGPT แบบง่ายที่สุด โดย **วิธีหลักที่แนะนำสำหรับ v5.8.6 คือ Remote MCP ผ่าน ngrok + OAuth** ไม่ต้องมี OpenAI Tunnel ID และไม่ต้องสร้าง Runtime API key สำหรับขั้นตอนหลักนี้ ส่วน **Tunnel ID + Runtime API key** ยังคงรองรับ แต่เป็นทางเลือก/โหมดขั้นสูงสำหรับผู้ที่ต้องการ OpenAI Secure MCP Tunnel โดยเฉพาะ
 
 ### 1. ติดตั้ง lnwjud หรือใช้ Portable
 
-1. แบบแนะนำ: ดาวน์โหลด public release ล่าสุด `lnwjud-Setup-5.8.5.exe` แล้วติดตั้งตามปกติ
-2. ถ้าไม่ต้องการติดตั้ง: ดาวน์โหลด `lnwjud-Portable-5.8.5.exe` แล้วเปิดได้ทันที
+1. แบบแนะนำ: ดาวน์โหลด public release ล่าสุด `lnwjud-Setup-5.8.6.exe` แล้วติดตั้งตามปกติ
+2. ถ้าไม่ต้องการติดตั้ง: ดาวน์โหลด `lnwjud-Portable-5.8.6.exe` แล้วเปิดได้ทันที
 3. เปิด **lnwjud Agent Control Center**
 4. เพิ่มหรือเลือก Project/Workspace ที่ต้องการให้ ChatGPT ทำงานด้วย
 
@@ -384,7 +381,7 @@ public ngrok URL นี้ชี้เข้า OAuth gateway แยกต่า
 6. รอ Configure/Doctor ผ่าน แล้วกด **Start Tunnel**
 7. ใน ChatGPT เพิ่ม Connection แบบ **Tunnel** แล้วเลือก tunnel ที่สร้างไว้หรือใส่ `tunnel_id`
 
-`lnwjud-Setup-5.8.5.exe` และ `lnwjud-Portable-5.8.5.exe` รวม official OpenAI `tunnel-client` ที่ตรวจสอบเวอร์ชันและ provenance ตามไฟล์ Release มาให้แล้ว จึง **ไม่ต้องดาวน์โหลด `tunnel-client.exe` เอง** ช่อง path เป็น override สำหรับ troubleshooting เท่านั้น; หากต้องการกลับไปใช้ตัว bundled ให้ล้าง override แล้วเลือก **Use bundled** อย่างชัดเจน
+`lnwjud-Setup-5.8.6.exe` และ `lnwjud-Portable-5.8.6.exe` รวม official OpenAI `tunnel-client` ที่ตรวจสอบเวอร์ชันและ provenance ตามไฟล์ Release มาให้แล้ว จึง **ไม่ต้องดาวน์โหลด `tunnel-client.exe` เอง** ช่อง path เป็น override สำหรับ troubleshooting เท่านั้น; หากต้องการกลับไปใช้ตัว bundled ให้ล้าง override แล้วเลือก **Use bundled** อย่างชัดเจน
 
 `Persistent Tunnel Identity` จำ Tunnel ID แยกจาก Run/Stop intent. เมื่อผู้ใช้กด **Stop Tunnel** lnwjud จะคงสถานะ stopped ข้ามการ restart และจะไม่ auto-reconnect จนกด Start อีกครั้ง. หากเปลี่ยน custom/bundled client ขณะ runtime ทำงาน ระบบจะหยุดและยืนยัน owner เดิมก่อน commit path ใหม่เพื่อไม่ให้มี runtime ซ้อน
 
@@ -645,8 +642,8 @@ corepack pnpm@10.15.0 package:windows
 The Windows 10/11 x64 artifacts are written to:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.8.6.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.8.6.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.8.7.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.8.7.exe
 ```
 
 The installer is per-user by default. The portable executable needs no installation but uses the same per-user lnwjud data/settings location. A common installed executable path is:
@@ -967,7 +964,7 @@ For workspace <workspace-id>, show the project snapshot, Git status, and the top
 When a first-party tool is enabled or disabled, standards-compliant MCP clients receive `notifications/tools/list_changed` and can refresh the live list without restarting lnwjud. ChatGPT app/action catalogs may additionally use a host-managed approved snapshot: use the ChatGPT action refresh/tool-scan flow that is actually available for the workspace. A browser F5 alone is **not** guaranteed to update an approved/frozen action snapshot, and lnwjud does not claim host synchronization without evidence.
 
 <!-- BEGIN GENERATED README TOOL REGISTRY -->
-## Complete MCP tool catalog (288 total definitions; 276 advertised by default; 288 with Codex delegation plus Agent Swarm enabled)
+## Complete MCP tool catalog (289 total definitions; 277 advertised by default; 289 with Codex delegation plus Agent Swarm enabled)
 
 This complete index is generated from `ToolRegistry.listAll()`, not copied from an older release document. The default `tools/list` surface advertises only operational or dependency-gated definitions; planned and feature-disabled definitions remain visible here without being advertised. Enabling Codex delegation plus Agent Swarm adds 12 opt-in definitions to the advertised surface.
 
@@ -1074,193 +1071,194 @@ This complete index is generated from `ToolRegistry.listAll()`, not copied from 
 | 99 | `list_delivery_receipts` | READ | default | operational | service_dispatch | List bounded durable dispatch receipts for a goal. |
 | 100 | `advance_goal_iteration` | WRITE | default | operational | service_dispatch | Advance one bounded review/improvement iteration under the durable goal lease. It never sends browser messages or creates an autonomous ChatGPT UI loop and cannot exceed maxIterations. |
 | 101 | `checkpoint_goal` | WRITE | default | operational | service_dispatch | Atomically checkpoint durable goal progress using the current lease and expected revision. For every meaningful milestone or handoff boundary, include resumeContext with the concrete state a new worker needs to reconstruct work without guessing: changedFiles, exact commands with pass/fail/running status and result, decisions, failedAttempts, pendingValidation, resumePrerequisites, stateFacts, and artifacts. summary is only a headline and must not replace reconstruction-grade resumeContext. Use trackedTasks for goal-relative blocking_job/supporting_service roles and explicit provider routing; activeTaskIds remains a legacy compatibility form. Supporting services do not block continuation liveness and are cancelled only when cancelWithGoal=true. A checkpoint records durable progress only; it is not a turn boundary or permission to yield, and it does not create a new Scheduled Task. After an ordinary checkpoint keep useful work moving on the current lease. A transient task/status/log/result observation failure must be retried or re-resolved in the same turn, and a tracked blocking job that becomes terminal must have its terminal result inspected before handoff. Before yielding an active automatic-continuation goal, ensure exactly one confirmed Native ChatGPT hourly recurring watchdog exists with cloud execution requested unless scheduling was explicitly disabled. Reuse the same nativeTaskId across checkpoints and ordinary hourly wakes; never create a per-wake successor and never retime the recurring cadence merely because a checkpoint changed. Historical v4.52 one-time rows keep their compatibility behavior until they become historical, and one-time plus recurring watchdogs must never overlap for one goal. A real native task ID is required for confirmed coverage, while execution mode may remain unverified when the host does not expose it. At an unavoidable turn boundary, persist full resumeContext before releasing the lease; if scheduling is enabled confirm watchdog coverage first. Never wait for the user to type continue/ทำต่อ. |
-| 102 | `finish_goal` | WRITE | default | operational | service_dispatch | Finish the local durable goal using lease/revision compare-and-swap. It must be called before any completion report, even when scheduling was disabled or the user requested no watchdog. status=completed is rejected while durable plan work, blockers, or blocking tasks remain. After the terminal CAS, finish_goal aborts in-flight fenced MCP requests and attempts to stop every tracked task whose cancelWithGoal policy is true; inspect requestCancellation, taskCancellations, allRequestsStopped, and allTasksStopped for unresolved work. Preferred v4.54 completion cleans any live Native ChatGPT watchdog first: call cancel_scheduled_continuation while the goal is still active, make the exact task non-runnable using host delete or confirmed disable, record truthful cleanup evidence, then call finish_goal once. Explicit user-attested manual deletion is a separate evidence class and must never be represented as host-native proof. Defensive compatibility remains: if finish_goal returns status=active with completionState=pending_native_cleanup, recover the exact cleanup locator from get_goal/get_scheduled_continuation, perform cleanup only, record evidence, and call finish_goal again without resuming workspace work. A recurring hourly run never consumes the task and outcome=consumed is not cleanup proof. Report completion only after completionState=completed and get_goal is terminal with no pending scheduled-task cleanup. |
-| 103 | `cancel_goal` | WRITE | default | operational | service_dispatch | Cancel a durable goal independently of any scheduled watchdog. It records the goal as cancelled, aborts in-flight fenced MCP requests for that goal, and attempts to stop only tracked tasks whose cancelWithGoal policy is true; shared supporting services remain running by default and are reported as taskCancellations status=skipped. An explicitly bound provider that is unavailable or cannot verify termination is reported as failed, so allTasksStopped remains false until the unresolved task is inspected. Inspect requestCancellation, taskCancellations, and allRequestsStopped/allTasksStopped for unresolved work. If scheduledTaskCancellation requests make_native_task_non_runnable, use cancel_scheduled_continuation separately, resolve the actual native ChatGPT cleanup operation exposed by the host, and record exact proof that the pending task is non-runnable. |
-| 104 | `reconcile_goals` | WRITE | default | operational | service_dispatch | Preview or apply exact durable-goal reconciliation after runtime liveness checks. |
-| 105 | `list_goals` | READ | default | operational | service_dispatch | List a bounded set of durable goals owned by the current stable MCP client, optionally filtered by workspace/status. |
-| 106 | `resource_snapshot` | READ | default | operational | service_dispatch | Show sampled resources scoped to registered workspace/owned Goal. Unknown ownership and context metrics remain unknown; shared tasks are never cancellable. |
-| 107 | `call_history` | READ | default | operational | service_dispatch | Read server-observed correlated MCP calls from bounded SQLite audit records. Values without measured transport spans remain null/unknown; supports filters and opaque keyset pagination. |
-| 108 | `goal_result` | READ | default | operational | service_dispatch | Read evidence-limited Durable Goal results. Never attributes legacy operations without a server-verified Goal lease. |
-| 109 | `workflow_templates` | READ | default | operational | service_dispatch | List six built-in Thai/English workflows for a registered workspace. Read-only; does not create a Goal. |
-| 110 | `workflow_prepare` | READ | default | operational | service_dispatch | Validate bounded inputs, workspace paths, provider readiness, and return a deterministic preview. No side effects. |
-| 111 | `workflow_start` | WRITE | default | operational | service_dispatch | Start or attach the selected validated workflow to an existing Durable Goal contract with hashed idempotency key. Never creates any scheduled task; caller must hold returned Goal lease to execute. |
-| 112 | `prepare_scheduled_continuation` | WRITE | default | operational | service_dispatch | Checkpoint durable progress and ensure exactly one live current-chat Native ChatGPT hourly recurring watchdog with cloud execution requested. When the current chat exposes an exact @connector mention for lnwjud, pass it as connectorMention so the generated native Scheduled Task prompt remains bound to that connector; omit it only when the host exposes no mention. At a meaningful continuation handoff include reconstruction-grade resumeContext (changed files, exact commands/results, decisions, failed attempts, pending validation, resume prerequisites, state facts, artifacts); summary alone is not sufficient resume state. New v4.53 watchdogs use occurrence=interval and intervalMinutes=60; when successorDelayMinutes is omitted the first firing is one hour from prepare, while a legacy explicit 2–25 minute value changes only the first firing and never the hourly recurrence cadence. Reuse the same confirmed native task ID across checkpoints and ordinary wakes; never create a per-wake successor or retime the recurring cadence. If an active v4.52 one-time watchdog already exists, reuse that legacy task until it becomes historical before creating the recurring watchdog, so one-time and recurring native tasks never overlap for one goal. prepared means reservation only and is not confirmed host coverage. Record native create failure or uncertainty truthfully and reconcile uncertain host state before any blind create. On an explicit host-surface lookup/dispatch failure such as Resource not found that proves the operation was not dispatched, re-resolve the current Native Scheduled Task host operation once and retry that exact native operation once; never retry ambiguous possible-success and never switch scheduler providers. Host create and cleanup remain Native ChatGPT Scheduled Task operations exposed by the current chat; never use browser/DOM automation, Windows Task Scheduler, cron, shell timers, or an lnwjud-local scheduler as a substitute. |
-| 113 | `record_scheduled_continuation_receipt` | WRITE | default | operational | service_dispatch | Record truthful cleanup/run receipts for recurring Native ChatGPT watchdogs and legacy one-time watchdogs. created requires the real native task ID and host-reported absolute dueAt. A recurring interval firing never consumes or replaces the native task, so outcome=consumed and reschedule_* remain legacy one-time compatibility only. For outcome=cancelled prefer matching native host evidence that the exact task is non-runnable: delete may report deleted/not_found and hosts without delete may report an exact disable receipt. If the host management surface is unavailable and the user explicitly deleted the exact task in ChatGPT Scheduled Tasks, userCancellationReceipt may record that separately as user-attested manual deletion only with userConfirmed=true; never label user testimony as host-native proof. The stored native task ID is immutable for the lifetime of the watchdog. |
-| 114 | `claim_scheduled_continuation` | WRITE | default | operational | service_dispatch | Scheduled-wake entrypoint and the first lnwjud action before any workspace mutation. Native watchdogs should pass the expected goalId and workspaceId from their wake metadata so the host-visible WRITE scope is explicit and lnwjud can reject mismatched identity before liveness or lease mutation; legacy callers that only have continuationId remain compatible. For occurrence=interval, the same native hourly task remains scheduled across firings: a live/uncertain worker returns worker_busy_noop without lease theft or host-task mutation, a true concurrent/stale duplicate whose observation predates an already-recorded lease acquisition returns already_claimed, an existing interval runKey alone never suppresses a fresh current-liveness check, a safely available lease returns recurring_acquired, and a still-valid stale lease with trustworthy no-worker/no-blocking-work evidence is recovered in the same hourly tick after the bounded 60-second stale-heartbeat grace rather than waiting for expiry or a second hourly firing. Only recurring_acquired may include a read-only automationResume hint; busy/no-op claims never inspect or mutate automation state. After recurring_acquired, discovering a fixable CI, test, code-scanning, packaging, release, or tool failure is not permission to yield: continue diagnosis, repair, and relevant validation in the same host turn while safe useful actions remain, rather than ending the hourly wake with a status-only report. Ordinary recurring wakes never create a successor, never consume the native task, and never retime its cadence. terminal_noop performs no work; if terminal cleanup is pending, make the exact recurring native task non-runnable rather than resuming goal work. Historical occurrence=once rows retain the v4.52 acquired/successor_required/reschedule compatibility paths. Never count prepared as confirmed and never mutate the workspace without the acquired goal lease. |
-| 115 | `get_scheduled_continuation` | READ | default | operational | service_dispatch | Read one scheduled-continuation snapshot by continuation ID or the latest record for a goal. In v4.53, occurrence=interval identifies the single hourly recurring watchdog; its dueAt is the first scheduled firing, not a mutation handoff deadline, and its native task ID remains stable across ordinary wakes. Historical occurrence=once rows preserve legacy one-time compatibility state. |
-| 116 | `expedite_scheduled_continuation` | WRITE | default | operational | service_dispatch | Legacy one-time compatibility only. For a still-pending occurrence=once watchdog and an enumerated handoff-risk signal, adaptively move that exact native task closer using the existing v4.52 rules. occurrence=interval recurring watchdogs must not use expedite_scheduled_continuation because ordinary recurring cadence is fixed at one hour and the host contract exposes no truthful immediate-run operation. Never create a replacement task through this operation. |
-| 117 | `cancel_scheduled_continuation` | WRITE | default | operational | service_dispatch | Cancel the scheduled watchdog independently of its durable goal. For v4.53 occurrence=interval, make the exact recurring Native ChatGPT task non-runnable with the strongest host operation actually exposed: prefer true delete, otherwise a host-confirmed disable. One recurring firing never consumes the task, so a past first due time is not cleanup proof. Historical occurrence=once rows retain their legacy cancellation/reconciliation behavior. Never treat a model assertion or unverified host state as cleanup proof. This does not cancel the durable goal or stop its running tasks. |
-| 118 | `symbol_search` | READ | default | operational | service_dispatch | Search indexed symbols across the workspace. |
-| 119 | `find_definition` | READ | default | operational | service_dispatch | Find deterministic symbol definitions. |
-| 120 | `find_references` | READ | default | operational | service_dispatch | Find textual and indexed references to a symbol. |
-| 121 | `find_implementations` | READ | default | operational | service_dispatch | Find interface and class implementations. |
-| 122 | `call_hierarchy` | READ | default | operational | service_dispatch | Return a deterministic call hierarchy approximation. |
-| 123 | `import_graph` | READ | default | operational | service_dispatch | Return indexed imports and exports for a module. |
-| 124 | `dependency_graph` | READ | default | operational | service_dispatch | Return package and module dependency metadata. |
-| 125 | `module_graph` | READ | default | operational | service_dispatch | Return the workspace module graph. |
-| 126 | `type_search` | READ | default | operational | service_dispatch | Search indexed TypeScript, JavaScript, and Python types. |
-| 127 | `trace_symbol` | READ | default | operational | service_dispatch | Combine definition, references, imports, tests, and recent context. |
-| 128 | `context_ranking` | READ | default | operational | deterministic_operation | Explain ranking signals without removing lower-ranked context. |
-| 129 | `debug_context` | READ | default | operational | service_dispatch | Gather deterministic debugging context and continuation metadata. |
-| 130 | `review_context` | READ | default | operational | service_dispatch | Gather code-review context. |
-| 131 | `change_context` | READ | default | operational | service_dispatch | Gather changed files, symbols, dependencies, and tests. |
-| 132 | `symbol_context` | READ | default | operational | service_dispatch | Gather context around a symbol. |
-| 133 | `test_context` | READ | default | operational | service_dispatch | Gather relevant test context. |
-| 134 | `dependency_context` | READ | default | operational | service_dispatch | Gather dependency-related context. |
-| 135 | `git_context` | READ | default | operational | service_dispatch | Gather Git status, diff, and history context. |
-| 136 | `frontend_context` | READ | default | operational | service_dispatch | Gather frontend project context. |
-| 137 | `backend_context` | READ | default | operational | service_dispatch | Gather backend project context. |
-| 138 | `route_intent` | READ | default | operational | deterministic_operation | Classify a prompt with a deterministic, overridable route. |
-| 139 | `recipe_list` | READ | default | operational | deterministic_operation | List built-in and user recipe names. |
-| 140 | `recipe_describe` | READ | default | operational | deterministic_operation | Describe a recipe plan and permissions. |
-| 141 | `recipe_run` | EXECUTE | default | operational | deterministic_operation | Preview or run a deterministic recipe plan. |
-| 142 | `dry_run` | READ | default | operational | deterministic_operation | Return a no-side-effect execution preview. |
-| 143 | `review_changes` | READ | default | operational | service_dispatch | Review current Git changes and affected context. |
-| 144 | `changed_symbols` | READ | default | operational | service_dispatch | Find symbols in changed files. |
-| 145 | `affected_modules` | READ | default | operational | service_dispatch | Find modules affected by current changes. |
-| 146 | `git_history_context` | READ | default | operational | service_dispatch | Return relevant recent Git history. |
-| 147 | `git_blame_context` | READ | default | operational | service_dispatch | Return line ownership context for a file. |
-| 148 | `discover_tests` | READ | default | operational | service_dispatch | Discover project tests without imposing an execution limit. |
-| 149 | `run_affected_tests` | EXECUTE | default | operational | service_dispatch | Plan or run tests affected by changed files. |
-| 150 | `test_failures` | READ | default | operational | service_dispatch | Summarize recorded test failures. |
-| 151 | `coverage_context` | READ | default | operational | service_dispatch | Return coverage context when project tooling provides it. |
-| 152 | `test_history` | READ | default | operational | service_dispatch | Return recent test execution history. |
-| 153 | `cache_stats` | READ | default | operational | deterministic_operation | Return shared cache hit/miss telemetry. |
-| 154 | `cache_clear` | WRITE | default | operational | deterministic_operation | Clear safe local runtime caches. |
-| 155 | `cache_invalidate` | WRITE | default | operational | deterministic_operation | Invalidate cache entries for a path or workspace. |
-| 156 | `hook_list` | READ | default | operational | deterministic_operation | List registered lifecycle hooks. |
-| 157 | `hook_register` | WRITE | default | operational | deterministic_operation | Register a deterministic lifecycle hook descriptor. |
-| 158 | `hook_remove` | WRITE | default | operational | deterministic_operation | Remove a lifecycle hook descriptor. |
-| 159 | `skill_match` | READ | default | operational | service_dispatch | Match relevant local skills without loading all skill text. |
-| 160 | `skill_load` | READ | default | operational | service_dispatch | Load a selected local skill by identifier. |
-| 161 | `plugin_install` | WRITE | default | operational | truthful_unavailable | Register a validated plugin descriptor in the locked shared runtime registry. This manages declared plugin state; it does not execute untrusted plugin code. |
-| 162 | `plugin_list` | READ | default | operational | deterministic_operation | List plugin descriptors from the locked shared runtime registry. |
-| 163 | `plugin_enable` | WRITE | default | operational | truthful_unavailable | Enable an installed plugin descriptor in persistent shared runtime state. |
-| 164 | `plugin_disable` | WRITE | default | operational | truthful_unavailable | Disable an installed plugin descriptor in persistent shared runtime state. |
-| 165 | `plugin_remove` | DANGEROUS | default | operational | truthful_unavailable | Remove an installed plugin descriptor from persistent shared runtime state. |
-| 166 | `session_context` | READ | default | operational | deterministic_operation | Return persisted development-session context. |
-| 167 | `session_checkpoint` | WRITE | default | operational | deterministic_operation | Persist a development-session checkpoint. |
-| 168 | `session_resume` | READ | default | operational | deterministic_operation | Resume a persisted session context. |
-| 169 | `session_history` | READ | default | operational | deterministic_operation | Return session checkpoints and decisions. |
-| 170 | `response_mode` | READ | default | operational | deterministic_operation | Select compact, normal, verbose, or stream formatting. |
-| 171 | `inspect_web_app` | READ | default | operational | service_dispatch | Combine DOM, console, network, URL, and screenshot metadata. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
-| 172 | `debug_ui` | READ | default | operational | service_dispatch | Gather deterministic UI debugging context. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
-| 173 | `capture_ui_state` | READ | default | operational | service_dispatch | Capture a structured UI state. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
-| 174 | `form_context` | READ | default | operational | service_dispatch | Inspect form controls and values metadata. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
-| 175 | `network_context` | READ | default | dependency_gated | truthful_unavailable | Summarize browser network context when a retained CDP network event stream is available. |
-| 176 | `console_context` | READ | default | dependency_gated | truthful_unavailable | Summarize browser console context when a retained CDP Runtime/Log event stream is available. |
-| 177 | `browser_debug_context` | READ | default | operational | service_dispatch | Combine browser diagnostics for one request. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
-| 178 | `windows_environment` | READ | default | dependency_gated | service_dispatch | Inspect Windows environment metadata. |
-| 179 | `service_context` | READ | default | operational | deterministic_operation | Inspect host service-manager metadata. |
-| 180 | `process_context` | READ | default | operational | service_dispatch | Inspect host process-tree context. |
-| 181 | `port_context` | READ | default | operational | deterministic_operation | Inspect local listening-port context. |
-| 182 | `registry_context` | READ | default | dependency_gated | deterministic_operation | Inspect Windows registry context through the Windows capability boundary. |
-| 183 | `event_log_context` | READ | default | operational | deterministic_operation | Inspect host-native event and log context. |
-| 184 | `installed_runtime_context` | READ | default | operational | deterministic_operation | Inspect installed runtimes and package managers. |
-| 185 | `path_context` | READ | default | operational | deterministic_operation | Resolve executable and PATH context. |
-| 186 | `startup_context` | READ | default | operational | deterministic_operation | Inspect host startup configuration context. |
-| 187 | `mcp_discover` | READ | default | operational | service_dispatch | Discover external MCP servers without flattening native tools. |
-| 188 | `mcp_health` | READ | default | operational | service_dispatch | Return external MCP connection health. |
-| 189 | `mcp_resources` | READ | default | dependency_gated | service_dispatch | List resources exposed by connected MCP servers when the child server supports resources/list. |
-| 190 | `task_create` | EXECUTE | default | operational | service_dispatch | Create a durable background task through the local shell task runtime. When the task belongs to a durable goal, pass goalId (or the current goalLease envelope) so terminal goals reject stale task creation before launch. Pass executable plus arguments; command is only an executable alias, never a shell command line. Pass cwd, timeout_seconds, and workspaceId as needed. |
-| 191 | `task_status` | READ | default | operational | service_dispatch | Read durable managed task state with bounded recent output by taskId; use task_result for the full captured result. |
-| 192 | `task_cancel` | EXECUTE | default | operational | service_dispatch | Cancel a durable managed task by taskId using the same verified process-tree termination path as shell tasks. |
-| 193 | `task_result` | READ | default | operational | service_dispatch | Read the current durable managed task result and captured output by taskId. |
-| 194 | `task_list` | READ | default | operational | service_dispatch | List durable managed tasks owned by the current client/session/workspace. |
-| 195 | `delegate` | EXECUTE | Codex opt-in | dependency_gated | service_dispatch | Delegate one bounded read-only task through the owned agent-swarm provider when configured. |
-| 196 | `delegate_status` | READ | Codex opt-in | dependency_gated | service_dispatch | Read delegated agent state from the owned agent-swarm provider. |
-| 197 | `delegate_cancel` | EXECUTE | Codex opt-in | dependency_gated | service_dispatch | Cancel an owned delegated agent task. |
-| 198 | `delegate_result` | READ | Codex opt-in | dependency_gated | service_dispatch | Read an owned delegated agent result. |
-| 199 | `parallel_delegate` | EXECUTE | Codex opt-in | dependency_gated | service_dispatch | Run up to four isolated read-only agent tasks through the owned swarm provider with explicit dependency/collision metadata. |
-| 200 | `permission_check` | READ | default | operational | deterministic_operation | Evaluate an action class without limiting allowed context reads. |
-| 201 | `permission_profile` | READ | default | operational | deterministic_operation | Return the active Permission v2 profile. |
-| 202 | `live_logs_query` | READ | default | operational | truthful_unavailable | Query bounded structured MCP activity events with tool, workspace, phase, result, call/trace correlation filters. |
-| 203 | `live_logs_status` | READ | default | operational | truthful_unavailable | Return the built-in MCP activity-log pipeline health and bounded source status. |
-| 204 | `telemetry_dashboard` | READ | default | operational | deterministic_operation | Return measured MCP activity, latency, error, cache, and context-economy telemetry from the local runtime. |
-| 205 | `context_economy_stats` | READ | default | operational | deterministic_operation | Return context discovery, deduplication, ledger, and token-efficiency telemetry. |
-| 206 | `execution_plan` | READ | default | operational | deterministic_operation | Return the cheapest deterministic execution plan and reason. |
-| 207 | `repo_map` | READ | default | operational | service_dispatch | Return a traversable repository structural map. |
-| 208 | `context_expand` | READ | default | operational | service_dispatch | Return optional import, caller, type, test, and change references. |
-| 209 | `recovery_status` | READ | default | operational | service_dispatch | Return reconnect, retry, continuation, cache, and worker recovery state. |
-| 210 | `tool_schema_list` | READ | default | operational | deterministic_operation | List versioned tool schema metadata. |
-| 211 | `tool_schema_register` | WRITE | default | operational | deterministic_operation | Register a validated backward-compatible versioned tool schema descriptor in the local runtime registry. |
-| 212 | `capabilities` | READ | default | operational | deterministic_operation | Discover capability categories without requiring every full schema. |
-| 213 | `tool_search` | READ | default | operational | deterministic_operation | Search tools, tags, phases, and descriptions deterministically. |
-| 214 | `tool_dynamic_filter` | READ | default | operational | deterministic_operation | Return a bounded ranked tool set using deterministic scoring with optional local rerank fallback. |
-| 215 | `tool_describe` | READ | default | operational | deterministic_operation | Describe one tool contract on demand. |
-| 216 | `tool_categories` | READ | default | operational | deterministic_operation | List tool categories and counts. |
-| 217 | `tool_function_find` | READ | default | operational | deterministic_operation | Find the best local tool/function candidates for a prompt. |
-| 218 | `tool_aliases` | READ | default | operational | deterministic_operation | List stable shorthand aliases and their primitive tool targets. |
-| 219 | `mcp_hub` | READ | default | dependency_gated | service_dispatch | Describe the additive MCP hub boundary without flattening child tools or retaining credentials. |
-| 220 | `dev_context` | READ | default | operational | service_dispatch | Run the unified deterministic development-context facade. |
-| 221 | `recipe_catalog` | READ | default | operational | deterministic_operation | Return inspectable developer automation recipes. |
-| 222 | `capture_screenshot` | READ | default | operational | service_dispatch | Capture screenshot metadata for visual validation. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
-| 223 | `compare_screenshot` | READ | default | operational | deterministic_operation | Compare screenshot metadata or supplied artifacts. |
-| 224 | `dom_snapshot` | READ | default | operational | service_dispatch | Return a structured DOM snapshot. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
-| 225 | `layout_metadata` | READ | default | operational | service_dispatch | Return layout metadata for visual validation. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
-| 226 | `visual_context` | READ | default | operational | service_dispatch | Combine screenshot, DOM, layout, console, and network references. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
-| 227 | `media_read` | READ | default | dependency_gated | service_dispatch | Read image files as native MCP image content and inspect or sample video files into bounded frame images for multimodal agents. Uses workspace-scoped paths and bundled FFmpeg/ffprobe on Windows when packaged, with local FFmpeg/ffprobe fallback on other platforms. |
-| 228 | `inspect_workbook` | READ | default | operational | service_dispatch | Inspect workbook sheets, used ranges, and a bounded sample through Excel COM. |
-| 229 | `compare_workbook_layout` | READ | default | dependency_gated | service_dispatch | Compare two workbook sheet/layout samples through the local Excel/Office provider. |
-| 230 | `render_excel_preview` | READ | default | dependency_gated | service_dispatch | Render a bounded structured Excel preview from sheet names and sampled cell values through the local Excel/Office provider. |
-| 231 | `inspect_pdf` | READ | default | dependency_gated | truthful_unavailable | Inspect PDF page structure and text through the local PDF provider. |
-| 232 | `compare_pdf_pages` | READ | default | dependency_gated | truthful_unavailable | Compare two PDFs by bounded page/text metadata through the local PDF provider. |
-| 233 | `project_profile_get` | READ | default | operational | service_dispatch | Read the validated workspace project-intelligence profile. |
-| 234 | `project_profile_set` | WRITE | default | operational | deterministic_operation | Persist validated workspace project-intelligence conventions through the guarded file boundary. |
-| 235 | `handoff_context` | READ | default | operational | service_dispatch | Recover the durable Goal, checkpoint, capsule and owned task receipts first, then observe optional workspace context with explicit provider states. Missing Git or search preserves available recovery state. |
-| 236 | `benchmark_run` | EXECUTE | default | dependency_gated | service_dispatch | Preview or start the detected managed benchmark project command and retain bounded run evidence. |
-| 237 | `regression_report` | READ | default | operational | deterministic_operation | Return retained local benchmark run evidence and regression comparisons for the current runtime session. |
-| 238 | `sandbox_exec` | EXECUTE | default | dependency_gated | truthful_unavailable | Run an artifact-based Windows Sandbox job with networking disabled and read-only mapped input. |
-| 239 | `event_watch` | EXECUTE | default | dependency_gated | deterministic_operation | Watch an allowlisted user-mode ETW or Windows Event Log diagnostic stream. |
-| 240 | `crash_trace` | READ | default | dependency_gated | deterministic_operation | Return bounded crash and service-diagnostic context from allowlisted user-mode sources. |
-| 241 | `lsp_diagnostics` | READ | default | dependency_gated | truthful_unavailable | Read diagnostics from an owned language-server child process. |
-| 242 | `lsp_rename` | WRITE | default | dependency_gated | truthful_unavailable | Create a cross-file LSP rename edit plan before any workspace write. |
-| 243 | `debug_attach` | EXECUTE | default | dependency_gated | truthful_unavailable | Attach to an already running numeric-loopback TCP DAP adapter with bounded initialization and attach-only configuration. The host retains sockets under the actual client, MCP session and registered workspace. dryRun validates without connecting. No debugger process is launched. |
-| 244 | `debug_step` | EXECUTE | default | dependency_gated | truthful_unavailable | Read bounded owned-session status/events by cursor, disconnect the adapter without terminating the debuggee, or issue a validated DAP command. Adapter replies and output retain their exact values. Event overflow and connection gaps are explicit. Control/evaluation uses current host permission, Engineering and Goal lease admission. dryRun sends no frame. |
-| 245 | `git_worktree_spawn` | WRITE | default | dependency_gated | deterministic_operation | Create a confined, ledger-owned Git worktree for isolated agent work with collision metadata. |
-| 246 | `git_worktree_remove` | DANGEROUS | default | dependency_gated | deterministic_operation | Remove a ledger-owned Git worktree after dry-run and standard-mode confirmation; trusted Full Bypass skips lnwjud approval. |
-| 247 | `db_inspect` | READ | default | dependency_gated | truthful_unavailable | Inspect a local database schema through a configured, read-only connection. |
-| 248 | `db_query` | READ | default | dependency_gated | truthful_unavailable | Run a bounded read-only local SQLite SELECT, PRAGMA, or WITH...SELECT query. |
-| 249 | `office_ppt` | WRITE | default | dependency_gated | service_dispatch | Read PowerPoint content or save a copy through the existing Office policy boundary. |
-| 250 | `office_status` | READ | default | operational | service_dispatch | Report truthful Office provider, app, action, dependency, and policy readiness without exposing credentials. |
-| 251 | `office_word` | WRITE | default | dependency_gated | service_dispatch | Read, create, edit, inspect, merge, convert, and validate Word documents through a verified Office provider. |
-| 252 | `office_excel` | WRITE | default | dependency_gated | service_dispatch | Automate structured Excel workbook reads, edits, formulas, sheets, formatting, exports, and validation through a verified provider. |
-| 253 | `office_powerpoint` | WRITE | default | dependency_gated | service_dispatch | Author, inspect, edit, export, and validate PowerPoint presentations through a verified provider. |
-| 254 | `office_outlook` | WRITE | default | dependency_gated | service_dispatch | Read Outlook mail, create and update drafts, and perform guarded mailbox mutations through a verified provider. |
-| 255 | `office_calendar` | WRITE | default | dependency_gated | service_dispatch | Read and manage Outlook/Microsoft 365 calendar events through a verified provider with guarded invite/cancel actions. |
-| 256 | `office_contacts` | WRITE | default | dependency_gated | service_dispatch | Read and manage Outlook/Microsoft 365 contacts through a verified provider. |
-| 257 | `office_tasks` | WRITE | default | dependency_gated | service_dispatch | Read and manage Outlook/Microsoft 365 tasks only when the configured provider exposes a compatible task API. |
-| 258 | `office_onenote` | WRITE | default | dependency_gated | truthful_unavailable | Read and manage OneNote through Microsoft Graph when OAuth and required scopes are configured. |
-| 259 | `office_onedrive` | WRITE | default | dependency_gated | truthful_unavailable | Manage OneDrive files through Microsoft Graph while respecting Active Project boundaries for local transfers. |
-| 260 | `office_sharepoint` | WRITE | default | dependency_gated | truthful_unavailable | Read and manage bounded SharePoint sites, lists, drives, and files through Microsoft Graph. |
-| 261 | `office_teams` | WRITE | default | dependency_gated | truthful_unavailable | Read and send guarded Microsoft Teams messages only through supported Microsoft Graph permissions. |
-| 262 | `office_access` | WRITE | default | dependency_gated | service_dispatch | Automate Microsoft Access only when a verified local Access provider is installed. |
-| 263 | `office_visio` | WRITE | default | dependency_gated | service_dispatch | Automate Microsoft Visio only when a verified local Visio provider is installed. |
-| 264 | `office_project` | WRITE | default | dependency_gated | service_dispatch | Automate Microsoft Project only when a verified local Project provider is installed. |
-| 265 | `office_publisher` | WRITE | default | dependency_gated | service_dispatch | Automate legacy Microsoft Publisher only when an installed automation provider is verified. |
-| 266 | `office_convert` | WRITE | default | dependency_gated | deterministic_operation | Convert supported Office formats through a verified provider and verify the produced artifact before reporting success. |
-| 267 | `office_batch` | WRITE | default | dependency_gated | deterministic_operation | Run a bounded ordered Office batch with per-step results, dry-run support, and fail-fast semantics; operations are not atomic across apps. |
-| 268 | `pdf_extract_tables` | READ | default | dependency_gated | truthful_unavailable | Extract bounded PDF text and tables through a local document provider. |
-| 269 | `docx_merge` | WRITE | default | dependency_gated | service_dispatch | Create a deterministic DOCX merge plan and write only after approval. |
-| 270 | `self_heal_plan` | READ | default | operational | service_dispatch | Propose safe, deterministic, reversible recovery steps without applying mutations. |
-| 271 | `self_heal_apply` | DANGEROUS | default | dependency_gated | service_dispatch | Apply a current reversible recovery plan without automatic destructive retries; standard mode requires confirmation and trusted Full Bypass skips lnwjud approval. |
-| 272 | `skills_import` | WRITE | default | operational | service_dispatch | Import a validated local SKILL.md into the selected workspace skill catalog through guarded file read/write operations. |
-| 273 | `ecc_status` | READ | default | operational | deterministic_operation | Report the pinned ECC provider, provenance, activation policy, and bundled security-scanner readiness. |
-| 274 | `ecc_catalog` | READ | default | operational | deterministic_operation | Search the pinned ECC artifact catalog without eagerly loading artifact bodies. |
-| 275 | `ecc_load` | READ | default | operational | truthful_unavailable | Load one selected bounded ECC text artifact by stable catalog ID. |
-| 276 | `ecc_configure` | WRITE | default | operational | truthful_unavailable | Persist selective ECC activation settings without granting imported artifacts extra runtime authority. |
-| 277 | `ecc_security_scan` | EXECUTE | default | dependency_gated | truthful_unavailable | Run the pinned bundled AgentShield scanner against ECC resources or a registered workspace with bounded JSON output. |
-| 278 | `ecc_memory_save` | WRITE | default | operational | service_dispatch | Create one unreviewed ecc.memory.v1 document without overwriting existing memory. |
-| 279 | `ecc_memory_search` | READ | default | operational | service_dispatch | Search active ECC Memory Vault entries with bounded local lexical retrieval. |
-| 280 | `ecc_memory_read` | READ | default | operational | service_dispatch | Read one ECC Memory Vault entry by stable memory id after completeness checks. |
-| 281 | `ecc_memory_doctor` | READ | default | operational | service_dispatch | Validate ECC Memory Vault documents, symlinks, duplicates, and schema health without rewriting them. |
-| 282 | `tool_batch` | EXECUTE | default | operational | service_dispatch | Execute multiple MCP tools with parallel, dependency-aware, timeout, cancellation, and partial-result handling. |
-| 283 | `automation_create` | WRITE | default | operational | service_dispatch | Create one owner- and workspace-scoped durable shell automation run beneath an existing leased Goal. The plan must be a bounded acyclic milestone graph with evidence-producing verification for every milestone. |
-| 284 | `automation_status` | READ | default | operational | service_dispatch | Read one durable automation run owned by the current actor in the requested workspace. |
-| 285 | `automation_events` | READ | default | operational | service_dispatch | Read a bounded page of durable automation events owned by the current actor in the requested workspace. |
-| 286 | `automation_run` | EXECUTE | default | operational | service_dispatch | Advance one leased durable automation run to its next deterministic dispatch, observation, or verification boundary. Repeat with the returned current revision; this operation never creates a scheduler. |
-| 287 | `automation_control` | DANGEROUS | default | operational | service_dispatch | Pause, resume, or cancel one leased durable automation run. Cancellation also applies the run cancellation policy to its root Goal. |
-| 288 | `automation_finalize` | WRITE | default | operational | service_dispatch | Finalize a fully verified durable automation run and confirm its root Goal reached terminal completion. This fails closed while native scheduled-task cleanup is pending. |
+| 102 | `checkpoint_goal_engineering` | WRITE | default | operational | service_dispatch | Atomically checkpoint durable goal progress using the current lease and expected revision. For every meaningful milestone or handoff boundary, include resumeContext with the concrete state a new worker needs to reconstruct work without guessing: changedFiles, exact commands with pass/fail/running status and result, decisions, failedAttempts, pendingValidation, resumePrerequisites, stateFacts, and artifacts. summary is only a headline and must not replace reconstruction-grade resumeContext. Use trackedTasks for goal-relative blocking_job/supporting_service roles and explicit provider routing; activeTaskIds remains a legacy compatibility form. Supporting services do not block continuation liveness and are cancelled only when cancelWithGoal=true. A checkpoint records durable progress only; it is not a turn boundary or permission to yield, and it does not create a new Scheduled Task. After an ordinary checkpoint keep useful work moving on the current lease. A transient task/status/log/result observation failure must be retried or re-resolved in the same turn, and a tracked blocking job that becomes terminal must have its terminal result inspected before handoff. Before yielding an active automatic-continuation goal, ensure exactly one confirmed Native ChatGPT hourly recurring watchdog exists with cloud execution requested unless scheduling was explicitly disabled. Reuse the same nativeTaskId across checkpoints and ordinary hourly wakes; never create a per-wake successor and never retime the recurring cadence merely because a checkpoint changed. Historical v4.52 one-time rows keep their compatibility behavior until they become historical, and one-time plus recurring watchdogs must never overlap for one goal. A real native task ID is required for confirmed coverage, while execution mode may remain unverified when the host does not expose it. At an unavoidable turn boundary, persist full resumeContext before releasing the lease; if scheduling is enabled confirm watchdog coverage first. Never wait for the user to type continue/ทำต่อ. Compatibility alias for clients whose connector cached an older checkpoint_goal input schema. Uses the same strict schema, lease and revision checks, and authenticated Goal handler. Tool availability follows checkpoint_goal. |
+| 103 | `finish_goal` | WRITE | default | operational | service_dispatch | Finish the local durable goal using lease/revision compare-and-swap. It must be called before any completion report, even when scheduling was disabled or the user requested no watchdog. status=completed is rejected while durable plan work, blockers, or blocking tasks remain. After the terminal CAS, finish_goal aborts in-flight fenced MCP requests and attempts to stop every tracked task whose cancelWithGoal policy is true; inspect requestCancellation, taskCancellations, allRequestsStopped, and allTasksStopped for unresolved work. Preferred v4.54 completion cleans any live Native ChatGPT watchdog first: call cancel_scheduled_continuation while the goal is still active, make the exact task non-runnable using host delete or confirmed disable, record truthful cleanup evidence, then call finish_goal once. Explicit user-attested manual deletion is a separate evidence class and must never be represented as host-native proof. Defensive compatibility remains: if finish_goal returns status=active with completionState=pending_native_cleanup, recover the exact cleanup locator from get_goal/get_scheduled_continuation, perform cleanup only, record evidence, and call finish_goal again without resuming workspace work. A recurring hourly run never consumes the task and outcome=consumed is not cleanup proof. Report completion only after completionState=completed and get_goal is terminal with no pending scheduled-task cleanup. |
+| 104 | `cancel_goal` | WRITE | default | operational | service_dispatch | Cancel a durable goal independently of any scheduled watchdog. It records the goal as cancelled, aborts in-flight fenced MCP requests for that goal, and attempts to stop only tracked tasks whose cancelWithGoal policy is true; shared supporting services remain running by default and are reported as taskCancellations status=skipped. An explicitly bound provider that is unavailable or cannot verify termination is reported as failed, so allTasksStopped remains false until the unresolved task is inspected. Inspect requestCancellation, taskCancellations, and allRequestsStopped/allTasksStopped for unresolved work. If scheduledTaskCancellation requests make_native_task_non_runnable, use cancel_scheduled_continuation separately, resolve the actual native ChatGPT cleanup operation exposed by the host, and record exact proof that the pending task is non-runnable. |
+| 105 | `reconcile_goals` | WRITE | default | operational | service_dispatch | Preview or apply exact durable-goal reconciliation after runtime liveness checks. |
+| 106 | `list_goals` | READ | default | operational | service_dispatch | List a bounded set of durable goals owned by the current stable MCP client, optionally filtered by workspace/status. |
+| 107 | `resource_snapshot` | READ | default | operational | service_dispatch | Show sampled resources scoped to registered workspace/owned Goal. Unknown ownership and context metrics remain unknown; shared tasks are never cancellable. |
+| 108 | `call_history` | READ | default | operational | service_dispatch | Read server-observed correlated MCP calls from bounded SQLite audit records. Values without measured transport spans remain null/unknown; supports filters and opaque keyset pagination. |
+| 109 | `goal_result` | READ | default | operational | service_dispatch | Read evidence-limited Durable Goal results. Never attributes legacy operations without a server-verified Goal lease. |
+| 110 | `workflow_templates` | READ | default | operational | service_dispatch | List six built-in Thai/English workflows for a registered workspace. Read-only; does not create a Goal. |
+| 111 | `workflow_prepare` | READ | default | operational | service_dispatch | Validate bounded inputs, workspace paths, provider readiness, and return a deterministic preview. No side effects. |
+| 112 | `workflow_start` | WRITE | default | operational | service_dispatch | Start or attach the selected validated workflow to an existing Durable Goal contract with hashed idempotency key. Never creates any scheduled task; caller must hold returned Goal lease to execute. |
+| 113 | `prepare_scheduled_continuation` | WRITE | default | operational | service_dispatch | Checkpoint durable progress and ensure exactly one live current-chat Native ChatGPT hourly recurring watchdog with cloud execution requested. When the current chat exposes an exact @connector mention for lnwjud, pass it as connectorMention so the generated native Scheduled Task prompt remains bound to that connector; omit it only when the host exposes no mention. At a meaningful continuation handoff include reconstruction-grade resumeContext (changed files, exact commands/results, decisions, failed attempts, pending validation, resume prerequisites, state facts, artifacts); summary alone is not sufficient resume state. New v4.53 watchdogs use occurrence=interval and intervalMinutes=60; when successorDelayMinutes is omitted the first firing is one hour from prepare, while a legacy explicit 2–25 minute value changes only the first firing and never the hourly recurrence cadence. Reuse the same confirmed native task ID across checkpoints and ordinary wakes; never create a per-wake successor or retime the recurring cadence. If an active v4.52 one-time watchdog already exists, reuse that legacy task until it becomes historical before creating the recurring watchdog, so one-time and recurring native tasks never overlap for one goal. prepared means reservation only and is not confirmed host coverage. Record native create failure or uncertainty truthfully and reconcile uncertain host state before any blind create. On an explicit host-surface lookup/dispatch failure such as Resource not found that proves the operation was not dispatched, re-resolve the current Native Scheduled Task host operation once and retry that exact native operation once; never retry ambiguous possible-success and never switch scheduler providers. Host create and cleanup remain Native ChatGPT Scheduled Task operations exposed by the current chat; never use browser/DOM automation, Windows Task Scheduler, cron, shell timers, or an lnwjud-local scheduler as a substitute. |
+| 114 | `record_scheduled_continuation_receipt` | WRITE | default | operational | service_dispatch | Record truthful cleanup/run receipts for recurring Native ChatGPT watchdogs and legacy one-time watchdogs. created requires the real native task ID and host-reported absolute dueAt. A recurring interval firing never consumes or replaces the native task, so outcome=consumed and reschedule_* remain legacy one-time compatibility only. For outcome=cancelled prefer matching native host evidence that the exact task is non-runnable: delete may report deleted/not_found and hosts without delete may report an exact disable receipt. If the host management surface is unavailable and the user explicitly deleted the exact task in ChatGPT Scheduled Tasks, userCancellationReceipt may record that separately as user-attested manual deletion only with userConfirmed=true; never label user testimony as host-native proof. The stored native task ID is immutable for the lifetime of the watchdog. |
+| 115 | `claim_scheduled_continuation` | WRITE | default | operational | service_dispatch | Scheduled-wake entrypoint and the first lnwjud action before any workspace mutation. Native watchdogs should pass the expected goalId and workspaceId from their wake metadata so the host-visible WRITE scope is explicit and lnwjud can reject mismatched identity before liveness or lease mutation; legacy callers that only have continuationId remain compatible. For occurrence=interval, the same native hourly task remains scheduled across firings: a live/uncertain worker returns worker_busy_noop without lease theft or host-task mutation, a true concurrent/stale duplicate whose observation predates an already-recorded lease acquisition returns already_claimed, an existing interval runKey alone never suppresses a fresh current-liveness check, a safely available lease returns recurring_acquired, and a still-valid stale lease with trustworthy no-worker/no-blocking-work evidence is recovered in the same hourly tick after the bounded 60-second stale-heartbeat grace rather than waiting for expiry or a second hourly firing. Only recurring_acquired may include a read-only automationResume hint; busy/no-op claims never inspect or mutate automation state. After recurring_acquired, discovering a fixable CI, test, code-scanning, packaging, release, or tool failure is not permission to yield: continue diagnosis, repair, and relevant validation in the same host turn while safe useful actions remain, rather than ending the hourly wake with a status-only report. Ordinary recurring wakes never create a successor, never consume the native task, and never retime its cadence. terminal_noop performs no work; if terminal cleanup is pending, make the exact recurring native task non-runnable rather than resuming goal work. Historical occurrence=once rows retain the v4.52 acquired/successor_required/reschedule compatibility paths. Never count prepared as confirmed and never mutate the workspace without the acquired goal lease. |
+| 116 | `get_scheduled_continuation` | READ | default | operational | service_dispatch | Read one scheduled-continuation snapshot by continuation ID or the latest record for a goal. In v4.53, occurrence=interval identifies the single hourly recurring watchdog; its dueAt is the first scheduled firing, not a mutation handoff deadline, and its native task ID remains stable across ordinary wakes. Historical occurrence=once rows preserve legacy one-time compatibility state. |
+| 117 | `expedite_scheduled_continuation` | WRITE | default | operational | service_dispatch | Legacy one-time compatibility only. For a still-pending occurrence=once watchdog and an enumerated handoff-risk signal, adaptively move that exact native task closer using the existing v4.52 rules. occurrence=interval recurring watchdogs must not use expedite_scheduled_continuation because ordinary recurring cadence is fixed at one hour and the host contract exposes no truthful immediate-run operation. Never create a replacement task through this operation. |
+| 118 | `cancel_scheduled_continuation` | WRITE | default | operational | service_dispatch | Cancel the scheduled watchdog independently of its durable goal. For v4.53 occurrence=interval, make the exact recurring Native ChatGPT task non-runnable with the strongest host operation actually exposed: prefer true delete, otherwise a host-confirmed disable. One recurring firing never consumes the task, so a past first due time is not cleanup proof. Historical occurrence=once rows retain their legacy cancellation/reconciliation behavior. Never treat a model assertion or unverified host state as cleanup proof. This does not cancel the durable goal or stop its running tasks. |
+| 119 | `symbol_search` | READ | default | operational | service_dispatch | Search indexed symbols across the workspace. |
+| 120 | `find_definition` | READ | default | operational | service_dispatch | Find deterministic symbol definitions. |
+| 121 | `find_references` | READ | default | operational | service_dispatch | Find textual and indexed references to a symbol. |
+| 122 | `find_implementations` | READ | default | operational | service_dispatch | Find interface and class implementations. |
+| 123 | `call_hierarchy` | READ | default | operational | service_dispatch | Return a deterministic call hierarchy approximation. |
+| 124 | `import_graph` | READ | default | operational | service_dispatch | Return indexed imports and exports for a module. |
+| 125 | `dependency_graph` | READ | default | operational | service_dispatch | Return package and module dependency metadata. |
+| 126 | `module_graph` | READ | default | operational | service_dispatch | Return the workspace module graph. |
+| 127 | `type_search` | READ | default | operational | service_dispatch | Search indexed TypeScript, JavaScript, and Python types. |
+| 128 | `trace_symbol` | READ | default | operational | service_dispatch | Combine definition, references, imports, tests, and recent context. |
+| 129 | `context_ranking` | READ | default | operational | deterministic_operation | Explain ranking signals without removing lower-ranked context. |
+| 130 | `debug_context` | READ | default | operational | service_dispatch | Gather deterministic debugging context and continuation metadata. |
+| 131 | `review_context` | READ | default | operational | service_dispatch | Gather code-review context. |
+| 132 | `change_context` | READ | default | operational | service_dispatch | Gather changed files, symbols, dependencies, and tests. |
+| 133 | `symbol_context` | READ | default | operational | service_dispatch | Gather context around a symbol. |
+| 134 | `test_context` | READ | default | operational | service_dispatch | Gather relevant test context. |
+| 135 | `dependency_context` | READ | default | operational | service_dispatch | Gather dependency-related context. |
+| 136 | `git_context` | READ | default | operational | service_dispatch | Gather Git status, diff, and history context. |
+| 137 | `frontend_context` | READ | default | operational | service_dispatch | Gather frontend project context. |
+| 138 | `backend_context` | READ | default | operational | service_dispatch | Gather backend project context. |
+| 139 | `route_intent` | READ | default | operational | deterministic_operation | Classify a prompt with a deterministic, overridable route. |
+| 140 | `recipe_list` | READ | default | operational | deterministic_operation | List built-in and user recipe names. |
+| 141 | `recipe_describe` | READ | default | operational | deterministic_operation | Describe a recipe plan and permissions. |
+| 142 | `recipe_run` | EXECUTE | default | operational | deterministic_operation | Preview or run a deterministic recipe plan. |
+| 143 | `dry_run` | READ | default | operational | deterministic_operation | Return a no-side-effect execution preview. |
+| 144 | `review_changes` | READ | default | operational | service_dispatch | Review current Git changes and affected context. |
+| 145 | `changed_symbols` | READ | default | operational | service_dispatch | Find symbols in changed files. |
+| 146 | `affected_modules` | READ | default | operational | service_dispatch | Find modules affected by current changes. |
+| 147 | `git_history_context` | READ | default | operational | service_dispatch | Return relevant recent Git history. |
+| 148 | `git_blame_context` | READ | default | operational | service_dispatch | Return line ownership context for a file. |
+| 149 | `discover_tests` | READ | default | operational | service_dispatch | Discover project tests without imposing an execution limit. |
+| 150 | `run_affected_tests` | EXECUTE | default | operational | service_dispatch | Plan or run tests affected by changed files. |
+| 151 | `test_failures` | READ | default | operational | service_dispatch | Summarize recorded test failures. |
+| 152 | `coverage_context` | READ | default | operational | service_dispatch | Return coverage context when project tooling provides it. |
+| 153 | `test_history` | READ | default | operational | service_dispatch | Return recent test execution history. |
+| 154 | `cache_stats` | READ | default | operational | deterministic_operation | Return shared cache hit/miss telemetry. |
+| 155 | `cache_clear` | WRITE | default | operational | deterministic_operation | Clear safe local runtime caches. |
+| 156 | `cache_invalidate` | WRITE | default | operational | deterministic_operation | Invalidate cache entries for a path or workspace. |
+| 157 | `hook_list` | READ | default | operational | deterministic_operation | List registered lifecycle hooks. |
+| 158 | `hook_register` | WRITE | default | operational | deterministic_operation | Register a deterministic lifecycle hook descriptor. |
+| 159 | `hook_remove` | WRITE | default | operational | deterministic_operation | Remove a lifecycle hook descriptor. |
+| 160 | `skill_match` | READ | default | operational | service_dispatch | Match relevant local skills without loading all skill text. |
+| 161 | `skill_load` | READ | default | operational | service_dispatch | Load a selected local skill by identifier. |
+| 162 | `plugin_install` | WRITE | default | operational | truthful_unavailable | Register a validated plugin descriptor in the locked shared runtime registry. This manages declared plugin state; it does not execute untrusted plugin code. |
+| 163 | `plugin_list` | READ | default | operational | deterministic_operation | List plugin descriptors from the locked shared runtime registry. |
+| 164 | `plugin_enable` | WRITE | default | operational | truthful_unavailable | Enable an installed plugin descriptor in persistent shared runtime state. |
+| 165 | `plugin_disable` | WRITE | default | operational | truthful_unavailable | Disable an installed plugin descriptor in persistent shared runtime state. |
+| 166 | `plugin_remove` | DANGEROUS | default | operational | truthful_unavailable | Remove an installed plugin descriptor from persistent shared runtime state. |
+| 167 | `session_context` | READ | default | operational | deterministic_operation | Return persisted development-session context. |
+| 168 | `session_checkpoint` | WRITE | default | operational | deterministic_operation | Persist a development-session checkpoint. |
+| 169 | `session_resume` | READ | default | operational | deterministic_operation | Resume a persisted session context. |
+| 170 | `session_history` | READ | default | operational | deterministic_operation | Return session checkpoints and decisions. |
+| 171 | `response_mode` | READ | default | operational | deterministic_operation | Select compact, normal, verbose, or stream formatting. |
+| 172 | `inspect_web_app` | READ | default | operational | service_dispatch | Combine DOM, console, network, URL, and screenshot metadata. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
+| 173 | `debug_ui` | READ | default | operational | service_dispatch | Gather deterministic UI debugging context. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
+| 174 | `capture_ui_state` | READ | default | operational | service_dispatch | Capture a structured UI state. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
+| 175 | `form_context` | READ | default | operational | service_dispatch | Inspect form controls and values metadata. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
+| 176 | `network_context` | READ | default | dependency_gated | truthful_unavailable | Summarize browser network context when a retained CDP network event stream is available. |
+| 177 | `console_context` | READ | default | dependency_gated | truthful_unavailable | Summarize browser console context when a retained CDP Runtime/Log event stream is available. |
+| 178 | `browser_debug_context` | READ | default | operational | service_dispatch | Combine browser diagnostics for one request. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
+| 179 | `windows_environment` | READ | default | dependency_gated | service_dispatch | Inspect Windows environment metadata. |
+| 180 | `service_context` | READ | default | operational | deterministic_operation | Inspect host service-manager metadata. |
+| 181 | `process_context` | READ | default | operational | service_dispatch | Inspect host process-tree context. |
+| 182 | `port_context` | READ | default | operational | deterministic_operation | Inspect local listening-port context. |
+| 183 | `registry_context` | READ | default | dependency_gated | deterministic_operation | Inspect Windows registry context through the Windows capability boundary. |
+| 184 | `event_log_context` | READ | default | operational | deterministic_operation | Inspect host-native event and log context. |
+| 185 | `installed_runtime_context` | READ | default | operational | deterministic_operation | Inspect installed runtimes and package managers. |
+| 186 | `path_context` | READ | default | operational | deterministic_operation | Resolve executable and PATH context. |
+| 187 | `startup_context` | READ | default | operational | deterministic_operation | Inspect host startup configuration context. |
+| 188 | `mcp_discover` | READ | default | operational | service_dispatch | Discover external MCP servers without flattening native tools. |
+| 189 | `mcp_health` | READ | default | operational | service_dispatch | Return external MCP connection health. |
+| 190 | `mcp_resources` | READ | default | dependency_gated | service_dispatch | List resources exposed by connected MCP servers when the child server supports resources/list. |
+| 191 | `task_create` | EXECUTE | default | operational | service_dispatch | Create a durable background task through the local shell task runtime. When the task belongs to a durable goal, pass goalId (or the current goalLease envelope) so terminal goals reject stale task creation before launch. Pass executable plus arguments; command is only an executable alias, never a shell command line. Pass cwd, timeout_seconds, and workspaceId as needed. |
+| 192 | `task_status` | READ | default | operational | service_dispatch | Read durable managed task state with bounded recent output by taskId; use task_result for the full captured result. |
+| 193 | `task_cancel` | EXECUTE | default | operational | service_dispatch | Cancel a durable managed task by taskId using the same verified process-tree termination path as shell tasks. |
+| 194 | `task_result` | READ | default | operational | service_dispatch | Read the current durable managed task result and captured output by taskId. |
+| 195 | `task_list` | READ | default | operational | service_dispatch | List durable managed tasks owned by the current client/session/workspace. |
+| 196 | `delegate` | EXECUTE | Codex opt-in | dependency_gated | service_dispatch | Delegate one bounded read-only task through the owned agent-swarm provider when configured. |
+| 197 | `delegate_status` | READ | Codex opt-in | dependency_gated | service_dispatch | Read delegated agent state from the owned agent-swarm provider. |
+| 198 | `delegate_cancel` | EXECUTE | Codex opt-in | dependency_gated | service_dispatch | Cancel an owned delegated agent task. |
+| 199 | `delegate_result` | READ | Codex opt-in | dependency_gated | service_dispatch | Read an owned delegated agent result. |
+| 200 | `parallel_delegate` | EXECUTE | Codex opt-in | dependency_gated | service_dispatch | Run up to four isolated read-only agent tasks through the owned swarm provider with explicit dependency/collision metadata. |
+| 201 | `permission_check` | READ | default | operational | deterministic_operation | Evaluate an action class without limiting allowed context reads. |
+| 202 | `permission_profile` | READ | default | operational | deterministic_operation | Return the active Permission v2 profile. |
+| 203 | `live_logs_query` | READ | default | operational | truthful_unavailable | Query bounded structured MCP activity events with tool, workspace, phase, result, call/trace correlation filters. |
+| 204 | `live_logs_status` | READ | default | operational | truthful_unavailable | Return the built-in MCP activity-log pipeline health and bounded source status. |
+| 205 | `telemetry_dashboard` | READ | default | operational | deterministic_operation | Return measured MCP activity, latency, error, cache, and context-economy telemetry from the local runtime. |
+| 206 | `context_economy_stats` | READ | default | operational | deterministic_operation | Return context discovery, deduplication, ledger, and token-efficiency telemetry. |
+| 207 | `execution_plan` | READ | default | operational | deterministic_operation | Return the cheapest deterministic execution plan and reason. |
+| 208 | `repo_map` | READ | default | operational | service_dispatch | Return a traversable repository structural map. |
+| 209 | `context_expand` | READ | default | operational | service_dispatch | Return optional import, caller, type, test, and change references. |
+| 210 | `recovery_status` | READ | default | operational | service_dispatch | Return reconnect, retry, continuation, cache, and worker recovery state. |
+| 211 | `tool_schema_list` | READ | default | operational | deterministic_operation | List versioned tool schema metadata. |
+| 212 | `tool_schema_register` | WRITE | default | operational | deterministic_operation | Register a validated backward-compatible versioned tool schema descriptor in the local runtime registry. |
+| 213 | `capabilities` | READ | default | operational | deterministic_operation | Discover capability categories without requiring every full schema. |
+| 214 | `tool_search` | READ | default | operational | deterministic_operation | Search tools, tags, phases, and descriptions deterministically. |
+| 215 | `tool_dynamic_filter` | READ | default | operational | deterministic_operation | Return a bounded ranked tool set using deterministic scoring with optional local rerank fallback. |
+| 216 | `tool_describe` | READ | default | operational | deterministic_operation | Describe one tool contract on demand. |
+| 217 | `tool_categories` | READ | default | operational | deterministic_operation | List tool categories and counts. |
+| 218 | `tool_function_find` | READ | default | operational | deterministic_operation | Find the best local tool/function candidates for a prompt. |
+| 219 | `tool_aliases` | READ | default | operational | deterministic_operation | List stable shorthand aliases and their primitive tool targets. |
+| 220 | `mcp_hub` | READ | default | dependency_gated | service_dispatch | Describe the additive MCP hub boundary without flattening child tools or retaining credentials. |
+| 221 | `dev_context` | READ | default | operational | service_dispatch | Run the unified deterministic development-context facade. |
+| 222 | `recipe_catalog` | READ | default | operational | deterministic_operation | Return inspectable developer automation recipes. |
+| 223 | `capture_screenshot` | READ | default | operational | service_dispatch | Capture screenshot metadata for visual validation. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
+| 224 | `compare_screenshot` | READ | default | operational | deterministic_operation | Compare screenshot metadata or supplied artifacts. |
+| 225 | `dom_snapshot` | READ | default | operational | service_dispatch | Return a structured DOM snapshot. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
+| 226 | `layout_metadata` | READ | default | operational | service_dispatch | Return layout metadata for visual validation. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
+| 227 | `visual_context` | READ | default | operational | service_dispatch | Combine screenshot, DOM, layout, console, and network references. Requires an exact dom_cdp tab_id from list_tabs or new_tab; never uses the active/first tab. |
+| 228 | `media_read` | READ | default | dependency_gated | service_dispatch | Read image files as native MCP image content and inspect or sample video files into bounded frame images for multimodal agents. Uses workspace-scoped paths and bundled FFmpeg/ffprobe on Windows when packaged, with local FFmpeg/ffprobe fallback on other platforms. |
+| 229 | `inspect_workbook` | READ | default | operational | service_dispatch | Inspect workbook sheets, used ranges, and a bounded sample through Excel COM. |
+| 230 | `compare_workbook_layout` | READ | default | dependency_gated | service_dispatch | Compare two workbook sheet/layout samples through the local Excel/Office provider. |
+| 231 | `render_excel_preview` | READ | default | dependency_gated | service_dispatch | Render a bounded structured Excel preview from sheet names and sampled cell values through the local Excel/Office provider. |
+| 232 | `inspect_pdf` | READ | default | dependency_gated | truthful_unavailable | Inspect PDF page structure and text through the local PDF provider. |
+| 233 | `compare_pdf_pages` | READ | default | dependency_gated | truthful_unavailable | Compare two PDFs by bounded page/text metadata through the local PDF provider. |
+| 234 | `project_profile_get` | READ | default | operational | service_dispatch | Read the validated workspace project-intelligence profile. |
+| 235 | `project_profile_set` | WRITE | default | operational | deterministic_operation | Persist validated workspace project-intelligence conventions through the guarded file boundary. |
+| 236 | `handoff_context` | READ | default | operational | service_dispatch | Recover the durable Goal, checkpoint, capsule and owned task receipts first, then observe optional workspace context with explicit provider states. Missing Git or search preserves available recovery state. |
+| 237 | `benchmark_run` | EXECUTE | default | dependency_gated | service_dispatch | Preview or start the detected managed benchmark project command and retain bounded run evidence. |
+| 238 | `regression_report` | READ | default | operational | deterministic_operation | Return retained local benchmark run evidence and regression comparisons for the current runtime session. |
+| 239 | `sandbox_exec` | EXECUTE | default | dependency_gated | truthful_unavailable | Run an artifact-based Windows Sandbox job with networking disabled and read-only mapped input. |
+| 240 | `event_watch` | EXECUTE | default | dependency_gated | deterministic_operation | Watch an allowlisted user-mode ETW or Windows Event Log diagnostic stream. |
+| 241 | `crash_trace` | READ | default | dependency_gated | deterministic_operation | Return bounded crash and service-diagnostic context from allowlisted user-mode sources. |
+| 242 | `lsp_diagnostics` | READ | default | dependency_gated | truthful_unavailable | Read diagnostics from an owned language-server child process. |
+| 243 | `lsp_rename` | WRITE | default | dependency_gated | truthful_unavailable | Create a cross-file LSP rename edit plan before any workspace write. |
+| 244 | `debug_attach` | EXECUTE | default | dependency_gated | truthful_unavailable | Attach to an already running numeric-loopback TCP DAP adapter with bounded initialization and attach-only configuration. The host retains sockets under the actual client, MCP session and registered workspace. dryRun validates without connecting. No debugger process is launched. |
+| 245 | `debug_step` | EXECUTE | default | dependency_gated | truthful_unavailable | Read bounded owned-session status/events by cursor, disconnect the adapter without terminating the debuggee, or issue a validated DAP command. Adapter replies and output retain their exact values. Event overflow and connection gaps are explicit. Control/evaluation uses current host permission, Engineering and Goal lease admission. dryRun sends no frame. |
+| 246 | `git_worktree_spawn` | WRITE | default | dependency_gated | deterministic_operation | Create a confined, ledger-owned Git worktree for isolated agent work with collision metadata. |
+| 247 | `git_worktree_remove` | DANGEROUS | default | dependency_gated | deterministic_operation | Remove a ledger-owned Git worktree after dry-run and standard-mode confirmation; trusted Full Bypass skips lnwjud approval. |
+| 248 | `db_inspect` | READ | default | dependency_gated | truthful_unavailable | Inspect a local database schema through a configured, read-only connection. |
+| 249 | `db_query` | READ | default | dependency_gated | truthful_unavailable | Run a bounded read-only local SQLite SELECT, PRAGMA, or WITH...SELECT query. |
+| 250 | `office_ppt` | WRITE | default | dependency_gated | service_dispatch | Read PowerPoint content or save a copy through the existing Office policy boundary. |
+| 251 | `office_status` | READ | default | operational | service_dispatch | Report truthful Office provider, app, action, dependency, and policy readiness without exposing credentials. |
+| 252 | `office_word` | WRITE | default | dependency_gated | service_dispatch | Read, create, edit, inspect, merge, convert, and validate Word documents through a verified Office provider. |
+| 253 | `office_excel` | WRITE | default | dependency_gated | service_dispatch | Automate structured Excel workbook reads, edits, formulas, sheets, formatting, exports, and validation through a verified provider. |
+| 254 | `office_powerpoint` | WRITE | default | dependency_gated | service_dispatch | Author, inspect, edit, export, and validate PowerPoint presentations through a verified provider. |
+| 255 | `office_outlook` | WRITE | default | dependency_gated | service_dispatch | Read Outlook mail, create and update drafts, and perform guarded mailbox mutations through a verified provider. |
+| 256 | `office_calendar` | WRITE | default | dependency_gated | service_dispatch | Read and manage Outlook/Microsoft 365 calendar events through a verified provider with guarded invite/cancel actions. |
+| 257 | `office_contacts` | WRITE | default | dependency_gated | service_dispatch | Read and manage Outlook/Microsoft 365 contacts through a verified provider. |
+| 258 | `office_tasks` | WRITE | default | dependency_gated | service_dispatch | Read and manage Outlook/Microsoft 365 tasks only when the configured provider exposes a compatible task API. |
+| 259 | `office_onenote` | WRITE | default | dependency_gated | truthful_unavailable | Read and manage OneNote through Microsoft Graph when OAuth and required scopes are configured. |
+| 260 | `office_onedrive` | WRITE | default | dependency_gated | truthful_unavailable | Manage OneDrive files through Microsoft Graph while respecting Active Project boundaries for local transfers. |
+| 261 | `office_sharepoint` | WRITE | default | dependency_gated | truthful_unavailable | Read and manage bounded SharePoint sites, lists, drives, and files through Microsoft Graph. |
+| 262 | `office_teams` | WRITE | default | dependency_gated | truthful_unavailable | Read and send guarded Microsoft Teams messages only through supported Microsoft Graph permissions. |
+| 263 | `office_access` | WRITE | default | dependency_gated | service_dispatch | Automate Microsoft Access only when a verified local Access provider is installed. |
+| 264 | `office_visio` | WRITE | default | dependency_gated | service_dispatch | Automate Microsoft Visio only when a verified local Visio provider is installed. |
+| 265 | `office_project` | WRITE | default | dependency_gated | service_dispatch | Automate Microsoft Project only when a verified local Project provider is installed. |
+| 266 | `office_publisher` | WRITE | default | dependency_gated | service_dispatch | Automate legacy Microsoft Publisher only when an installed automation provider is verified. |
+| 267 | `office_convert` | WRITE | default | dependency_gated | deterministic_operation | Convert supported Office formats through a verified provider and verify the produced artifact before reporting success. |
+| 268 | `office_batch` | WRITE | default | dependency_gated | deterministic_operation | Run a bounded ordered Office batch with per-step results, dry-run support, and fail-fast semantics; operations are not atomic across apps. |
+| 269 | `pdf_extract_tables` | READ | default | dependency_gated | truthful_unavailable | Extract bounded PDF text and tables through a local document provider. |
+| 270 | `docx_merge` | WRITE | default | dependency_gated | service_dispatch | Create a deterministic DOCX merge plan and write only after approval. |
+| 271 | `self_heal_plan` | READ | default | operational | service_dispatch | Propose safe, deterministic, reversible recovery steps without applying mutations. |
+| 272 | `self_heal_apply` | DANGEROUS | default | dependency_gated | service_dispatch | Apply a current reversible recovery plan without automatic destructive retries; standard mode requires confirmation and trusted Full Bypass skips lnwjud approval. |
+| 273 | `skills_import` | WRITE | default | operational | service_dispatch | Import a validated local SKILL.md into the selected workspace skill catalog through guarded file read/write operations. |
+| 274 | `ecc_status` | READ | default | operational | deterministic_operation | Report the pinned ECC provider, provenance, activation policy, and bundled security-scanner readiness. |
+| 275 | `ecc_catalog` | READ | default | operational | deterministic_operation | Search the pinned ECC artifact catalog without eagerly loading artifact bodies. |
+| 276 | `ecc_load` | READ | default | operational | truthful_unavailable | Load one selected bounded ECC text artifact by stable catalog ID. |
+| 277 | `ecc_configure` | WRITE | default | operational | truthful_unavailable | Persist selective ECC activation settings without granting imported artifacts extra runtime authority. |
+| 278 | `ecc_security_scan` | EXECUTE | default | dependency_gated | truthful_unavailable | Run the pinned bundled AgentShield scanner against ECC resources or a registered workspace with bounded JSON output. |
+| 279 | `ecc_memory_save` | WRITE | default | operational | service_dispatch | Create one unreviewed ecc.memory.v1 document without overwriting existing memory. |
+| 280 | `ecc_memory_search` | READ | default | operational | service_dispatch | Search active ECC Memory Vault entries with bounded local lexical retrieval. |
+| 281 | `ecc_memory_read` | READ | default | operational | service_dispatch | Read one ECC Memory Vault entry by stable memory id after completeness checks. |
+| 282 | `ecc_memory_doctor` | READ | default | operational | service_dispatch | Validate ECC Memory Vault documents, symlinks, duplicates, and schema health without rewriting them. |
+| 283 | `tool_batch` | EXECUTE | default | operational | service_dispatch | Execute multiple MCP tools with parallel, dependency-aware, timeout, cancellation, and partial-result handling. |
+| 284 | `automation_create` | WRITE | default | operational | service_dispatch | Create one owner- and workspace-scoped durable shell automation run beneath an existing leased Goal. The plan must be a bounded acyclic milestone graph with evidence-producing verification for every milestone. |
+| 285 | `automation_status` | READ | default | operational | service_dispatch | Read one durable automation run owned by the current actor in the requested workspace. |
+| 286 | `automation_events` | READ | default | operational | service_dispatch | Read a bounded page of durable automation events owned by the current actor in the requested workspace. |
+| 287 | `automation_run` | EXECUTE | default | operational | service_dispatch | Advance one leased durable automation run to its next deterministic dispatch, observation, or verification boundary. Repeat with the returned current revision; this operation never creates a scheduler. |
+| 288 | `automation_control` | DANGEROUS | default | operational | service_dispatch | Pause, resume, or cancel one leased durable automation run. Cancellation also applies the run cancellation policy to its root Goal. |
+| 289 | `automation_finalize` | WRITE | default | operational | service_dispatch | Finalize a fully verified durable automation run and confirm its root Goal reached terminal completion. This fails closed while native scheduled-task cleanup is pending. |
 <!-- END GENERATED README TOOL REGISTRY -->
 
 ## Detailed capability guide

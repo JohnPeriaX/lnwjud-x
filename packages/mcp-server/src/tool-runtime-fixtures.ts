@@ -185,6 +185,10 @@ export const CORE_TOOL_RUNTIME_FIXTURES = {
     goalId: 'goal-1', leaseToken: 'lease-token', expectedRevision: 0, currentPhase: 'smoke', summary: 'smoke',
     stepUpdates: [], nextAction: '', blockers: [], evidence: [], activeTaskIds: [],
   }, 'goals.checkpointGoal'),
+  checkpoint_goal_engineering: service({
+    goalId: 'goal-1', leaseToken: 'lease-token', expectedRevision: 0, currentPhase: 'smoke', summary: 'smoke',
+    stepUpdates: [], nextAction: '', blockers: [], evidence: [], activeTaskIds: [],
+  }, 'goals.checkpointGoal'),
   finish_goal: service({ goalId: 'goal-1', leaseToken: 'lease-token', expectedRevision: 0, status: 'completed', summary: 'smoke', evidence: [] }, 'goals.finishGoal'),
   cancel_goal: service({ goalId: 'goal-1', expectedRevision: 0, summary: 'cancel smoke', evidence: [] }, 'goals.cancelGoal'),
   reconcile_goals: service({ workspaceId, goalIds: ['goal-1'], reason: 'abandoned', summary: 'reconcile smoke', apply: false }, 'goals.reconcileGoals'),

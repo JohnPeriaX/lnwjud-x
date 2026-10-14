@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Cross-platform local AI-agent runtime and MCP gateway</strong><br />
-  <em>288 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 276 are advertised by default and all 288 when Codex delegation plus Agent Swarm is enabled.</em>
+  <em>289 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 277 are advertised by default and all 289 when Codex delegation plus Agent Swarm is enabled.</em>
 </p>
 
 <p align="center">
@@ -18,31 +18,31 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D4" />
   <img alt="Node" src="https://img.shields.io/badge/Node.js-24.x-339933" />
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-288%20tools-6f42c1" />
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-289%20tools-6f42c1" />
 </p>
 
 <h2 align="center">Download lnwjud</h2>
-<p align="center">Choose your platform and download the current v5.8.5 release directly.</p>
+<p align="center">Choose your platform and download the current v5.8.6 release directly.</p>
 
 <table align="center">
   <tr>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Setup-5.8.5.exe">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Setup-5.8.6.exe">
         <img src="assets/download/download-windows.svg" width="300" alt="Download lnwjud for Windows" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Portable-5.8.5.exe">Portable x64</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-Portable-5.8.6.exe">Portable x64</a></sub>
     </td>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.5-arm64.dmg">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.6-arm64.dmg">
         <img src="assets/download/download-macos.svg" width="300" alt="Download lnwjud for macOS" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.5-x64.dmg">Intel x64 DMG</a> · <a href="docs/INSTALL_MACOS.md">Install guide</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.6-x64.dmg">Intel x64 DMG</a> · <a href="docs/INSTALL_MACOS.md">Install guide</a></sub>
     </td>
     <td align="center" width="33%">
-      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.5-x64.deb">
+      <a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.6-x64.deb">
         <img src="assets/download/download-linux.svg" width="300" alt="Download lnwjud for Linux" />
       </a><br />
-      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.5-x64.AppImage">x64 AppImage</a> · <a href="docs/INSTALL_LINUX.md">Other architectures</a></sub>
+      <sub><a href="https://github.com/engasnm111/lnwjud/releases/latest/download/lnwjud-5.8.6-x64.AppImage">x64 AppImage</a> · <a href="docs/INSTALL_LINUX.md">Other architectures</a></sub>
     </td>
   </tr>
 </table>
@@ -51,9 +51,23 @@
 
 ---
 
-## Current published version: v5.8.5
+## Current published version: v5.8.6
 
-## Current source version: v5.8.6
+## Current source version: v5.8.7
+
+### What's new in v5.8.7
+
+- **Absolute paths work without registering the folder first:** a tool call that names another folder attaches it as the project for that call instead of failing. Full Access attaches silently; stricter profiles ask once per new folder and the primary Active Project never moves. `workspace_tree` now applies the same read trust the host already grants `read_file`, and `git_status`, `git_diff` and `git_log` accept any repository through `cwd`.
+- **Goal leases are per project:** a durable goal owned by a different project no longer rejects ordinary Git or file work in a project that has no rolling goal. Ownership is still enforced per workspace, and an unreadable fence state fails closed with a call that actually works.
+- **Denials name a usable retry:** scope denials return the path or retry form that will succeed instead of only reporting a mismatch with the Active Project, so the assistant no longer tells you to register folders by hand. The new `get_file_info` tool reports size, type, timestamps and permissions without pulling file content into the conversation.
+- **Fork source build:** the ToolRegistry catalog is synchronized at 289 declared tools (277 default-advertised), and this version is built from the fork tree that also carries upstream v5.8.6 and v5.8.5.
+- **ภาษาไทย:** วาง absolute path แล้วทำงานได้ทันทีโดยโปรเจกต์หลักไม่ถูกย้าย, durable goal ของโปรเจกต์อื่นไม่บล็อกงานปกติในโปรเจกต์ที่ไม่มี goal ค้างอยู่, ข้อความปฏิเสธบอกวิธีเรียกที่ใช้ได้จริง, `workspace_tree` ใช้สิทธิ์การอ่านเดียวกับ `read_file`, คำสั่ง Git รับ `cwd` จาก repository ใดก็ได้ และเพิ่มเครื่องมือใหม่ `get_file_info`
+
+### What's new in v5.8.6
+
+- **Engineering Gate checkpoint compatibility (Issue #198):** Add `checkpoint_goal_engineering` with the same strict schema, Goal handler, lease/revision checks and evidence validation as `checkpoint_goal`. It follows the canonical tool's availability, so disabling `checkpoint_goal` disables both names.
+- **Verification boundary:** The connected `@lnwjud-pc` plugin is running app v5.8.5. Its direct `checkpoint_goal` schema exposes both Engineering fields; a call with non-empty values and `get_goal` readback confirmed persistence. Fresh-session v5.8.6 inventory and alias call/readback remain post-install acceptance.
+- **ภาษาไทย:** `@lnwjud-pc` ที่เชื่อมต่ออยู่ใช้แอป v5.8.5; schema ของ `checkpoint_goal` ประกาศฟิลด์ Engineering ทั้งสองรายการ และเรียกด้วยค่าจริงพร้อมอ่านกลับผ่าน `get_goal` ได้แล้ว ส่วน inventory และการเรียก alias ใน fresh session หลังติดตั้ง v5.8.6 ยังเป็น acceptance ที่รออยู่
 
 ### What's new in v5.8.5
 
@@ -61,23 +75,6 @@
 - **Existing Engineering Goals:** Reconcile workflow classification, gate contracts and source scope from the lease-acquired Goal snapshot. Preserve compatible findings, task tracking and proof; revalidate scope-dependent checks when the requested source scope changes.
 - **Modern MCP HTTP inventory and schema evidence:** Notify subscribed clients when host tool availability changes, then serve the current tools/list on the next request. `tool_describe` reports a SHA-256 digest from the active ToolRegistry schema and identifies remote connector schema as unavailable.
 - **ภาษาไทย:** แยก Full Audit และการตรวจประวัติ deployment/release แบบอ่านอย่างเดียวออกจากคำสั่งปล่อยงาน, reconcile metadata ของ Goal เดิมจาก snapshot ที่ acquire ภายใต้ lease, แจ้ง MCP client เมื่อ tool availability เปลี่ยน และแสดง digest ของ local schema โดยไม่อ้างว่าอ่าน schema ของ connector ภายนอกได้
-
-### What's new in v5.8.4
-
-- **Durable MCP Shell results (Issue #193):** Preserve exact client/session/workspace ownership when a modern HTTP request or legacy MCP transport is replaced. Authorized owners can retrieve retained task status, stdout/stderr and terminal receipts; foreign owners remain denied.
-- **Checked workflows and recovery:** Execute reviewed recipe steps only when requested, evaluate each step under current permissions and Goal leases, and distinguish unavailable provider evidence from completed work. Workspace indexing and context reporting retain explicit error/completeness states.
-- **Agent Swarm:** Fix non-interactive Codex CLI waiting for extra stdin and keep monitoring spawned agents after a start request ends. Verified with real local child-process fixtures; hosted Codex results still depend on account quota and provider availability.
-- **Tool and native provider contracts:** Synchronize all 285 declared MCP tools (273 default), improve truthful Doctor readiness and native media lifecycle boundaries. macOS/Linux capabilities remain subject to platform permissions and target-native verification.
-- **ภาษาไทย:** แก้การอ่านผล Shell หลัง reconnect ตามสิทธิ์เจ้าของ ตรวจ Goal Lease ระหว่างรัน Workflow และแก้ Agent Swarm รอ stdin โดยไม่อ้างว่าบริการหรือฟีเจอร์ทุกแพลตฟอร์มพร้อมใช้เมื่อยังขาดสิทธิ์หรือ Provider
-
-### What's new in v5.8.3
-
-- **Ponytail ULTRA Goal context (Issue #190):** Code mutations without `goalLease` now explain when Ponytail was loaded for a Goal, and tell users to supply that Goal's lease or load the bundled skill in workspace scope. Goal-scoped activation never silently authorizes unbound edits.
-- **Doctor MCP history and Results:** Improved tables and full-detail JSON copy; all visible dates use Gregorian DD/MM/YYYY, Asia/Bangkok (UTC+07:00), 24-hour time. Copied timestamp fields use offset-aware ISO 8601 without changing the underlying instant.
-- **Doctor Resources:** Tracked Goal tasks remain visible even when CPU/RAM cannot be measured; show ownership and why cancellation is unavailable. Only verified active owned blocking jobs can request native-approved cancellation.
-- **Workflows guided inputs:** Detect actual workbook sheets/columns, choose real Git branches and a project package version, and generate a new, workspace-bound report mapping when requested. Advanced manual input remains available; no AI workflow starts automatically.
-- **Code Review:** Default Git comparison base is HEAD, with clear guidance for main/dev/commit refs.
-- **ภาษาไทย:** ตาราง Doctor อ่านง่ายขึ้น ข้อมูลวันที่ทุกหน้าจอเป็นปี ค.ศ. เวลาไทย 24 ชั่วโมง และ JSON ที่คัดลอกใช้ +07:00; หน้ารีวิวโค้ดอธิบายฐานเปรียบเทียบ Git และมีค่า HEAD เริ่มต้น
 
 ### Earlier release highlights — v5.8.0
 
@@ -101,7 +98,7 @@
 
 **ภาษาไทย — ต่างจาก 5.7.4:** เพิ่มเทมเพลต 6 แบบ, ประวัติ MCP และผลงาน Goal ที่มีหลักฐาน, RAM/CPU จริงของโปรเซสที่ตรวจเจ้าของได้, Context Economy แบบรวมระดับ Transport, ตรวจ CSV/XLSX, Git tree/preview ที่ครบขึ้น, UI และ dropdown กลาง, กากบาท Modal ขนาดชัดเจน, Work Log ที่กรองง่ายขึ้น, แก้ Tunnel reconnect ก่อนพร้อม และอัปเดต tunnel-client 0.0.16 พร้อมการทดสอบ/แพ็กเกจตาม SHA จริง ค่าไม่ทราบจะไม่แสดงเป็น 0 หรืออ้างว่าสำเร็จโดยไม่มีข้อมูล
 
-Latest published release: **v5.8.5**. The download buttons above point directly to the verified v5.8.5 assets. The release was published after the exact tagged main commit passed the target-native release gates.
+Latest published release: **v5.8.6**. The download buttons above point directly to the verified v5.8.6 assets. The release was published after the exact tagged main commit passed the target-native release gates.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for previous releases and the complete release history.
 
@@ -150,7 +147,7 @@ For the Thai setup and workflow guide, see [docs/USAGE_TH.md](docs/USAGE_TH.md#8
 
 ## What can lnwjud do?
 
-lnwjud exposes **288 tool definitions** through one local runtime and MCP gateway. The default advertised set is 276; all 288 are available when Codex delegation plus Agent Swarm is enabled.
+lnwjud exposes **289 tool definitions** through one local runtime and MCP gateway. The default advertised set is 277; all 289 are available when Codex delegation plus Agent Swarm is enabled.
 
 | Area | Examples |
 | --- | --- |
