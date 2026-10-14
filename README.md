@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Cross-platform local AI-agent runtime and MCP gateway</strong><br />
-  <em>285 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 273 are advertised by default and all 285 when Codex delegation plus Agent Swarm is enabled.</em>
+  <em>286 total tool definitions for local files, Git, processes, Windows automation, WSL, browser control, durable goal continuation, Engineering Harness, native Goal automation, context capsules, indexing, observability, Office semantic automation, ECC integration, and extensibility; 274 are advertised by default and all 286 when Codex delegation plus Agent Swarm is enabled.</em>
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D4" />
   <img alt="Node" src="https://img.shields.io/badge/Node.js-24.x-339933" />
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-285%20tools-6f42c1" />
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-286%20tools-6f42c1" />
 </p>
 
 <h2 align="center">Download lnwjud</h2>
@@ -53,7 +53,13 @@
 
 ## Current published version: v5.8.5
 
-## Current source version: v5.8.5
+## Current source version: v5.8.6
+
+### What's new in v5.8.6
+
+- **Engineering Gate checkpoint compatibility (Issue #198):** Add `checkpoint_goal_engineering` with the same strict schema, Goal handler, lease/revision checks and evidence validation as `checkpoint_goal`. It follows the canonical tool's availability, so disabling `checkpoint_goal` disables both names.
+- **Verification boundary:** The connected `@lnwjud-pc` plugin is running app v5.8.5. Its direct `checkpoint_goal` schema exposes both Engineering fields; a call with non-empty values and `get_goal` readback confirmed persistence. Fresh-session v5.8.6 inventory and alias call/readback remain post-install acceptance.
+- **ภาษาไทย:** `@lnwjud-pc` ที่เชื่อมต่ออยู่ใช้แอป v5.8.5; schema ของ `checkpoint_goal` ประกาศฟิลด์ Engineering ทั้งสองรายการ และเรียกด้วยค่าจริงพร้อมอ่านกลับผ่าน `get_goal` ได้แล้ว ส่วน inventory และการเรียก alias ใน fresh session หลังติดตั้ง v5.8.6 ยังเป็น acceptance ที่รออยู่
 
 ### What's new in v5.8.5
 
@@ -69,15 +75,6 @@
 - **Agent Swarm:** Fix non-interactive Codex CLI waiting for extra stdin and keep monitoring spawned agents after a start request ends. Verified with real local child-process fixtures; hosted Codex results still depend on account quota and provider availability.
 - **Tool and native provider contracts:** Synchronize all 285 declared MCP tools (273 default), improve truthful Doctor readiness and native media lifecycle boundaries. macOS/Linux capabilities remain subject to platform permissions and target-native verification.
 - **ภาษาไทย:** แก้การอ่านผล Shell หลัง reconnect ตามสิทธิ์เจ้าของ ตรวจ Goal Lease ระหว่างรัน Workflow และแก้ Agent Swarm รอ stdin โดยไม่อ้างว่าบริการหรือฟีเจอร์ทุกแพลตฟอร์มพร้อมใช้เมื่อยังขาดสิทธิ์หรือ Provider
-
-### What's new in v5.8.3
-
-- **Ponytail ULTRA Goal context (Issue #190):** Code mutations without `goalLease` now explain when Ponytail was loaded for a Goal, and tell users to supply that Goal's lease or load the bundled skill in workspace scope. Goal-scoped activation never silently authorizes unbound edits.
-- **Doctor MCP history and Results:** Improved tables and full-detail JSON copy; all visible dates use Gregorian DD/MM/YYYY, Asia/Bangkok (UTC+07:00), 24-hour time. Copied timestamp fields use offset-aware ISO 8601 without changing the underlying instant.
-- **Doctor Resources:** Tracked Goal tasks remain visible even when CPU/RAM cannot be measured; show ownership and why cancellation is unavailable. Only verified active owned blocking jobs can request native-approved cancellation.
-- **Workflows guided inputs:** Detect actual workbook sheets/columns, choose real Git branches and a project package version, and generate a new, workspace-bound report mapping when requested. Advanced manual input remains available; no AI workflow starts automatically.
-- **Code Review:** Default Git comparison base is HEAD, with clear guidance for main/dev/commit refs.
-- **ภาษาไทย:** ตาราง Doctor อ่านง่ายขึ้น ข้อมูลวันที่ทุกหน้าจอเป็นปี ค.ศ. เวลาไทย 24 ชั่วโมง และ JSON ที่คัดลอกใช้ +07:00; หน้ารีวิวโค้ดอธิบายฐานเปรียบเทียบ Git และมีค่า HEAD เริ่มต้น
 
 ### Earlier release highlights — v5.8.0
 
@@ -150,7 +147,7 @@ For the Thai setup and workflow guide, see [docs/USAGE_TH.md](docs/USAGE_TH.md#8
 
 ## What can lnwjud do?
 
-lnwjud exposes **285 tool definitions** through one local runtime and MCP gateway. The default advertised set is 273; all 285 are available when Codex delegation plus Agent Swarm is enabled.
+lnwjud exposes **286 tool definitions** through one local runtime and MCP gateway. The default advertised set is 274; all 286 are available when Codex delegation plus Agent Swarm is enabled.
 
 | Area | Examples |
 | --- | --- |

@@ -98,7 +98,7 @@ test('desktop serves the real MCP client development workflow', async () => {
       'run_goal', 'get_goal', 'get_goal_plan', 'update_goal_plan', 'update_goal_acceptance', 'revise_goal_intent',
       'create_context_capsule', 'get_context_capsule', 'list_context_capsules', 'context_pressure',
       'record_delivery_receipt', 'list_delivery_receipts', 'advance_goal_iteration',
-      'checkpoint_goal', 'finish_goal', 'cancel_goal', 'reconcile_goals', 'list_goals',
+      'checkpoint_goal', 'checkpoint_goal_engineering', 'finish_goal', 'cancel_goal', 'reconcile_goals', 'list_goals',
       'resource_snapshot', 'call_history', 'goal_result', 'workflow_templates', 'workflow_prepare', 'workflow_start',
       'prepare_scheduled_continuation', 'record_scheduled_continuation_receipt', 'claim_scheduled_continuation', 'get_scheduled_continuation', 'expedite_scheduled_continuation', 'cancel_scheduled_continuation',
     ];

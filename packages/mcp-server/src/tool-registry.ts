@@ -189,6 +189,9 @@ const MAX_REMEMBERED_ACTIVITY_HANDLES = 512;
 const AUTOMATION_MUTATION_TOOL_NAMES: ReadonlySet<string> = new Set([
   'automation_create', 'automation_run', 'automation_control', 'automation_finalize',
 ]);
+const TOOL_AVAILABILITY_NAME_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+  checkpoint_goal_engineering: 'checkpoint_goal',
+});
 
 interface BudgetedToolExecution {
   readonly response: McpToolResponse;
@@ -395,11 +398,12 @@ export class ToolRegistry {
         return false;
       }
     }
+    const availabilityName = TOOL_AVAILABILITY_NAME_ALIASES[name] ?? name;
     return resolveEffectiveToolAvailability({
-      name,
+      name: availabilityName,
       snapshot: this.currentToolAvailabilitySnapshot(),
-      systemEligible: this.systemEligibleToolNames.has(name),
-      defaultEnabled: this.defaultExposedToolNames.has(name),
+      systemEligible: this.systemEligibleToolNames.has(name) && this.systemEligibleToolNames.has(availabilityName),
+      defaultEnabled: this.defaultExposedToolNames.has(name) && this.defaultExposedToolNames.has(availabilityName),
     }).effectiveExposed;
   }
 
@@ -1738,7 +1742,7 @@ function summarizeMutationForApproval(toolName: string, input: unknown, activeWo
       lines.push(`launchCount = ${taskIds.length}`);
       if (taskIds.length > 0) lines.push(`taskIds = ${JSON.stringify(taskIds)}`);
     }
-    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.8.5 enforces read-only child sandboxes.');
+    lines.push('WARNING: this consumes explicitly enabled Codex quota; v5.8.6 enforces read-only child sandboxes.');
     return boundedApprovalSummary(lines);
   }
   const projectKind = projectCommandKind(toolName);
