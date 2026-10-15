@@ -126,3 +126,20 @@ apps/desktop/build/runtime-tools/
 apps/desktop/build/ecc-runtime/
 apps/desktop/build/vendor/
 .tmp
+
+# Agent / skill working artifacts
+# Created when a skill or coding agent runs against this checkout (audit state,
+# payloads, scratch plans, IDE and agent-local settings). None of it is product
+# source and none of it belongs in a release artifact or a fork/upstream diff.
+# Already-tracked files are unaffected by these rules: the committed skills under
+# .agents/skills stay in the repository because AGENTS.md references them.
+.bug-hunter/
+.qoder/
+.agents/
+.claude/
+.kilo/
+.superpowers/
+.opencode/
+.droid/
+.serena/
+.codegraph/
