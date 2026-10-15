@@ -240,6 +240,16 @@
       ]
     },
     {
+      "id": "tunnel-lock-winner-order-budget",
+      "summary": "The Windows tunnel-lock winner-order acceptance test gets 30s in local runs as well as in CI. The fixture starts six real powershell.exe processes (owner identity, the production starter script, a holder, and one mutex helper per lock operation) and each cold start measures 1.8-2.1s, making the normal instrumented cost 23.3s against upstream's 15s non-CI branch, so the stage failed deterministically with every assertion passing. Restoring the CI ternary re-breaks the release gate on any host whose PowerShell cold start is above 2.5s, and a timeout failure there is indistinguishable from a lock regression.",
+      "markers": [
+        { "file": "apps/desktop/tests/session-resilience-acceptance.test.ts", "contains": "the old 15s local budget could not fit the work" }
+      ],
+      "proofTests": [
+        "apps/desktop/tests/session-resilience-acceptance.test.ts"
+      ]
+    },
+    {
       "id": "default-project-not-primary",
       "summary": "The first entry of active_workspace_ids is presented as the default project, never the Primary Project, because every open project is usable concurrently and the router now enforces that. Upstream ships the older key names and wording; taking its side during a merge renames the i18n keys back and leaves the components that read home.defaultProject/defaultBadge rendering missing translations.",
       "markers": [

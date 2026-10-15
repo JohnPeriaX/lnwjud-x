@@ -111,6 +111,12 @@ describe('session resilience acceptance', () => {
     }
   }, 30_000);
 
+  // Phase cost measured on this host (instrumented run, all assertions passing): currentOwner 2258ms,
+  // acquire 1566ms, production starter script 4078ms, release 1388ms, PowerShell holder 2614ms,
+  // contended acquire 8570ms, exit wait 192ms, re-acquire 1393ms, final release 1254ms = 23.3s. Six of
+  // those phases each start a real powershell.exe, whose cold start alone measures 1.8-2.1s here, so
+  // the old 15s local budget could not fit the work even when every step succeeded. The test does not
+  // get faster without deleting the behavior it proves; it now gets the same budget CI already used.
   it.runIf(process.platform === 'win32')('keeps the desktop lock and production launcher to one owner in either winner order without running tunnel-client', async () => {
     const root = await temporaryDirectory();
     const profileDirectory = path.join(root, 'tunnel-client');
@@ -146,7 +152,7 @@ describe('session resilience acceptance', () => {
     const afterRelease = await acquireTunnelLock({ profileDirectory, owner: await currentOwner() });
     expect(afterRelease.acquired).toBe(true);
     if (afterRelease.acquired) expect(await afterRelease.release()).toBe(true);
-  }, process.env.CI ? 30_000 : 15_000);
+  }, 30_000);
 
   it.runIf(process.platform === 'win32')('uses the same critical section across a TypeScript stale reclaim and PowerShell publisher', async () => {
     const root = await temporaryDirectory();
