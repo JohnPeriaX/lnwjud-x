@@ -21,6 +21,26 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.9',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'batch-split-guidance', titleKey: 'whatsNew.589.batch.title', descriptionKey: 'whatsNew.589.batch.description', badge: 'improved', tags: ['read_files', 'apply_patch', 'Active Project'] },
+          { id: 'git-plain-folder', titleKey: 'whatsNew.589.gitrepo.title', descriptionKey: 'whatsNew.589.gitrepo.description', badge: 'fixed', tags: ['git_diff', 'Git'] },
+        ],
+      },
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'tunnel-owner-probe', titleKey: 'whatsNew.589.tunnel.title', descriptionKey: 'whatsNew.589.tunnel.description', badge: 'fixed', tags: ['Secure Tunnel', 'Windows', 'Start Tunnel'] },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.8.8',
     categories: [
       {

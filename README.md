@@ -53,7 +53,15 @@
 
 ## Current published version: v5.8.6
 
-## Current source version: v5.8.8
+## Current source version: v5.8.9
+
+### What's new in v5.8.9
+
+- **Mixed-project file batches name the folders to split:** one `read_files` or `apply_patch` call that crossed two projects used to answer only `All files must be in the same workspace`, which an assistant repeated to the user as "the connector cannot read paths on this machine" even though every file was readable. The refusal now names the file that broke the batch, both project folders, and the retry that works: one call per project. Absolute paths still attach their own folder, and the one-project-per-call rule itself was not relaxed.
+- **A plain folder is reported as not a Git repository:** `git_diff` inside a folder without a repository failed as an unexplained internal error, because Git signals that condition with exit 129 for `diff` and exit 128 for `status`, and only 128 was recognised. The call now returns `GIT_NOT_REPOSITORY`, so an uninitialized folder is never mistaken for an lnwjud fault, while an unrelated Git failure still stays an internal error.
+- **Start Tunnel no longer depends on how busy the machine is:** Windows answers "when did this process start" only through PowerShell, whose cold start measures 1.6-2.1s on this host, while the tunnel lock identified its own process with the short timeout meant for judging whether another process is still alive. Naming the running process now has its own budget, so the coin flip that users worked around by killing the app and waiting minutes is gone. Cross-process liveness keeps the fast timeout and still fails closed.
+- **Fork source build:** each behavior change above carries a deterministic regression test at its own seam and is registered in the fork's divergence registry (23 behaviors now), so an upstream merge that restores the old message-only or exit-128-only classification fails a guard instead of passing silently. No tool was added or removed and the MCP catalog is unchanged.
+- **ภาษาไทย:** batch ที่ปนไฟล์คนละโปรเจกต์จะบอกว่าไฟล์ใดทำให้ข้ามโปรเจกต์ พร้อมโฟลเดอร์ของทั้งสองโปรเจกต์และวิธีแยกเรียกที่ถูกต้อง, โฟลเดอร์ธรรมดาตอบตรงว่าไม่ใช่ Git repository แทน error ลึกลับที่ไม่บอกสาเหตุ, และการกด Start Tunnel ไม่ขึ้นกับความว่างของเครื่องอีกต่อไป โดยเกณฑ์ตัดสินว่า process อื่นยังอยู่หรือตายยังคง timeout สั้นและ fail closed ตามเดิม
 
 ### What's new in v5.8.8
 
@@ -71,12 +79,6 @@
 - **Denials name a usable retry:** scope denials return the path or retry form that will succeed instead of only reporting a mismatch with the Active Project, so the assistant no longer tells you to register folders by hand. The new `get_file_info` tool reports size, type, timestamps and permissions without pulling file content into the conversation.
 - **Fork source build:** the ToolRegistry catalog is synchronized at 289 declared tools (277 default-advertised), and this version is built from the fork tree that also carries upstream v5.8.6 and v5.8.5.
 - **ภาษาไทย:** วาง absolute path แล้วทำงานได้ทันทีโดยโปรเจกต์หลักไม่ถูกย้าย, durable goal ของโปรเจกต์อื่นไม่บล็อกงานปกติในโปรเจกต์ที่ไม่มี goal ค้างอยู่, ข้อความปฏิเสธบอกวิธีเรียกที่ใช้ได้จริง, `workspace_tree` ใช้สิทธิ์การอ่านเดียวกับ `read_file`, คำสั่ง Git รับ `cwd` จาก repository ใดก็ได้ และเพิ่มเครื่องมือใหม่ `get_file_info`
-
-### What's new in v5.8.6
-
-- **Engineering Gate checkpoint compatibility (Issue #198):** Add `checkpoint_goal_engineering` with the same strict schema, Goal handler, lease/revision checks and evidence validation as `checkpoint_goal`. It follows the canonical tool's availability, so disabling `checkpoint_goal` disables both names.
-- **Verification boundary:** The connected `@lnwjud-pc` plugin is running app v5.8.5. Its direct `checkpoint_goal` schema exposes both Engineering fields; a call with non-empty values and `get_goal` readback confirmed persistence. Fresh-session v5.8.6 inventory and alias call/readback remain post-install acceptance.
-- **ภาษาไทย:** `@lnwjud-pc` ที่เชื่อมต่ออยู่ใช้แอป v5.8.5; schema ของ `checkpoint_goal` ประกาศฟิลด์ Engineering ทั้งสองรายการ และเรียกด้วยค่าจริงพร้อมอ่านกลับผ่าน `get_goal` ได้แล้ว ส่วน inventory และการเรียก alias ใน fresh session หลังติดตั้ง v5.8.6 ยังเป็น acceptance ที่รออยู่
 
 ### Earlier release highlights — v5.8.0
 
