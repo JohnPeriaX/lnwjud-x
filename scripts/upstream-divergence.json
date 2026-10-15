@@ -55,11 +55,26 @@
     },
     {
       "id": "actionable-scope-denial",
-      "summary": "A scope refusal names the retry that works, because a vague refusal makes the assistant tell the user to register the folder by hand.",
+      "summary": "A scope refusal names the retry that works, because a vague refusal makes the assistant tell the user to register the folder by hand, or to claim the host cannot read the path at all when the batch only spanned two projects.",
       "markers": [
-        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "describeActiveWorkspaceScopeMismatch" }
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "describeActiveWorkspaceScopeMismatch" },
+        { "file": "packages/application/src/file-service.ts", "contains": "describeBatchProjectSplit" }
       ],
-      "proofTests": ["packages/mcp-server/src/external-project-attach.test.ts"]
+      "proofTests": [
+        "packages/mcp-server/src/external-project-attach.test.ts",
+        "packages/application/src/file-service.test.ts"
+      ]
+    },
+    {
+      "id": "git-diff-non-repository-classification",
+      "summary": "A missing Git repository is recognized from Git's message instead of only exit 128, because 'git diff' in a plain folder exits 129 with a usage warning. Under the 128-only check the diff call fell through to INTERNAL_ERROR, whose message the MCP result mapper replaces with 'Operation failed', so a folder that was never a repository was reported to the user as an lnwjud failure and retried.",
+      "markers": [
+        { "file": "packages/git/src/git-adapter.ts", "contains": "const NOT_A_GIT_REPOSITORY = /not a git repository/i;" },
+        { "file": "packages/git/src/git-adapter.ts", "contains": "if (NOT_A_GIT_REPOSITORY.test(result.stderr))" }
+      ],
+      "proofTests": [
+        "packages/git/src/git-adapter.test.ts"
+      ]
     },
     {
       "id": "silent-attach-profile",

@@ -1,4 +1,4 @@
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -11,10 +11,11 @@ afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-function repository(workspace: Workspace): WorkspaceRepository {
+function repository(...workspaces: Workspace[]): WorkspaceRepository {
+  const byId = new Map(workspaces.map((workspace) => [workspace.id, workspace]));
   return {
-    async list(): Promise<Workspace[]> { return [workspace]; },
-    async get(id: string): Promise<Workspace | null> { return id === workspace.id ? workspace : null; },
+    async list(): Promise<Workspace[]> { return [...workspaces]; },
+    async get(id: string): Promise<Workspace | null> { return byId.get(id) ?? null; },
     async insert(): Promise<void> {},
     async delete(): Promise<void> {},
   };
@@ -112,5 +113,62 @@ describe('FileService', () => {
       expect(imageResult.value.encoding).toBe('base64');
       expect(imageResult.value.mimeType).toBe('image/png');
     }
+  });
+
+  it('names both projects and the split retry when one read batch spans two projects', async () => {
+    const roots = await Promise.all([
+      mkdtemp(path.join(os.tmpdir(), 'lnwjud-batch-split-a-')),
+      mkdtemp(path.join(os.tmpdir(), 'lnwjud-batch-split-b-')),
+    ]);
+    temporaryRoots.push(...roots);
+    const workspaces: Workspace[] = roots.map((root, index): Workspace => ({
+      id: `workspace-${index}`, displayName: `Project ${index}`, rootPath: root, realRootPath: root, createdAt: new Date(0).toISOString(),
+    }));
+    const firstPath = path.join(roots[0]!, 'one.txt');
+    const secondPath = path.join(roots[1]!, 'two.txt');
+    await writeFile(firstPath, 'one', 'utf8');
+    await writeFile(secondPath, 'two', 'utf8');
+
+    const result = await new FileService(repository(...workspaces)).readFiles(
+      { clientId: 'test', clientName: 'test' },
+      undefined,
+      { files: [{ path: firstPath }, { path: secondPath }] },
+    );
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
+    if (result.ok) throw new Error('A batch that spans two projects must never be answered as one read');
+    // The refusal is what the assistant repeats to the user, so it has to name the real split.
+    expect(result.error.message).toContain(secondPath);
+    expect(result.error.message).toContain(roots[0]!);
+    expect(result.error.message).toContain(roots[1]!);
+    expect(result.error.message).toContain('one call per project');
+    expect(result.error.message).not.toContain('All files must be in the same workspace');
+  });
+
+  it('refuses a patch batch that spans two projects before writing either file', async () => {
+    const roots = await Promise.all([
+      mkdtemp(path.join(os.tmpdir(), 'lnwjud-batch-patch-a-')),
+      mkdtemp(path.join(os.tmpdir(), 'lnwjud-batch-patch-b-')),
+    ]);
+    temporaryRoots.push(...roots);
+    const workspaces: Workspace[] = roots.map((root, index): Workspace => ({
+      id: `workspace-${index}`, displayName: `Project ${index}`, rootPath: root, realRootPath: root, createdAt: new Date(0).toISOString(),
+    }));
+    const firstPath = path.join(roots[0]!, 'one.txt');
+    const secondPath = path.join(roots[1]!, 'two.txt');
+    await writeFile(firstPath, 'original-one', 'utf8');
+    await writeFile(secondPath, 'original-two', 'utf8');
+
+    const result = await new FileService(repository(...workspaces)).applyPatch(
+      { clientId: 'test', clientName: 'test' },
+      undefined,
+      { files: [{ path: firstPath, content: 'patched-one' }, { path: secondPath, content: 'patched-two' }] },
+    );
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
+    if (result.ok) throw new Error('A patch that spans two projects must be refused');
+    expect(result.error.message).toContain('one call per project');
+    expect(await readFile(firstPath, 'utf8')).toBe('original-one');
+    expect(await readFile(secondPath, 'utf8')).toBe('original-two');
   });
 });

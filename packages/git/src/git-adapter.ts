@@ -44,6 +44,7 @@ const MAX_GIT_ARGS = 128;
 const MAX_GIT_ARG_LENGTH = 32_768;
 const DEFAULT_GIT_TIMEOUT_MS = 60_000;
 const MAX_GIT_TIMEOUT_MS = 300_000;
+const NOT_A_GIT_REPOSITORY = /not a git repository/i;
 
 export class GitAdapter {
   public constructor(private readonly runner: GitRunner = new DirectGitRunner()) {}
@@ -161,7 +162,11 @@ export class GitAdapter {
 
   private mapError(result: GitRunResult): Result<never> | null {
     if (result.exitCode === 0) return null;
-    if (result.exitCode === 128 && /not a git repository/i.test(result.stderr)) {
+    // Git reports the same missing repository with two different shapes: `status` and `log` exit 128
+    // with a fatal, while `diff` exits 129 with a usage warning offering --no-index. Matching only 128
+    // sent the diff case to INTERNAL_ERROR, whose message the MCP result mapper replaces with
+    // "Operation failed", so a folder that was never a repository looked like an lnwjud fault.
+    if (NOT_A_GIT_REPOSITORY.test(result.stderr)) {
       return err(appError('GIT_NOT_REPOSITORY', 'Workspace is not a Git repository'));
     }
     if (result.exitCode === -1 && /ENOENT/i.test(result.stderr)) {

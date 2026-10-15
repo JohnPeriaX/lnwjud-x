@@ -266,6 +266,16 @@ export class FileService {
     return this.unrestricted || this.trustedWorkspaceAccess;
   }
 
+  /**
+   * A refusal inside a batch is agent-facing text: the assistant repeats it to the user as its own
+   * diagnosis. "All files must be in the same workspace" reads like the host cannot reach the path at
+   * all, so the user is told to attach the folder or grant access when the batch simply spanned two
+   * projects. Name both roots and the retry that actually works.
+   */
+  private describeBatchProjectSplit(filePath: string, anchor: Workspace, other: Workspace): string {
+    return `"${filePath}" belongs to project "${other.rootPath}", while the first file of this batch belongs to project "${anchor.rootPath}". A single call handles one project only: split the batch into one call per project folder and keep every path absolute, because each folder is attached from its own path without registering it first.`;
+  }
+
   public async readFile(
     actor: FileActor,
     workspaceId: string | undefined,
@@ -327,7 +337,7 @@ export class FileService {
       const fileWorkspace = await resolveWorkspaceForPath(this.workspaces, workspaceId, fileRequest.path, authorization, process.platform, this.externalReadRoots, this.allowExplicitAbsoluteRead);
       if (!fileWorkspace.ok) return fileWorkspace;
       if (fileWorkspace.value.id !== workspaceResult.value.id) {
-        return err(appError('PATH_OUTSIDE_WORKSPACE', 'All files must be in the same workspace'));
+        return err(appError('PATH_OUTSIDE_WORKSPACE', this.describeBatchProjectSplit(fileRequest.path, workspaceResult.value, fileWorkspace.value)));
       }
       const result = await this.readFile(actor, fileWorkspace.value.id, fileRequest, authorization);
       if (!result.ok) return result;
@@ -453,7 +463,7 @@ export class FileService {
       if (isAborted(signal)) return cancelledFileMutation();
       if (!fileWorkspace.ok) return fileWorkspace;
       if (fileWorkspace.value.id !== workspace.id) {
-        return err(appError('PATH_OUTSIDE_WORKSPACE', 'All files must be in the same workspace'));
+        return err(appError('PATH_OUTSIDE_WORKSPACE', this.describeBatchProjectSplit(patch.path, workspace, fileWorkspace.value)));
       }
       const resolved = await this.guard.resolveForWrite(workspace, patch.path, authorization);
       if (isAborted(signal)) return cancelledFileMutation();

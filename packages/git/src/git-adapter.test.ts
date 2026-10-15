@@ -105,4 +105,29 @@ describe('GitAdapter', () => {
       error: { code: 'GIT_NOT_REPOSITORY' },
     });
   });
+
+  it('maps the diff usage warning to GIT_NOT_REPOSITORY instead of an opaque internal failure', async () => {
+    // Measured on a plain folder outside any repository: `git diff` does not exit 128. It exits 129
+    // with this warning plus a usage dump, and the internal error message it used to produce is
+    // replaced by "Operation failed" in the MCP result, leaving the caller no way to tell the two apart.
+    const runner = new FakeGitRunner({
+      exitCode: 129,
+      stdout: '',
+      stderr: 'warning: Not a git repository. Use --no-index to compare two paths outside a working tree\nusage: git diff --no-index [<options>] <path> <path>',
+    });
+
+    await expect(new GitAdapter(runner).diff('C:\\plain-folder', { path: 'create-server.js' })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'GIT_NOT_REPOSITORY', message: 'Workspace is not a Git repository' },
+    });
+  });
+
+  it('keeps an unrelated failing git command an internal failure', async () => {
+    const runner = new FakeGitRunner({ exitCode: 128, stdout: '', stderr: 'fatal: bad revision' });
+
+    await expect(new GitAdapter(runner).log('C:\\workspace')).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INTERNAL_ERROR' },
+    });
+  });
 });
