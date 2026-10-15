@@ -167,6 +167,31 @@
         "packages/application/src/search-service.test.ts",
         "packages/application/src/workspace-query-service.test.ts"
       ]
+    },
+    {
+      "id": "workspace-id-target-resolution",
+      "summary": "workspaceId is resolved as a target at the registry seam before any policy runs: an absolute host path becomes the project that owns it (active set, then registry, then host attach), a uniquely matching project name becomes its id, and a path that cannot become a project is refused with the real project list. Upstream treats the field as an opaque id, so a path or a mistyped id produced WORKSPACE_NOT_FOUND and 'not an Active Project' loops across chats (measured 66 path-shaped calls and 31 WORKSPACE_NOT_FOUND completions in one log window).",
+      "markers": [
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "private async resolveWorkspaceIdTarget" },
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "describeUnresolvableWorkspacePath" },
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "describeUnregisteredProjects" }
+      ],
+      "proofTests": [
+        "packages/mcp-server/src/workspace-id-routing.test.ts"
+      ]
+    },
+    {
+      "id": "active-project-path-wins-routing",
+      "summary": "When an explicit workspaceId conflicts with the project that owns the call's own absolute path, the path wins: routing rewrites workspaceId to that project and the call runs. Upstream (ed397533, 2026-10-12) refuses shell/wsl_exec/task_create/process_start outright, which measured 45 INVALID_INPUT failures in 36 hours while every Active Project was advertised as usable at the same time. The reconciled id travels to the executor, so a durable handle stays addressable by the same client.",
+      "markers": [
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "this.routeInputToActiveWorkspace(prepared.value.input" }
+      ],
+      "proofTests": [
+        "packages/mcp-server/src/workspace-id-routing.test.ts",
+        "packages/mcp-server/src/checked-workflow-registry.test.ts",
+        "packages/mcp-server/src/tool-registry.test.ts",
+        "packages/mcp-server/src/durable-task-http.integration.test.ts"
+      ]
     }
   ]
 }

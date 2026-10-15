@@ -774,17 +774,23 @@ describe('MCP tool registry', () => {
     expect(projectStarts).toBe(0);
   });
 
-  it.each(['shell', 'wsl_exec', 'task_create', 'process_start'])('rejects an explicit %s workspace conflict before creating an inaccessible owned handle', async (toolName) => {
+  it.each(['shell', 'wsl_exec', 'task_create', 'process_start'])('routes a conflicting %s workspace to the project that owns its working directory', async (toolName) => {
     const rootA = path.join(tmpdir(), 'lnwjud-explicit-owner-a');
     const rootB = path.join(tmpdir(), 'lnwjud-explicit-owner-b');
     const calls: Array<{ tool: string; input: unknown }> = [];
     const registry = new ToolRegistry({
       capabilities: {
-        async execute(tool, input): Promise<ReturnType<typeof ok<{ task_id: string; state: string }>>> {
+        async execute(tool, input): Promise<ReturnType<typeof ok<Record<string, unknown>>>> {
           calls.push({ tool, input });
-          return ok({ task_id: 'owned-task', state: 'running' });
+          return ok({ task_id: 'owned-task', processId: 'owned-task', state: 'running', pid: 4242, startedAt: new Date(0).toISOString(), cwd: rootB });
         },
       },
+      process: {
+        async start(_actor: unknown, workspaceId: string, request: Record<string, unknown>): Promise<ReturnType<typeof ok>> {
+          calls.push({ tool: 'process_start', input: { workspaceId, ...request } });
+          return ok({ processId: 'owned-process', executable: 'node.exe', args: ['--version'], cwd: rootB, state: 'running', startedAt: new Date(0).toISOString() });
+        },
+      } as unknown as McpApplicationServices['process'],
     }, actor, {
       activeWorkspaceScopesProvider: async (): Promise<Array<{ workspaceId: string; rootPath: string }>> => [
         { workspaceId: 'workspace-a', rootPath: rootA },
@@ -800,11 +806,11 @@ describe('MCP tool registry', () => {
         ? { args: ['--version'] }
         : { ...(toolName === 'task_create' ? {} : { operation: 'run' }), arguments: ['--version'] }),
     });
-    expect(response).toMatchObject({
-      isError: true,
-      structuredContent: { error: { code: 'INVALID_INPUT' } },
-    });
-    expect(calls).toEqual([]);
+    // The directory the caller named decides the project, so the owned handle is created inside a
+    // project the same call can address later instead of being refused or left unreachable.
+    expect(response.isError, JSON.stringify(response)).not.toBe(true);
+    expect(calls).toHaveLength(1);
+    expect((calls[0]?.input as Record<string, unknown>).workspaceId).toBe('workspace-b');
   });
 
   it('routes absolute file, database, and command targets to any matching member of the active workspace set', async () => {

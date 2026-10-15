@@ -85,8 +85,13 @@ describe('durable task ownership over HTTP', () => {
         workspaceId: 'workspace-a', executable: process.execPath, arguments: ['--version'], cwd: rootB,
         ...(launchTool === 'shell' ? { operation: 'run' } : {}),
       } });
-      expect(conflict).toMatchObject({ isError: true, structuredContent: { error: { code: 'INVALID_INPUT' } } });
-      expect(owners).toEqual([]);
+      // The working directory decides the project, so the call runs in workspace-b and its execution
+      // ownership is recorded for workspace-b - never for the stale id the call started with.
+      expect(conflict.isError, JSON.stringify(conflict)).not.toBe(true);
+      const conflictTaskId = z.string().min(1).parse(conflict.structuredContent?.task_id);
+      expect(owners).toHaveLength(1);
+      expect(owners[0]).toMatchObject({ clientId: options.actor.clientId, workspaceId: 'workspace-b' });
+      owners.length = 0;
 
       const launched = await client.callTool({ name: launchTool, arguments: {
         workspaceId: 'workspace-a', executable: process.execPath, arguments: [fixturePath, readyPath, releasePath], cwd: rootA,
@@ -136,7 +141,12 @@ describe('durable task ownership over HTTP', () => {
         expect(denied).toMatchObject({ isError: true, structuredContent: { error: { code: 'PERMISSION_DENIED' } } });
       }
       const foreignWorkspaceList = await client.callTool({ name: 'task_list', arguments: { workspaceId: 'workspace-b' } });
-      expect(foreignWorkspaceList.structuredContent).toMatchObject({ tasks: [] });
+      // workspace-b holds only the call its own working directory reconciled to, and never the task
+      // that belongs to workspace-a.
+      const listedInB = ((foreignWorkspaceList.structuredContent as { tasks?: Array<{ task_id?: string }> }).tasks ?? [])
+        .map((task) => task.task_id);
+      expect(listedInB).toContain(conflictTaskId);
+      expect(listedInB).not.toContain(taskId);
       if (protocol === 'modern') foreignHandle = await startMcpHttp(options);
       const foreignTransport = new StreamableHTTPClientTransport(foreignHandle?.endpoint ?? handle.endpoint);
       await foreignClient.connect(foreignTransport);

@@ -148,7 +148,7 @@ export interface ToolRegistryOptions {
   readonly workspaceScopeResolver?: (workspaceId: string) => WorkspaceScope | null | Promise<WorkspaceScope | null>;
   /** Host-owned active workspace used as the mutation authorization boundary. */
   readonly activeWorkspaceScopeProvider?: () => WorkspaceScope | null | Promise<WorkspaceScope | null>;
-  /** Host-owned active project set; first entry is the primary/default project. */
+  /** Host-owned active project set; the first entry is the default project, and all entries are usable. */
   readonly activeWorkspaceScopesProvider?: () => readonly WorkspaceScope[] | Promise<readonly WorkspaceScope[]>;
   /**
    * Host-owned bridge that turns one explicit absolute path outside every Active Project into a
@@ -1042,20 +1042,22 @@ export class ToolRegistry {
       && (silentProjectAttachApproved
         || preliminaryDecision.kind === 'read'
         || hasExplicitUserConfirmation(input));
-    const routed = await this.routeInputToActiveWorkspace(input, { toolName: tool.name, autoAttachApproved });
+    // A caller that types a folder path into `workspaceId` is naming a location, not a project id.
+    // Read it as the path it really is once, here, so no downstream rule ever compares a path
+    // against a project id or looks a path up with `workspaces.get()`.
+    const prepared = await this.resolveWorkspaceIdTarget(tool.name, input, autoAttachApproved);
+    if (!prepared.ok) return err(prepared.error);
+    // The path a call carries is the target the user named. Routing rewrites `workspaceId` to the
+    // project that owns that path, so an older id remembered from another chat follows the path
+    // instead of refusing the whole call.
+    const routed = await this.routeInputToActiveWorkspace(prepared.value.input, { toolName: tool.name, autoAttachApproved });
     const activeRoutedInput = routed.input;
-    const requestedWorkspaceId = readExplicitWorkspaceId(input);
-    if (requestedWorkspaceId !== undefined
-      && requestedWorkspaceId !== readExplicitWorkspaceId(activeRoutedInput)
-      && ['shell', 'wsl_exec', 'task_create', 'process_start'].includes(tool.name)) {
-      return err(appError('INVALID_INPUT', 'The explicit command workspace conflicts with its working directory. Use the matching workspace or omit workspaceId to infer it.'));
-    }
     const prohibitedReason = fullBypass ? undefined : prohibitedInvocationReason(tool.name, activeRoutedInput);
     if (prohibitedReason !== undefined) return err(appError('PERMISSION_DENIED', prohibitedReason));
     let mutationDecision = inspectMutationOperation(tool.name, activeRoutedInput, tool.permission);
     const policy = this.destructivePolicyProvider();
     const mutationWorkspaceId = readExplicitWorkspaceId(activeRoutedInput);
-    const attachedScope = routed.attachedScope
+    const attachedScope = routed.attachedScope ?? prepared.value.attachedScope
       ?? await this.attachRegisteredWorkspaceScope(mutationWorkspaceId, tool.name, autoAttachApproved);
     const nativePathScopeRequired = requiresNativePathScope(tool.name, activeRoutedInput);
     const activeWorkspaceScope = !this.enforceActiveWorkspaceScope || (mutationDecision.kind === 'read' && !nativePathScopeRequired)
@@ -1069,7 +1071,7 @@ export class ToolRegistry {
     const nativePathScopeMismatch = nativePathScopeRequired
       && (activeWorkspaceScope === null || (mutationWorkspaceId !== undefined && mutationWorkspaceId !== activeWorkspaceScope.workspaceId));
     if (!fullBypass && this.enforceActiveWorkspaceScope && (mutationScopeMismatch || nativePathScopeMismatch)) {
-      return err(appError('PERMISSION_DENIED', describeActiveWorkspaceScopeMismatch(mutationWorkspaceId, activeWorkspaceScope)));
+      return err(appError('PERMISSION_DENIED', describeActiveWorkspaceScopeMismatch(mutationWorkspaceId, activeWorkspaceScope, prepared.value.unregisteredHint)));
     }
     const policyAllowsScopedDestructive = !fullBypass && mutationWorkspaceId !== undefined
       // A folder still waiting for its first confirmation is not yet a user-approved Active
@@ -1155,6 +1157,103 @@ export class ToolRegistry {
       return { ...resultBase, goalLeaseRequired, decision: needsApproval ? 'ask' : 'allow', reason: assessment.mutationDecision.reason };
     } catch {
       return { ...base, decision: 'unknown', reason: 'The host could not observe all required admission policy' };
+    }
+  }
+
+  /**
+   * `workspaceId` names a project, yet callers routinely send a folder path, a project's display name,
+   * or an id they mistyped by a character. Each of those used to dead-end the call, and the retry
+   * repeated the same bad value. Resolve the target once at this seam: a path becomes the project that
+   * owns it, a unique project name becomes its id, and a value that matches nothing keeps its own
+   * meaning (some tools legitimately carry a non-project handle) while the scope fence below gets the
+   * list of real projects to name back.
+   */
+  private async resolveWorkspaceIdTarget(
+    toolName: string,
+    input: unknown,
+    approve: boolean,
+  ): Promise<Result<{ readonly input: unknown; readonly attachedScope: WorkspaceScope | null; readonly unregisteredHint?: string }>> {
+    const supplied = readExplicitWorkspaceId(input);
+    if (supplied === undefined || !isRecord(input)) return ok({ input, attachedScope: null });
+    const value = supplied.trim();
+    const pathShaped = isAbsoluteActivityPath(value);
+    if (!pathShaped) {
+      const activeScopes = await this.activeWorkspaceScopes();
+      if (activeScopes.some((scope) => scope.workspaceId === value)) return ok({ input, attachedScope: null });
+      if (this.activeWorkspaceScopesProvider === undefined) {
+        const single = await this.activeWorkspaceScopeProvider();
+        if (single !== null && single.workspaceId === value) return ok({ input, attachedScope: null });
+      }
+      // Without an Active Project fence there is no dead-end to prevent, so an ordinary id keeps its
+      // own meaning and the host is not read again on every call.
+      if (!this.enforceActiveWorkspaceScope) return ok({ input, attachedScope: null });
+    }
+    try {
+      if (pathShaped) {
+        const active = mostSpecificActiveWorkspaceScope(await this.activeWorkspaceScopes(), value);
+        if (active !== null) return ok({ input: { ...input, workspaceId: active.workspaceId }, attachedScope: null });
+      }
+      const registered = await this.registeredWorkspaceEntries();
+      if (!pathShaped && registered.some((entry) => entry.id === value)) return ok({ input, attachedScope: null });
+      const owningProjectId = pathShaped ? await this.activityWorkspaceResolver(value) : undefined;
+      if (owningProjectId !== undefined) return ok({ input: { ...input, workspaceId: owningProjectId }, attachedScope: null });
+      if (!pathShaped) {
+        const named = registered.filter((entry) => entry.displayName !== undefined
+          && entry.displayName.toLowerCase() === value.toLowerCase());
+        if (named.length === 1 && named[0] !== undefined) {
+          return ok({
+            input: { ...input, workspaceId: named[0].id },
+            attachedScope: null,
+            ...(this.services.workspaceInfo?.list === undefined ? {} : { unregisteredHint: describeUnregisteredProjects(registered) }),
+          });
+        }
+        if (this.services.workspaceInfo?.list === undefined) return ok({ input, attachedScope: null });
+        // A value that is neither a project id nor a path may still be a handle the owning tool
+        // understands, so the call keeps its target. Only the scope fence can refuse it, and then it
+        // can finally say which projects do exist.
+        return ok({ input, attachedScope: null, unregisteredHint: describeUnregisteredProjects(registered, value) });
+      }
+      const attached = await this.attachExternalProject([value], toolName, approve);
+      if (attached !== null) return ok({ input: { ...input, workspaceId: attached.workspaceId }, attachedScope: attached });
+      if (this.services.workspaceInfo?.list === undefined) return ok({ input, attachedScope: null });
+      return err(appError('INVALID_INPUT', describeUnresolvableWorkspacePath(value, registered)));
+    } catch {
+      // An unreachable host bridge must not turn a usable call into an internal failure.
+      return ok({ input, attachedScope: null });
+    }
+  }
+
+  private async activeWorkspaceScopes(): Promise<readonly WorkspaceScope[]> {
+    if (this.activeWorkspaceScopesProvider === undefined) return [];
+    try {
+      return await this.activeWorkspaceScopesProvider();
+    } catch {
+      return [];
+    }
+  }
+
+  /** Registered projects the host knows about, used only to name real targets back to the caller. */
+  private async registeredWorkspaceEntries(): Promise<readonly RegisteredWorkspaceEntry[]> {
+    const infoPort = this.services.workspaceInfo;
+    if (infoPort?.list === undefined) return [];
+    try {
+      const listed = await infoPort.list(this.actor);
+      if (!listed.ok || !Array.isArray(listed.value)) return [];
+      const entries: RegisteredWorkspaceEntry[] = [];
+      for (const entry of listed.value) {
+        if (!isRecord(entry)) continue;
+        const id = readTrimmedString(entry.id);
+        if (id === undefined) continue;
+        entries.push({
+          id,
+          rootPath: readTrimmedString(entry.rootPath),
+          realRootPath: readTrimmedString(entry.realRootPath),
+          displayName: readTrimmedString(entry.displayName),
+        });
+      }
+      return entries;
+    } catch {
+      return [];
     }
   }
 
@@ -1464,6 +1563,39 @@ function mostSpecificActiveWorkspaceScope(scopes: readonly WorkspaceScope[], can
   return matches[0] ?? null;
 }
 
+interface RegisteredWorkspaceEntry {
+  readonly id: string;
+  readonly rootPath: string | undefined;
+  readonly realRootPath: string | undefined;
+  readonly displayName: string | undefined;
+}
+
+/**
+ * A folder path typed into workspaceId is a location the caller really meant, so the refusal names
+ * both repairs: the field that path belongs in, and the projects that already exist.
+ */
+function describeUnresolvableWorkspacePath(value: string, registered: readonly RegisteredWorkspaceEntry[]): string {
+  return `workspaceId "${value}" is a folder path, not a project id, and no registered project contains it. Put the path in the tool's own path field (for example cwd or path) so lnwjud adds that folder as a project, or pass one of the project ids below.${describeUnregisteredProjects(registered)}`;
+}
+
+/**
+ * A workspaceId that matches no project is usually one mistyped character, not a user's setup
+ * problem, so the message names the projects that really exist and the closest one. A bare "not an
+ * Active Project" gave the caller nothing to correct and the same bad value was retried for hours.
+ */
+function describeUnregisteredProjects(registered: readonly RegisteredWorkspaceEntry[], value?: string): string {
+  if (registered.length === 0) return ' No project is registered on this host yet.';
+  const near = value === undefined ? [] : registered.filter((entry) => entry.id.slice(0, 8) === value.slice(0, 8));
+  const [closest] = near;
+  const hint = near.length === 1 && closest !== undefined
+    ? ` The closest project is "${closest.displayName ?? closest.realRootPath ?? closest.rootPath ?? ''}" (${closest.realRootPath ?? closest.rootPath ?? 'unknown root'}) with workspaceId "${closest.id}".`
+    : '';
+  const projects = registered.slice(0, 6)
+    .map((entry) => `"${entry.displayName ?? entry.realRootPath ?? entry.rootPath ?? entry.id}" (${entry.realRootPath ?? entry.rootPath ?? 'unknown root'}) = ${entry.id}`)
+    .join(', ');
+  return `${hint} Projects on this host: ${projects}.`;
+}
+
 /**
  * A goal lease is ownership proof for the workspace its goal owns. When it is supplied for a
  * mutation elsewhere whose fence state could not be confirmed, refuse and name both retries; a
@@ -1484,12 +1616,14 @@ function describeGoalLeaseWorkspaceMismatch(
 function describeActiveWorkspaceScopeMismatch(
   mutationWorkspaceId: string | undefined,
   activeWorkspaceScope: WorkspaceScope | null,
+  unregisteredHint: string | undefined,
 ): string {
   const primary = activeWorkspaceScope?.rootPath;
+  const evidence = unregisteredHint === undefined ? '' : unregisteredHint;
   if (mutationWorkspaceId === undefined) {
-    return `No project target could be resolved for this mutation, so it was not run. Pass an absolute path inside the folder you mean (lnwjud attaches that folder as a project automatically) or an explicit workspaceId; a relative path has no project context. ${primary === undefined ? 'No Active Project is available.' : `The current Primary Project is "${primary}".`}`
+    return `No project target could be resolved for this mutation, so it was not run. Pass an absolute path inside the folder you mean (lnwjud attaches that folder as a project automatically) or an explicit workspaceId; a relative path has no project context. ${primary === undefined ? 'No Active Project is available.' : `The current default project is "${primary}" and every open project is usable at the same time.`}${evidence}`
   }
-  return `Workspace "${mutationWorkspaceId}" is not an Active Project, so this mutation was not run. Pass an absolute path inside the folder you mean instead and lnwjud will attach it automatically. ${primary === undefined ? 'No Active Project is available.' : `The current Primary Project is "${primary}".`}`
+  return `Workspace "${mutationWorkspaceId}" is not an Active Project, so this mutation was not run. Pass an absolute path inside the folder you mean instead and lnwjud will attach it automatically. ${primary === undefined ? 'No Active Project is available.' : `The current default project is "${primary}" and every open project is usable at the same time.`}${evidence}`
 }
 
 /**

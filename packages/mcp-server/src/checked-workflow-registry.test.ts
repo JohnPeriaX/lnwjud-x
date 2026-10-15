@@ -69,16 +69,25 @@ describe('checked workflows through registered tools', () => {
     expect(fence.end).not.toHaveBeenCalled();
   });
 
-  it('shares active-project and explicit command workspace refusal with actual dispatch', async () => {
-    const execute = vi.fn(async () => ok({ accepted: true }));
+  it('reconciles an explicit command workspace to the project that owns its working directory', async () => {
+    const executed: Array<{ tool: string; input: unknown }> = [];
+    const execute = vi.fn(async (tool: string, input: unknown): Promise<ReturnType<typeof ok>> => {
+      executed.push({ tool, input });
+      return ok({ accepted: true });
+    });
     const registry = new ToolRegistry({ capabilities: { execute } }, actor, {
       activeWorkspaceScopesProvider: (): Array<{ workspaceId: string; rootPath: string }> => [{ workspaceId: 'a', rootPath: 'E:\\a' }, { workspaceId: 'b', rootPath: 'E:\\b' }],
     });
     const input = { workspaceId: 'a', operation: 'run', executable: 'node', arguments: ['--version'], cwd: 'E:\\b' };
     expect((await registry.invoke('permission_check', { tool: 'shell', input })).structuredContent)
-      .toMatchObject({ decision: 'deny', reason: expect.stringContaining('conflicts') });
-    expect(await registry.invoke('shell', input)).toMatchObject({ isError: true, structuredContent: { error: { code: 'INVALID_INPUT' } } });
-    expect(execute).not.toHaveBeenCalled();
+      .not.toMatchObject({ decision: 'deny' });
+
+    const response = await registry.invoke('shell', input);
+
+    expect(response.isError, JSON.stringify(response)).not.toBe(true);
+    // The directory the caller named wins over an id remembered from another chat, and the project
+    // that reaches the executor is the one that owns that directory.
+    expect(executed[0]?.input).toMatchObject({ workspaceId: 'b', cwd: 'E:\\b' });
   });
 
   it('does not turn a permission preview or chat confirmation into host approval', async () => {

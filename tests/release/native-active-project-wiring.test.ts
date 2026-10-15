@@ -29,8 +29,11 @@ describe('path-bearing native Active Project wiring', () => {
     // Upstream moved routing into the shared assessInvocationPolicy helper, so the routing call and
     // the attach approval flag now live there. A preview is advisory and must pass allowAttach=false,
     // otherwise merely previewing a call would register a project and consume a folder's first
-    // confirmation; the real invocation passes true.
-    expect(registry).toContain('const routed = await this.routeInputToActiveWorkspace(input, { toolName: tool.name, autoAttachApproved });');
+    // confirmation; the real invocation passes true. A workspaceId that is really a path, a project
+    // name or a mistyped id is resolved before routing, so no later rule can compare a path against
+    // a project id.
+    expect(registry).toContain('const prepared = await this.resolveWorkspaceIdTarget(tool.name, input, autoAttachApproved);');
+    expect(registry).toContain('const routed = await this.routeInputToActiveWorkspace(prepared.value.input, { toolName: tool.name, autoAttachApproved });');
     expect(registry).toContain('this.assessInvocationPolicy(tool, goalBound.value, profile, fullBypass, true)');
     expect(registry).toContain('this.assessInvocationPolicy(tool, goalBound.value, profile, fullBypass, false)');
     expect(registry).toContain('const matched = commonActiveWorkspaceScope(scopes, absolutePaths);');
