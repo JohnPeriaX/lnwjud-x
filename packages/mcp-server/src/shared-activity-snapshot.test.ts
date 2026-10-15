@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ActivityTracker } from './activity-tracker.js';
 import {
   SharedActivitySnapshotLease,
+  currentSharedActivityOwner,
   parseProcessProbeOutput,
   probeProcessStart,
   readSharedActivitySnapshot,
@@ -180,6 +181,25 @@ describe('shared cross-process MCP activity snapshot', () => {
     await lease.initialize();
     await expect(lease.close()).resolves.toBe(true);
     expect(JSON.parse(await readFile(leasePath, 'utf8'))).toEqual(replacement);
+  });
+});
+
+describe('stdio activity owner identity', () => {
+  it('identifies this process even when a Windows PowerShell cold start exceeds the shared budget', async () => {
+    const startedAt = '2026-08-20T00:00:00.000Z';
+    const budgets: number[] = [];
+    const runProbe = async (_pid: number, timeoutMs: number): Promise<string> => {
+      budgets.push(timeoutMs);
+      // Measured on this host: powershell.exe answering Get-Process -Id <self> takes 1.8-2.1s.
+      // Anything at or below the shared foreign-pid budget can therefore never succeed.
+      if (timeoutMs < 2_500) throw Object.assign(new Error('probe exceeded timeout'), { killed: true, signal: 'SIGTERM' });
+      return `LIVE|${startedAt}`;
+    };
+
+    const identity = await currentSharedActivityOwner({ runProbe });
+
+    expect(identity).toEqual({ pid: process.pid, processStartedAt: startedAt });
+    expect(Math.min(...budgets)).toBeGreaterThanOrEqual(2_500);
   });
 });
 

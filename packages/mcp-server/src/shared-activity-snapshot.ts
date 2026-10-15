@@ -265,8 +265,16 @@ export async function readSharedActivitySnapshot(options: ReadSharedActivitySnap
   };
 }
 
-export async function currentSharedActivityOwner(): Promise<SharedActivityOwner> {
-  const probe = await probeProcessStart(process.pid);
+/**
+ * Windows answers "when did this process start" only through PowerShell, whose cold start measures
+ * 1.8-2.1s on this platform. The shared default budget exists so a staleness decision about ANOTHER
+ * process stays fast and fails closed; refusing to identify our own process is never safer than
+ * waiting a little longer for a value that cannot change while we run.
+ */
+const OWN_PROCESS_PROBE_TIMEOUT_MS = 5_000;
+
+export async function currentSharedActivityOwner(options: ProcessProbeOptions = {}): Promise<SharedActivityOwner> {
+  const probe = await probeProcessStart(process.pid, { timeoutMs: OWN_PROCESS_PROBE_TIMEOUT_MS, ...options });
   if (probe.state !== 'live') throw new Error(`Could not verify STDIO activity owner process: ${probe.state === 'unverifiable' ? probe.reason : 'gone'}`);
   return { pid: process.pid, processStartedAt: probe.processStartedAt };
 }
