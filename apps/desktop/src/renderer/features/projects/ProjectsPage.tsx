@@ -51,7 +51,7 @@ export function ProjectsPage(props: ProjectsPageProps): ReactElement {
           <div className="project-row-title">
             <strong>{workspace.displayName}</strong>
             {active ? <span className="project-status-badge current">{t('project.active')}</span> : null}
-            {selected ? <span className="project-status-badge system">{t('home.primaryBadge')}</span> : null}
+            {selected ? <span className="project-status-badge system">{t('home.defaultBadge')}</span> : null}
             {archived ? <span className="project-status-badge archived">{t('project.archivedBadge')}</span> : null}
           </div>
           <p>{workspace.realRootPath}</p>
@@ -68,7 +68,7 @@ export function ProjectsPage(props: ProjectsPageProps): ReactElement {
                 {active ? t('project.deactivate') : t('project.activate')}
               </ActionButton>
               <ActionButton type="button" disabled={busy || selected} onClick={() => { void runWorkspaceAction(workspace.id, () => props.onSelectWorkspace(workspace.id)); }}>
-                {selected ? t('home.primaryBadge') : t('project.setMain')}
+                {selected ? t('home.defaultBadge') : t('project.setMain')}
               </ActionButton>
               <ActionButton type="button" className="project-archive-button" disabled={busy} onClick={() => { void runWorkspaceAction(workspace.id, () => props.onSetWorkspaceArchived(workspace.id, true)); }}>
                 {t('project.archive')}

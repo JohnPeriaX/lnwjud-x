@@ -1258,7 +1258,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
    * generic file MCP servers. Reads and user-confirmed calls register the folder and add it to the
    * Active Project set; an unconfirmed mutation only records a pending scope so the agent gets a
    * retryable confirmation instead of a dead-end denial. A project the user deliberately deactivated
-   * in the Desktop UI is never re-activated from here, and the Primary Project never changes.
+   * in the Desktop UI is never re-activated from here, and the default project never changes.
    */
   async function attachExternalProjectScope(request: ExternalProjectAttachRequest): Promise<WorkspaceScope | null> {
     const projectRoot = resolveAttachableProjectRoot(request.path, process.platform);
@@ -1630,7 +1630,7 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
 
   async function selectWorkspaceOnly(workspaceId: string): Promise<WorkspaceSummary> {
     const workspace = await resolveWorkspaceOrThrow(workspaceId);
-    if (isMachineRootPath(workspace.realRootPath) || isMachineRootPath(workspace.rootPath)) throw new Error('Machine-root workspace cannot be the Primary Project');
+    if (isMachineRootPath(workspace.realRootPath) || isMachineRootPath(workspace.rootPath)) throw new Error('Machine-root workspace cannot be the default project');
     await activateWorkspace(workspaceId);
     settingsRepository.set(selectedWorkspaceSettingKey, workspaceId);
     await resolveActiveProjectWorkspaces();

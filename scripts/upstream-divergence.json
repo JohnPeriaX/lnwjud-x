@@ -192,6 +192,20 @@
         "packages/mcp-server/src/tool-registry.test.ts",
         "packages/mcp-server/src/durable-task-http.integration.test.ts"
       ]
+    },
+    {
+      "id": "default-project-not-primary",
+      "summary": "The first entry of active_workspace_ids is presented as the default project, never the Primary Project, because every open project is usable concurrently and the router now enforces that. Upstream ships the older key names and wording; taking its side during a merge renames the i18n keys back and leaves the components that read home.defaultProject/defaultBadge rendering missing translations.",
+      "markers": [
+        { "file": "apps/desktop/src/renderer/i18n/messages.ts", "contains": "'home.defaultProject':" },
+        { "file": "apps/desktop/src/renderer/i18n/messages.ts", "contains": "'home.defaultBadge':" },
+        { "file": "apps/desktop/src/renderer/features/home/ControlCenterPage.tsx", "contains": "t('home.defaultProject')" },
+        { "file": "apps/desktop/src/renderer/features/projects/ProjectsPage.tsx", "contains": "t('home.defaultBadge')" },
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "The current default project is" }
+      ],
+      "proofTests": [
+        "apps/desktop/tests/i18n.test.ts"
+      ]
     }
   ]
 }

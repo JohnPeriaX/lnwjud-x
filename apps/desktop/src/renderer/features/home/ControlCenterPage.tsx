@@ -289,7 +289,7 @@ export function ControlCenterPage(props: ControlCenterPageProps): ReactElement {
                       <small>{workspace.realRootPath}</small>
                     </span>
                     <span className="active-project-state">
-                      {primary ? <em className="primary-project-badge">{t('home.primaryBadge')}</em> : active ? <em className="active-project-badge">{t('home.activeBadge')}</em> : null}
+                      {primary ? <em className="primary-project-badge">{t('home.defaultBadge')}</em> : active ? <em className="active-project-badge">{t('home.activeBadge')}</em> : null}
                     </span>
                   </label>
                 );
@@ -299,11 +299,11 @@ export function ControlCenterPage(props: ControlCenterPageProps): ReactElement {
 
           <div className="primary-project-control">
             <div className="primary-project-copy">
-              <strong>{t('home.primaryProject')}</strong>
-              <small>{t('home.primaryProjectHint')}</small>
+              <strong>{t('home.defaultProject')}</strong>
+              <small>{t('home.defaultProjectHint')}</small>
             </div>
             <div className="form-row primary-project-row">
-              <SearchableSelect label={t('home.primaryProject')} value={selectedId}
+              <SearchableSelect label={t('home.defaultProject')} value={selectedId}
                 disabled={activeProjects.length === 0}
                 onChange={setSelectedId}
                 options={activeProjects.map((workspace) => ({value:workspace.id,label:workspace.displayName}))} />
