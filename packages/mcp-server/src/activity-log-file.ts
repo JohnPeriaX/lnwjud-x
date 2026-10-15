@@ -17,6 +17,7 @@ export function formatActivityLogLine(event: ActivitySinkEvent): string {
     durationMs: event.durationMs,
     timestamp: event.timestamp,
     ...(event.workspaceId === undefined ? {} : { workspaceId: event.workspaceId }),
+    ...(event.reconciledFrom === undefined ? {} : { reconciledFrom: event.reconciledFrom }),
     ...(event.sessionId === undefined ? {} : { sessionId: event.sessionId }),
     ...(event.targetSummary === undefined ? {} : { targetSummary: redactor.redactText(event.targetSummary) }),
     targetDetail: decodeActivityTargetReference(event.targetDetail, event.targetSummary),

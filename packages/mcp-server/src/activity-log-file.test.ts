@@ -26,10 +26,23 @@ describe('mcp activity log file', () => {
     await tracker.end(callId, 'SUCCESS', 4);
 
     const raw = await readFile(filePath, 'utf8');
-    const lines = raw.trim().split('\n').map((line) => JSON.parse(line) as { callId: string; phase: string; toolName: string; workspaceId?: string; sessionId?: string });
+    const lines = raw.trim().split('\n').map((line) => JSON.parse(line) as { callId: string; phase: string; toolName: string; workspaceId?: string; reconciledFrom?: string; sessionId?: string });
     expect(lines).toEqual([
       expect.objectContaining({ callId, phase: 'started', toolName: 'read_file', workspaceId: 'workspace-1', sessionId: 'session-a' }),
       expect.objectContaining({ callId, phase: 'completed', toolName: 'read_file', workspaceId: 'workspace-1', sessionId: 'session-a' }),
+    ]);
+    expect(lines[1]?.reconciledFrom).toBeUndefined();
+
+    // A routed call must stay measurable: the start names what was sent, the completion names the
+    // project that actually ran, and only a real reconciliation adds `reconciledFrom`.
+    const routedCallId = await tracker.begin('git_status', { workspaceId: 'E:\\Script\\World-NextX\\src' });
+    tracker.reconcileWorkspace(routedCallId, 'workspace-2', 'E:\\Script\\World-NextX\\src');
+    await tracker.end(routedCallId, 'SUCCESS', 3);
+    const routedLines = (await readFile(filePath, 'utf8')).trim().split('\n').slice(2)
+      .map((line) => JSON.parse(line) as { callId: string; phase: string; workspaceId?: string; reconciledFrom?: string });
+    expect(routedLines).toEqual([
+      expect.objectContaining({ callId: routedCallId, phase: 'started', workspaceId: 'E:\\Script\\World-NextX\\src' }),
+      expect.objectContaining({ callId: routedCallId, phase: 'completed', workspaceId: 'workspace-2', reconciledFrom: 'E:\\Script\\World-NextX\\src' }),
     ]);
     expect(formatActivityLogLine({
       callId: 'c1',

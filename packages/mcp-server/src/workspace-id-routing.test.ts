@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ok } from '@lnwjud/domain';
 import { permissionProfiles, type PermissionProfile } from '@lnwjud/permissions';
+import type { ActivitySinkEvent } from './activity-tracker.js';
 import {
   ToolRegistry,
   type ExternalProjectAttachRequest,
@@ -33,11 +34,13 @@ function compose(options: {
   readonly fileCalls: FileCall[];
   readonly goalCalls: GoalCall[];
   readonly attachCalls: ExternalProjectAttachRequest[];
+  readonly events: ActivitySinkEvent[];
 } {
   const gitCalls: GitCall[] = [];
   const fileCalls: FileCall[] = [];
   const goalCalls: GoalCall[] = [];
   const attachCalls: ExternalProjectAttachRequest[] = [];
+  const events: ActivitySinkEvent[] = [];
   const services: McpApplicationServices = {
     git: {
       async status(_actor: unknown, workspaceId: string): Promise<ReturnType<typeof ok>> {
@@ -84,6 +87,7 @@ function compose(options: {
     } as unknown as McpApplicationServices['workspaceInfo'],
   };
   const registry = new ToolRegistry(services, actor, {
+    activity: { async record(event): Promise<void> { events.push(event); } },
     profileProvider: (): PermissionProfile => permissionProfiles[options.profileName ?? 'full'],
     activeWorkspaceScopesProvider: async (): Promise<readonly WorkspaceScope[]> => [activeScope],
     ...(options.attach === undefined ? {} : {
@@ -93,7 +97,7 @@ function compose(options: {
       },
     }),
   });
-  return { registry, gitCalls, fileCalls, goalCalls, attachCalls };
+  return { registry, gitCalls, fileCalls, goalCalls, attachCalls, events };
 }
 
 function messageOf(response: { structuredContent?: unknown }): string {
@@ -223,5 +227,30 @@ describe('workspace target resolution in the tool registry', () => {
 
     expect(response.isError, JSON.stringify(response)).not.toBe(true);
     expect(fileCalls).toEqual([{ workspaceId: activeScope.workspaceId, path: `${activeScope.rootPath}\\notes.txt` }]);
+  });
+
+  it('reports the project a reconciled call really ran in, beside what the caller sent', async () => {
+    const supplied = `${rememberedScope.rootPath}\\src`;
+    const { registry, events } = compose();
+
+    await registry.invoke('git_status', { workspaceId: supplied });
+
+    const started = events.find((event) => event.phase === 'started');
+    const completed = events.find((event) => event.phase === 'completed');
+    // The start stays truthful about the request; only completion may claim a resolved target.
+    expect(started).toMatchObject({ workspaceId: supplied });
+    expect(started?.reconciledFrom).toBeUndefined();
+    expect(completed).toMatchObject({ resultCode: 'SUCCESS', workspaceId: rememberedScope.workspaceId, reconciledFrom: supplied });
+  });
+
+  it('keeps attribution of a path-only call on the project that owns the path', async () => {
+    const { registry, events } = compose();
+
+    await registry.invoke('read_file', {
+      workspaceId: rememberedScope.workspaceId, path: `${activeScope.rootPath}\\notes.txt`,
+    });
+
+    const completed = events.find((event) => event.phase === 'completed');
+    expect(completed).toMatchObject({ workspaceId: activeScope.workspaceId, reconciledFrom: rememberedScope.workspaceId });
   });
 });

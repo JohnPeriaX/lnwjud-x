@@ -528,6 +528,9 @@ export class ToolRegistry {
         policyAllowsScopedDestructive, hostApprovalRequired, permissionDecision,
         attachedScope, pendingProjectApproval } = assessed.value;
       this.activity.updatePermissionDecision(callId, permissionDecision);
+      // The caller's own `workspaceId` is already in the started record. Keep the project the call
+      // really ran in on the completed record, and name what was sent when the path overrode it.
+      this.activity.reconcileWorkspace(callId, mutationWorkspaceId, readExplicitWorkspaceId(goalBound.value));
       const mutationFenceWorkspaceId = mutationWorkspaceId ?? activeWorkspaceScope?.workspaceId ?? activityWorkspaceId;
       const codingMutation = mutationDecision.kind !== 'read' && isCodingMutation(tool.name, activeRoutedInput);
       const isInformational = isInformationalCommandInvocation(tool.name, activeRoutedInput);

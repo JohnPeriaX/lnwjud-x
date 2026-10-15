@@ -18,6 +18,8 @@ export interface ActivitySinkEvent {
   readonly resultCode: string;
   readonly durationMs: number;
   readonly workspaceId?: string;
+  /** The `workspaceId` the caller sent, kept only when routing resolved a different project. */
+  readonly reconciledFrom?: string;
   readonly sessionId?: string;
   readonly targetSummary?: string;
   readonly targetDetail?: ActivityTargetReference;
@@ -86,6 +88,7 @@ export interface InFlightToolCall {
   readonly startedAt: string;
   readonly goalId?: string;
   readonly workspaceId?: string;
+  readonly reconciledFrom?: string;
   readonly sessionId?: string;
   readonly targetSummary?: string;
   readonly targetDetail: ActivityTargetReference;
@@ -240,6 +243,26 @@ export class ActivityTracker {
     this.activityRevision += 1;
   }
 
+  /**
+   * Records the project a call really ran in after Active Project routing. The started record keeps
+   * what the caller sent, and only the completed record carries the resolution plus `reconciledFrom`,
+   * so a log reader can prove no call ever landed in a folder nobody named.
+   */
+  public reconcileWorkspace(callId: string, workspaceId: string | undefined, suppliedWorkspaceId?: string): void {
+    const existing = this.inflight.get(callId);
+    if (existing === undefined || workspaceId === undefined) return;
+    const reconciledFrom = suppliedWorkspaceId !== undefined && suppliedWorkspaceId !== workspaceId
+      ? suppliedWorkspaceId
+      : undefined;
+    if (workspaceId === existing.workspaceId && reconciledFrom === undefined) return;
+    this.inflight.set(callId, {
+      ...existing,
+      workspaceId,
+      ...(reconciledFrom === undefined ? {} : { reconciledFrom }),
+    });
+    this.activityRevision += 1;
+  }
+
   public updateAuthorizationMode(callId: string, authorizationMode: 'standard' | 'full_bypass'): void {
     const existing = this.inflight.get(callId);
     if (existing === undefined || existing.authorizationMode === authorizationMode) return;
@@ -287,6 +310,7 @@ export class ActivityTracker {
       durationMs,
       timestamp,
       ...(existing?.workspaceId === undefined ? {} : { workspaceId: existing.workspaceId }),
+      ...(existing?.reconciledFrom === undefined ? {} : { reconciledFrom: existing.reconciledFrom }),
       ...(existing?.sessionId === undefined ? {} : { sessionId: existing.sessionId }),
       ...(existing?.targetSummary === undefined ? {} : { targetSummary: existing.targetSummary }),
       targetDetail,

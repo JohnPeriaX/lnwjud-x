@@ -194,6 +194,20 @@
       ]
     },
     {
+      "id": "workspace-reconciliation-observability",
+      "summary": "The completed activity record carries the project a call really ran in, in both the audit row and the tailed mcp-activity.log, and the log additionally names what the caller sent as reconciledFrom. Upstream attributes every call to the workspaceId it received, so a wrong-project landing is invisible in the log and the routing fixes above cannot be measured against a fail-rate baseline. Dropping the field merges cleanly and silently removes the only evidence that path attribution works.",
+      "markers": [
+        { "file": "packages/mcp-server/src/activity-tracker.ts", "contains": "public reconcileWorkspace(callId: string" },
+        { "file": "packages/mcp-server/src/activity-tracker.ts", "contains": "readonly reconciledFrom?: string;" },
+        { "file": "packages/mcp-server/src/activity-log-file.ts", "contains": "reconciledFrom: event.reconciledFrom" },
+        { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "this.activity.reconcileWorkspace(callId, mutationWorkspaceId" }
+      ],
+      "proofTests": [
+        "packages/mcp-server/src/workspace-id-routing.test.ts",
+        "packages/mcp-server/src/activity-log-file.test.ts"
+      ]
+    },
+    {
       "id": "durable-shell-abort-wait-budget",
       "summary": "The durable-shell abort test gets its own 20s budget. It spawns a real detached worker and then waits with the timeout the test itself declares (5s), while Vitest's default kill is also 5s, so an honest completion can never be observed on a loaded host: measured 2394ms idle and killed at 5486ms inside the serial release suite. Restoring the missing budget argument re-creates a gate failure that no assertion can distinguish from a durable-shell regression.",
       "markers": [
