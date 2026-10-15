@@ -355,6 +355,10 @@ describe('durable shell background tasks', () => {
     expect(cancelled).toMatchObject({ ok: true, value: { task_id: taskId, state: 'cancelled', durable: true } });
   }, 45_000);
 
+  // The durable worker is a real child process: 2.4s on an idle host, 5.5s+ inside the
+  // serial release suite, and the receipt check below declares its own 5s wait budget.
+  // Vitest's 5s default can therefore kill a call that is still inside its own contract,
+  // which is a fixture budget rather than a shell-behaviour assertion.
   it('keeps a durable auto task running when the original MCP caller aborts after submission', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-durable-shell-'));
     temporaryRoots.push(root);
@@ -387,7 +391,7 @@ describe('durable shell background tasks', () => {
     const replacementRuntime = new ShellCapabilityBackend({ allowedRoots: [root], taskStateDirectory });
     const finished = await replacementRuntime.execute({ operation: 'wait', task_id: taskId, timeout_seconds: 5 });
     expect(finished).toMatchObject({ ok: true, value: { state: 'completed', exit_code: 0, stdout: 'after-abort', durable: true } });
-  });
+  }, 20_000);
 
   it('caps concurrent durable workers so many chats cannot exhaust a Windows 10/11 machine with child consoles', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-durable-shell-cap-'));

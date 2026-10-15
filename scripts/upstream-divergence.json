@@ -194,6 +194,16 @@
       ]
     },
     {
+      "id": "durable-shell-abort-wait-budget",
+      "summary": "The durable-shell abort test gets its own 20s budget. It spawns a real detached worker and then waits with the timeout the test itself declares (5s), while Vitest's default kill is also 5s, so an honest completion can never be observed on a loaded host: measured 2394ms idle and killed at 5486ms inside the serial release suite. Restoring the missing budget argument re-creates a gate failure that no assertion can distinguish from a durable-shell regression.",
+      "markers": [
+        { "file": "packages/capabilities/src/durable-shell-task-store.test.ts", "contains": "which is a fixture budget rather than a shell-behaviour assertion" }
+      ],
+      "proofTests": [
+        "packages/capabilities/src/durable-shell-task-store.test.ts"
+      ]
+    },
+    {
       "id": "default-project-not-primary",
       "summary": "The first entry of active_workspace_ids is presented as the default project, never the Primary Project, because every open project is usable concurrently and the router now enforces that. Upstream ships the older key names and wording; taking its side during a merge renames the i18n keys back and leaves the components that read home.defaultProject/defaultBadge rendering missing translations.",
       "markers": [
