@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { link, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { probeProcessStart, type ProcessProbeResult } from '@lnwjud/mcp-server';
+import { OWN_PROCESS_PROBE_TIMEOUT_MS, probeProcessStart, type ProcessProbeResult } from '@lnwjud/mcp-server';
 
 const LOCK_FILE = 'lnwjud.tunnel.lock';
 const POSIX_MUTEX_FILE = 'lnwjud.tunnel.mutex';
@@ -234,8 +234,15 @@ function isNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as NodeJS.ErrnoException).code === 'ENOENT';
 }
 
-async function currentProcessOwner(): Promise<TunnelLockOwner> {
-  const probe = await probeProcessStart(process.pid);
+/**
+ * The lock is only meaningful once this process can name itself, and on Windows that answer comes
+ * from a PowerShell cold start measured at 1.8-2.1s here. The shared fast budget exists to judge
+ * ANOTHER process without hanging the decision; applying it to our own identity made every tunnel
+ * start a coin flip that failed closed as "probe_timeout", and the user recovered by killing the
+ * app and waiting for the machine to idle.
+ */
+export async function currentProcessOwner(): Promise<TunnelLockOwner> {
+  const probe = await probeProcessStart(process.pid, { timeoutMs: OWN_PROCESS_PROBE_TIMEOUT_MS });
   if (probe.state !== 'live') throw new Error(`Could not verify this process for the tunnel lock: ${probe.state === 'unverifiable' ? probe.reason : 'gone'}`);
   return { pid: process.pid, processStartedAt: probe.processStartedAt, acquiredAt: new Date().toISOString() };
 }

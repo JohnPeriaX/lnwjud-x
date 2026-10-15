@@ -1,4 +1,4 @@
-﻿import { execFile } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, open, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -269,9 +269,10 @@ export async function readSharedActivitySnapshot(options: ReadSharedActivitySnap
  * Windows answers "when did this process start" only through PowerShell, whose cold start measures
  * 1.8-2.1s on this platform. The shared default budget exists so a staleness decision about ANOTHER
  * process stays fast and fails closed; refusing to identify our own process is never safer than
- * waiting a little longer for a value that cannot change while we run.
+ * waiting a little longer for a value that cannot change while we run. Owner-identity probes share
+ * this budget: the STDIO activity lease and the tunnel lock both identify the process holding them.
  */
-const OWN_PROCESS_PROBE_TIMEOUT_MS = 5_000;
+export const OWN_PROCESS_PROBE_TIMEOUT_MS = 5_000;
 
 export async function currentSharedActivityOwner(options: ProcessProbeOptions = {}): Promise<SharedActivityOwner> {
   const probe = await probeProcessStart(process.pid, { timeoutMs: OWN_PROCESS_PROBE_TIMEOUT_MS, ...options });

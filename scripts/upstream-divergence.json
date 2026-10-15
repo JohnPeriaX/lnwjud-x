@@ -244,14 +244,16 @@
     },
     {
       "id": "own-process-identity-probe-budget",
-      "summary": "The STDIO activity owner identity probe gets its own 5s per-attempt budget instead of the shared 1750ms budget meant for judging whether ANOTHER process is still alive. Windows answers 'when did this process start' only through PowerShell, whose cold start measures 1.8-2.1s on this host, so the shared budget made currentSharedActivityOwner() throw probe_timeout deterministically and the direct STDIO runtime could never publish its activity lease (its SQLite handle then blocked temp cleanup with EBUSY). Reverting to the single-argument call merges cleanly and re-breaks STDIO startup on any normal Windows machine.",
+      "summary": "An owner-identity probe gets its own 5s per-attempt budget instead of the shared 1750ms budget meant for judging whether ANOTHER process is still alive. Windows answers 'when did this process start' only through PowerShell, whose cold start measures 1.8-2.1s on this host, so the shared budget made currentSharedActivityOwner() throw probe_timeout deterministically and the direct STDIO runtime could never publish its activity lease (its SQLite handle then blocked temp cleanup with EBUSY). The same shape blocked Desktop tunnel start: tunnel-lock.ts currentProcessOwner() inherited 1750ms, so 'Could not verify this process for the tunnel lock: probe_timeout' was a coin flip that the user worked around by killing the app and waiting for the machine to idle. Reverting either call to the single-argument form merges cleanly and re-breaks startup on any normal Windows machine.",
       "markers": [
-        { "file": "packages/mcp-server/src/shared-activity-snapshot.ts", "contains": "const OWN_PROCESS_PROBE_TIMEOUT_MS = 5_000;" },
-        { "file": "packages/mcp-server/src/shared-activity-snapshot.ts", "contains": "probeProcessStart(process.pid, { timeoutMs: OWN_PROCESS_PROBE_TIMEOUT_MS" }
+        { "file": "packages/mcp-server/src/shared-activity-snapshot.ts", "contains": "export const OWN_PROCESS_PROBE_TIMEOUT_MS = 5_000;" },
+        { "file": "packages/mcp-server/src/shared-activity-snapshot.ts", "contains": "probeProcessStart(process.pid, { timeoutMs: OWN_PROCESS_PROBE_TIMEOUT_MS" },
+        { "file": "apps/desktop/src/main/tunnel-lock.ts", "contains": "probeProcessStart(process.pid, { timeoutMs: OWN_PROCESS_PROBE_TIMEOUT_MS" }
       ],
       "proofTests": [
         "packages/mcp-server/src/shared-activity-snapshot.test.ts",
-        "apps/cli/src/runtime/stdio-mcp-runtime.test.ts"
+        "apps/cli/src/runtime/stdio-mcp-runtime.test.ts",
+        "apps/desktop/tests/tunnel-lock-owner-probe.test.ts"
       ]
     },
     {
