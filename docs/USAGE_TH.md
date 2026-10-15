@@ -1,8 +1,8 @@
-# คู่มือใช้งาน lnwjud v5.8.7 (ภาษาไทย)
+# คู่มือใช้งาน lnwjud v5.8.8 (ภาษาไทย)
 
 lnwjud คือ cross-platform local AI-agent runtime / MCP gateway สำหรับให้ ChatGPT, Codex และ MCP client อื่นทำงานกับเครื่องของคุณ เช่น อ่าน/ค้น/แก้ไฟล์, Git, รันโปรเซส และเครื่องมือพัฒนาอื่น ๆ โดยงานจริงยังทำบนเครื่องของคุณ ความสามารถ Windows-only เช่น WSL, Registry และ Windows Sandbox จะไม่แสดงเป็นพร้อมใช้งานบน macOS/Linux
 
-คู่มือนี้อัปเดตตาม source `v5.8.7`; public release `v5.8.6` คือรุ่นที่เผยแพร่แล้วบน [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/tag/v5.8.6)
+คู่มือนี้อัปเดตตาม source `v5.8.8`; public release `v5.8.6` คือรุ่นที่เผยแพร่แล้วบน [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/tag/v5.8.6)
 
 > สำหรับผู้ใช้ package ของ lnwjud **ไม่ต้องติดตั้ง Node.js และไม่ต้องดาวน์โหลด `tunnel-client` เอง** ตัว build จาก source `v5.8.1` รวม official OpenAI `tunnel-client v0.0.16` ที่ตรงกับ OS/architecture พร้อม SHA-256/provenance ส่วน release รุ่นก่อนหน้าอาจ bundle เวอร์ชันต่างกัน ให้ยึดหลักฐานของไฟล์ที่ดาวน์โหลดจริง
 
@@ -53,7 +53,7 @@ Node.js, pnpm และ Git จำเป็นเฉพาะกรณีพั�
 2. ติดตั้งตามปกติ
 3. เปิด **lnwjud Agent Control Center**
 4. เพิ่ม Project/Workspace ที่ต้องการใช้งาน
-5. ถ้าทำงานพร้อมกันหลายแชท/หลายโปรเจกต์ ให้ตั้ง Active Projects ได้มากกว่า 1 โปรเจกต์ และเลือก Primary Project สำหรับงานที่ต้องมีค่า default
+5. ถ้าทำงานพร้อมกันหลายแชท/หลายโปรเจกต์ ให้ตั้ง Active Projects ได้มากกว่า 1 โปรเจกต์ และเลือก โปรเจกต์เริ่มต้น (Default Project) เป็นค่าอ้างอิงเมื่อบทสนทนาไม่ได้ระบุโปรเจกต์
 
 ### แบบไม่ต้องติดตั้ง: Portable EXE
 
@@ -310,9 +310,9 @@ v4.11.0 รองรับ Active Projects หลายรายการพร�
 
 - แต่ละ MCP session มี session identity แยกกัน
 - process/task handle ถูกแยกตาม owner/session
-- file / Git / process / shell / database / Office / native-path tools ต้องทำงานได้กับ **ทุก workspace ที่อยู่ใน Active Projects set** ไม่ใช่เฉพาะ Primary Project
+- file / Git / process / shell / database / Office / native-path tools ต้องทำงานได้กับ **ทุก workspace ที่อยู่ใน Active Projects set** ไม่ใช่เฉพาะโปรเจกต์เริ่มต้นเท่านั้น
 - ถ้า request มี absolute `path`, `cwd`, database `target` หรือ path field ที่ชี้ไปยัง Active Project ตัวอื่น runtime จะ route `workspaceId` ไปยังสมาชิกที่ครอบ path นั้นโดยอัตโนมัติ; เมื่อ Full Bypass ปิด path ที่ไม่อยู่ใน Active set ยังถูก guard ตามเดิม
-- Primary Project เป็นเพียงค่า default เมื่อ client ไม่ได้ระบุ project/path ชัดเจน ไม่ใช่ขอบเขตสิทธิ์เพียงรายการเดียว
+- โปรเจกต์เริ่มต้น (Default Project) เป็นเพียงค่าอ้างอิงเมื่อ client ไม่ได้ระบุ project/path ชัดเจน ไม่ใช่ขอบเขตสิทธิ์เพียงรายการเดียว
 - Work Log และ Live Logs สามารถกรอง Workspace / Session ได้
 
 อย่าเลือกทั้งไดรฟ์เป็น Active Project เพียงเพื่อความสะดวก ถ้างานจริงอยู่ใน project folder ที่เจาะจง
@@ -447,8 +447,8 @@ corepack pnpm@10.15.0 package:windows
 ไฟล์ที่ได้จะอยู่ที่:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.8.7.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.8.7.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.8.8.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.8.8.exe
 apps/desktop/dist/installers/latest.yml
 apps/desktop/dist/installers/portable.yml
 ```

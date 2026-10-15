@@ -21,6 +21,28 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.8',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'no-borrowed-project', titleKey: 'whatsNew.588.safety.title', descriptionKey: 'whatsNew.588.safety.description', badge: 'fixed', tags: ['absolute path', 'audit', 'checkpoint'] },
+          { id: 'unknown-workspace-guidance', titleKey: 'whatsNew.588.refusal.title', descriptionKey: 'whatsNew.588.refusal.description', badge: 'improved', tags: ['workspaceId', 'retry', 'MCP'] },
+        ],
+      },
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'concurrent-projects', titleKey: 'whatsNew.588.concurrent.title', descriptionKey: 'whatsNew.588.concurrent.description', badge: 'fixed', tags: ['Active Project', 'cwd', 'shell'] },
+          { id: 'workspace-id-path', titleKey: 'whatsNew.588.pathtarget.title', descriptionKey: 'whatsNew.588.pathtarget.description', badge: 'fixed', tags: ['workspaceId', 'absolute path'] },
+          { id: 'default-project-label', titleKey: 'whatsNew.588.default.title', descriptionKey: 'whatsNew.588.default.description', badge: 'improved', tags: ['Desktop', 'project'] },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.8.7',
     categories: [
       {

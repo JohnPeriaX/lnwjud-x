@@ -2,6 +2,16 @@
 
 Release highlights are listed newest first. The [README](README.md) shows the three newest versions, and each [GitHub Release](https://github.com/engasnm111/lnwjud/releases) contains its published notes and downloads.
 
+### What's new in v5.8.8
+
+- **All Active Projects are usable at the same time:** a call that named one project in `workspaceId` and a different folder in its own `path` or `cwd` used to be rejected with `INVALID_INPUT`. The named path is what the user actually pointed at, so routing now resolves the project that owns it, rewrites `workspaceId` to match, and passes that reconciled project to the executor. Durable shell and process handles stay owned by, and addressable from, the project whose directory the call named.
+- **`workspaceId` accepts what callers actually send:** an absolute folder path resolves to the Active Project that owns it, else the registered project that owns it, else the project the host attaches for that call; a uniquely matching project name resolves to its id. A path that cannot become a project is refused with the projects that exist instead of being misjudged against the first one.
+- **No borrowed projects:** an absolute path that belongs to no registered workspace is no longer answered with the first workspace in the registry. The relative path, permission decision and audit/checkpoint attribution now stay with the folder that was actually named, and there is no configuration or environment escape that restores the old fallback.
+- **Refusals name a fix:** a scope refusal for an unknown workspaceId lists the projects on the host with ids and roots, and names the closest project when one character was mistyped - the failure mode that made an assistant retry the same bad id 18 times against `run_goal`.
+- **Default project wording:** Control Center, the Projects page and scope messages say "Default project" instead of "Primary project", matching behavior that already allowed concurrent projects. Stored keys and order are unchanged, so no migration is required and older builds still read the same state.
+- **Local verification:** the workspace locator, search and tree surfaces, `@lnwjud/mcp-server` routing/attach/destructive-scope suites and the full Desktop suite pass on this tree, and the divergence registry now carries 17 fork behaviors. Exact-SHA hosted CI, publisher signing, packaging and post-install acceptance remain separate gates.
+- **ภาษาไทย:** ทุกโปรเจกต์ที่เปิดอยู่ใช้งานพร้อมกันได้จริง — `workspaceId` ที่ขัดกับ `path`/`cwd` ถูก reconcile ไปยังโปรเจกต์เจ้าของ path, วางพาธเต็มหรือชื่อโปรเจกต์ใน `workspaceId` ก็จับคู่หรือเพิ่มเป็นโปรเจกต์ได้, พาธที่ไม่อยู่ในโปรเจกต์ใดเลยถูกปฏิเสธตรง ๆ แทนการหยิบโปรเจกต์แรกมาใช้, ข้อความปฏิเสธบอกโปรเจกต์ที่มีอยู่จริงพร้อม id ที่ใกล้เคียงที่สุด และ UI เรียกโปรเจกต์ตัวแรกว่า "โปรเจกต์เริ่มต้น (Default)" โดยค่าที่เก็บไม่เปลี่ยน
+
 ### What's new in v5.8.7
 
 - **Path access parity with DesktopCommanderMCP:** an absolute path outside the Active Project is routed to that workspace instead of being denied. Preview calls cannot register a project; only a real tool call attaches, Full Access attaches silently, and stricter permission profiles request one confirmation per new folder. Attaching never relocates the primary Active Project.

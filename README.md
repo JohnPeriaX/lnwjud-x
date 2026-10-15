@@ -53,7 +53,16 @@
 
 ## Current published version: v5.8.6
 
-## Current source version: v5.8.7
+## Current source version: v5.8.8
+
+### What's new in v5.8.8
+
+- **Every Active Project is usable at the same time:** a call whose `workspaceId` disagrees with the folder named in its own `path` or `cwd` no longer fails. The project that owns that path wins, the id is rewritten to match, and the reconciled project travels to the executor, so shell, task and process work lands where you pointed it and stays addressable from that project afterwards.
+- **A path typed into `workspaceId` is understood:** an absolute folder path, or a uniquely matching project name, resolves to the project that owns it (or attaches the folder as a project under the existing policy) instead of returning `WORKSPACE_NOT_FOUND` or an unanswerable "not an Active Project". A mistyped project id now names the projects that exist, including the closest one, so the retry fixes itself.
+- **No more borrowed projects:** an absolute path that belongs to no registered project is refused with the folder worth adding, instead of quietly borrowing the first project in the registry for the relative path, the permission decision and the audit/checkpoint attribution. There is no setting or environment escape that restores the old fallback.
+- **"Primary project" is now "Default project":** Control Center, the Projects page and scope messages use the wording that matches real behaviour. The stored project order is untouched, so index 0 remains the default and no migration or data move is needed.
+- **Fork source build:** this version carries the fork's routing and attribution fixes on top of the upstream v5.8.6 tree, with the ToolRegistry catalog unchanged at 289 declared tools (277 default-advertised).
+- **ภาษาไทย:** ทุกโปรเจกต์ที่เปิดอยู่ใช้งานพร้อมกันได้จริง — `workspaceId` ที่ไม่ตรงกับ `path`/`cwd` ถูก reconcile ไปยังโปรเจกต์เจ้าของ path, วางพาธเต็มหรือชื่อโปรเจกต์ใน `workspaceId` ก็จับคู่ได้, พาธที่ไม่อยู่ในโปรเจกต์ใดเลยถูกปฏิเสธตรง ๆ แทนการหยิบโปรเจกต์แรก, และ UI เปลี่ยนจาก "โปรเจกต์หลัก (Primary)" เป็น "โปรเจกต์เริ่มต้น (Default)"
 
 ### What's new in v5.8.7
 
@@ -68,13 +77,6 @@
 - **Engineering Gate checkpoint compatibility (Issue #198):** Add `checkpoint_goal_engineering` with the same strict schema, Goal handler, lease/revision checks and evidence validation as `checkpoint_goal`. It follows the canonical tool's availability, so disabling `checkpoint_goal` disables both names.
 - **Verification boundary:** The connected `@lnwjud-pc` plugin is running app v5.8.5. Its direct `checkpoint_goal` schema exposes both Engineering fields; a call with non-empty values and `get_goal` readback confirmed persistence. Fresh-session v5.8.6 inventory and alias call/readback remain post-install acceptance.
 - **ภาษาไทย:** `@lnwjud-pc` ที่เชื่อมต่ออยู่ใช้แอป v5.8.5; schema ของ `checkpoint_goal` ประกาศฟิลด์ Engineering ทั้งสองรายการ และเรียกด้วยค่าจริงพร้อมอ่านกลับผ่าน `get_goal` ได้แล้ว ส่วน inventory และการเรียก alias ใน fresh session หลังติดตั้ง v5.8.6 ยังเป็น acceptance ที่รออยู่
-
-### What's new in v5.8.5
-
-- **Engineering Harness audit routing (Issue #194):** Keep Full Audit requests and read-only reviews of existing deployments or release history in the local review workflow. Explicit deploy, release, commit, push, PR and merge requests retain their matching delivery scope and gates.
-- **Existing Engineering Goals:** Reconcile workflow classification, gate contracts and source scope from the lease-acquired Goal snapshot. Preserve compatible findings, task tracking and proof; revalidate scope-dependent checks when the requested source scope changes.
-- **Modern MCP HTTP inventory and schema evidence:** Notify subscribed clients when host tool availability changes, then serve the current tools/list on the next request. `tool_describe` reports a SHA-256 digest from the active ToolRegistry schema and identifies remote connector schema as unavailable.
-- **ภาษาไทย:** แยก Full Audit และการตรวจประวัติ deployment/release แบบอ่านอย่างเดียวออกจากคำสั่งปล่อยงาน, reconcile metadata ของ Goal เดิมจาก snapshot ที่ acquire ภายใต้ lease, แจ้ง MCP client เมื่อ tool availability เปลี่ยน และแสดง digest ของ local schema โดยไม่อ้างว่าอ่าน schema ของ connector ภายนอกได้
 
 ### Earlier release highlights — v5.8.0
 
