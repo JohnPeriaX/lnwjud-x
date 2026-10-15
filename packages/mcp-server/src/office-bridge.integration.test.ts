@@ -47,18 +47,21 @@ describe.skipIf(process.platform !== 'win32')('Windows Office bridge boundary in
     expect(stderr).toBe('');
     expect(stdout).toContain('Office bridge helper boundary, Unicode, macro/link policy, readback and lifecycle checks passed.');
   }, 45_000);
+  // Both probes below run a real PowerShell script whose child alone costs 5.6-7.0s on this
+  // host (measured without Vitest) against the 30s budget they declare, so they need the same
+  // per-test budget upstream already gave the sibling PowerShell integration probe above.
   it('captures all Office account action effects without using a real account or sending', async () => {
     const script = fileURLToPath(new URL('../../../scripts/test-office-account-dispatch.ps1', import.meta.url));
     const { stdout, stderr } = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script], { timeout: 30_000, windowsHide: true, maxBuffer: 1024 * 1024 });
     expect(stderr).toBe('');
     expect(stdout).toContain('All 17 Office account actions passed captured-provider checks.');
-  });
+  }, 45_000);
   it('preserves borrowed PowerPoint applications and bounds cross-process ownership contention', async () => {
     const script = fileURLToPath(new URL('../../../scripts/test-office-powerpoint-lifetime.ps1', import.meta.url));
     const { stdout, stderr } = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script], { timeout: 30_000, windowsHide: true, maxBuffer: 1024 * 1024 });
     expect(stderr).toBe('');
     expect(stdout).toContain('PowerPoint borrowed/created ownership, bounded contention and abandoned-lock recovery passed.');
-  });
+  }, 45_000);
 });
 
 describe.skipIf(process.platform !== 'win32' || process.env.LNWJUD_RUN_OFFICE_COM_ACCEPTANCE !== '1')('Windows Office disposable COM artifact acceptance', () => {

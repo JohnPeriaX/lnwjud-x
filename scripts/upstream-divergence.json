@@ -218,6 +218,16 @@
       ]
     },
     {
+      "id": "office-bridge-script-test-budget",
+      "summary": "The two Office bridge probes that run scripts/test-office-account-dispatch.ps1 and scripts/test-office-powerpoint-lifetime.ps1 get the same 45s per-test budget upstream already gave their sibling PowerShell probe in the same file (commit ba9d7776). The PowerShell child alone measures 5.6-7.0s on this host before Vitest adds anything, so with the 5s default these two tests cannot finish even on an idle machine and the release stage fails deterministically.",
+      "markers": [
+        { "file": "packages/mcp-server/src/office-bridge.integration.test.ts", "contains": "whose child alone costs 5.6-7.0s on this" }
+      ],
+      "proofTests": [
+        "packages/mcp-server/src/office-bridge.integration.test.ts"
+      ]
+    },
+    {
       "id": "default-project-not-primary",
       "summary": "The first entry of active_workspace_ids is presented as the default project, never the Primary Project, because every open project is usable concurrently and the router now enforces that. Upstream ships the older key names and wording; taking its side during a merge renames the i18n keys back and leaves the components that read home.defaultProject/defaultBadge rendering missing translations.",
       "markers": [
