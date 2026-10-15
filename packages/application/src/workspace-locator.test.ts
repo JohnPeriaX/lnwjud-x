@@ -76,6 +76,43 @@ describe('resolveWorkspaceForPath', () => {
     expect(result).toMatchObject({ ok: true, value: { id: 'project' } });
   });
 
+  it('refuses an absolute path outside every registered project instead of borrowing the first one', async () => {
+    const result = await resolveWorkspaceForPath(
+      repository([drive, nested]),
+      undefined,
+      'D:\\Elsewhere\\report.md',
+      undefined,
+      'win32',
+      [],
+      true,
+    );
+    expect(result).toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
+    if (result.ok) throw new Error('A path that belongs to no project must never resolve to a project');
+    expect(result.error.message).toContain('D:\\Elsewhere\\report.md');
+    expect(result.error.message).toContain('is not inside any registered project');
+    expect(result.error.message).toContain(path.win32.join('C:', 'Users', 'me', 'proj'));
+  });
+
+  it('refuses an unmatched absolute path under Full Bypass without naming an unrelated project', async () => {
+    const result = await resolveWorkspaceForPath(
+      repository([nested, drive]),
+      undefined,
+      'D:\\Elsewhere\\report.md',
+      { mode: 'full_bypass', applicationApproved: true, bypassApplicationAuthorization: true, source: 'full_bypass' },
+      'win32',
+    );
+    expect(result).toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
+    if (result.ok) throw new Error('Full Bypass skips prompts; it does not invent a project');
+  });
+
+  it('names the containing folder as the project to add', async () => {
+    const result = await resolveWorkspaceForPath(repository([nested]), undefined, 'D:\\Elsewhere\\report.md', undefined, 'win32', [], true);
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'PATH_OUTSIDE_WORKSPACE', message: expect.stringContaining('add "D:\\Elsewhere" as a project') },
+    });
+  });
+
   it('requires source and destination to share one workspace', async () => {
     const other: Workspace = {
       id: 'drive-d',

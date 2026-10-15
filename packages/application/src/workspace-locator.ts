@@ -1,5 +1,13 @@
 import { appError, err, isFullBypassAuthorization, ok, type InvocationAuthorization, type Result } from '@lnwjud/domain';
-import { isAbsoluteHostPath, isForeignAbsolutePath, isHostPathWithin, resolveHostPath, type Workspace, type WorkspaceRepository } from '@lnwjud/workspace';
+import {
+  hostPathApi,
+  isAbsoluteHostPath,
+  isForeignAbsolutePath,
+  isHostPathWithin,
+  resolveHostPath,
+  type Workspace,
+  type WorkspaceRepository,
+} from '@lnwjud/workspace';
 
 export function isAbsoluteFsPath(inputPath: string, platform: NodeJS.Platform = process.platform): boolean {
   return isAbsoluteHostPath(inputPath, platform);
@@ -36,12 +44,23 @@ export async function resolveWorkspaceForPath(
 
   const listed = await workspaces.list();
   const matches = listed.filter((workspace) => workspaceContains(workspace, inputPath, platform));
-  if (matches.length === 0) {
-    if ((allowExplicitAbsoluteRead || isFullBypassAuthorization(authorization)) && listed[0] !== undefined) return ok(listed[0]);
-    return err(appError('PATH_OUTSIDE_WORKSPACE', 'Path is not inside a registered workspace'));
-  }
+  if (matches.length === 0) return err(appError('PATH_OUTSIDE_WORKSPACE', describeUnmatchedAbsolutePath(inputPath, listed, platform)));
   matches.sort((left, right) => longestRoot(right).length - longestRoot(left).length);
   return ok(matches[0]!);
+}
+
+/**
+ * An absolute path that belongs to no registered project is never answered with some other project.
+ * Borrowing the first registered workspace used to make a call silently read, write and audit inside
+ * a folder nobody named, which is the opposite of what an explicit path means. Name the real choices.
+ */
+function describeUnmatchedAbsolutePath(inputPath: string, listed: readonly Workspace[], platform: NodeJS.Platform): string {
+  const registered = listed.slice(0, 5).map((workspace) => `"${workspace.rootPath}"`).join(', ');
+  const api = hostPathApi(platform);
+  const absolute = resolveHostPath(inputPath, platform);
+  const folder = absolute === null ? undefined : api.dirname(absolute);
+  const add = folder === undefined || folder === absolute ? 'the folder that contains it' : `"${folder}"`;
+  return `Path "${inputPath}" is not inside any registered project, so nothing was read or written there. Work inside a project you already have (${registered.length === 0 ? 'no project is registered yet' : registered}) or add ${add} as a project, then retry.`;
 }
 
 export async function resolveSharedWorkspace(

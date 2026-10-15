@@ -154,6 +154,19 @@
       "proofTests": [
         "apps/desktop/tests/session-resilience-acceptance.test.ts"
       ]
+    },
+    {
+      "id": "no-arbitrary-workspace-fallback",
+      "summary": "An absolute path that belongs to no registered project is refused with the projects that exist and the folder that could be added. Upstream answers the same case with the first workspace in the registry list, which made a call read, write, audit and checkpoint inside a folder nobody named - the measured cause of work landing in the wrong project. Restoring that one-line fallback merges cleanly and reintroduces the misattribution with no failing test.",
+      "markers": [
+        { "file": "packages/application/src/workspace-locator.ts", "contains": "describeUnmatchedAbsolutePath" },
+        { "file": "packages/application/src/workspace-locator.ts", "contains": "is not inside any registered project" }
+      ],
+      "proofTests": [
+        "packages/application/src/workspace-locator.test.ts",
+        "packages/application/src/search-service.test.ts",
+        "packages/application/src/workspace-query-service.test.ts"
+      ]
     }
   ]
 }

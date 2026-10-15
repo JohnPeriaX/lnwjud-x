@@ -114,7 +114,7 @@ describe('SearchService', () => {
     )).resolves.toEqual({ ok: true, value: { matches: [], truncated: true } });
   });
 
-  it('uses an explicit external absolute path as the ripgrep root under Full Bypass', async () => {
+  it('searches an explicit external absolute path only through the anchored project under Full Bypass', async () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'lnwjud-search-workspace-'));
     const outsideRoot = await mkdtemp(path.join(tmpdir(), 'lnwjud-search-outside-'));
     try {
@@ -138,9 +138,21 @@ describe('SearchService', () => {
         { query: 'needle', path: outsideRoot, discovery: 'explicit' },
       )).resolves.toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
 
-      const result = await service.searchText(
+      // No project named, no anchor: Full Bypass skips prompts but must not borrow workspace-1.
+      await expect(service.searchText(
         { clientId: 'test', clientName: 'test' },
         undefined,
+        { query: 'needle', path: outsideRoot, discovery: 'explicit' },
+        undefined,
+        authorization,
+      )).resolves.toMatchObject({
+        ok: false,
+        error: { code: 'PATH_OUTSIDE_WORKSPACE', message: expect.stringContaining('not inside any registered project') },
+      });
+
+      const result = await service.searchText(
+        { clientId: 'test', clientName: 'test' },
+        workspace.id,
         { query: 'needle', path: outsideRoot, discovery: 'explicit' },
         undefined,
         authorization,

@@ -36,7 +36,7 @@ describe('WorkspaceQueryService', () => {
     if (result.ok) expect(result.value.entries.map((entry) => entry.path)).toEqual(['src', path.join('src', 'index.ts')]);
   });
 
-  it('honours the host explicit-absolute-read grant the same way the file read path does', async () => {
+  it('refuses an outside absolute path on the tree surface instead of borrowing the registered project', async () => {
     const projectRaw = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-query-project-'));
     const siblingRaw = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-query-sibling-'));
     temporaryRoots.push(projectRaw, siblingRaw);
@@ -56,15 +56,19 @@ describe('WorkspaceQueryService', () => {
     const refused = await new WorkspaceQueryService(repository).tree(actor, undefined, { path: siblingRoot });
     expect(refused).toMatchObject({ ok: false, error: { code: 'PATH_OUTSIDE_WORKSPACE' } });
 
-    // Desktop and non-strict STDIO grant allowExplicitAbsoluteRead, so read_file already accepts
-    // this path; workspace_tree must not contradict the same host on the same target.
+    // A host that grants explicit absolute reads must still not report an unrelated project's tree.
+    // The grant is honoured once the caller names the project the path is anchored to (workspaceId).
     const trusted = new WorkspaceQueryService(repository, new WorkspacePathGuard(new SecretPolicy(), {
       trustedWorkspaceAccess: true,
       allowExplicitAbsoluteRead: true,
     }));
-    const allowed = await trusted.tree(actor, undefined, { path: siblingRoot });
-
-    expect(allowed).toMatchObject({ ok: true });
-    if (allowed.ok) expect(allowed.value.entries.map((entry) => entry.path)).toContain('notes.txt');
+    const unanchored = await trusted.tree(actor, undefined, { path: siblingRoot });
+    expect(unanchored).toMatchObject({
+      ok: false,
+      error: { code: 'PATH_OUTSIDE_WORKSPACE', message: expect.stringContaining('not inside any registered project') },
+    });
+    const anchored = await trusted.tree(actor, workspace.id, { path: siblingRoot });
+    expect(anchored).toMatchObject({ ok: true });
+    if (anchored.ok) expect(anchored.value.entries.map((entry) => entry.path)).toContain('notes.txt');
   });
 });
