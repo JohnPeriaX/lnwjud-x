@@ -69,6 +69,7 @@ export class AuditService {
         ...(input.resultMessage === undefined ? {} : { errorMessage: input.resultMessage }),
         ...(input.traceId === undefined ? {} : { traceId: input.traceId }),
         ...(input.traceParent === undefined ? {} : { traceParent: input.traceParent }),
+        ...(input.observedTransport === undefined ? {} : { observedTransport: input.observedTransport }),
         ...(input.authorizationMode === undefined ? {} : { authorizationMode: input.authorizationMode }),
         ...(input.permissionDecision === undefined ? {} : { permissionDecision: input.permissionDecision }),
       },

@@ -1,8 +1,18 @@
-import { appError, err, ok, type CallHistoryPage, type CallHistoryQuery, type CallTimingObservation, type Result } from '@lnwjud/domain';
+import { appError, err, ok, type CallHistoryPage, type CallHistoryQuery, type CallTimingObservation, type ObservedCallTransport, type Result } from '@lnwjud/domain';
 import type { AuditEventRepository } from '@lnwjud/audit';
 import type { WorkspaceRepository } from '@lnwjud/workspace';
 import type { FileActor } from '../file-service.js';
 import { aggregateCallTimings } from './call-timing-aggregate.js';
+
+/**
+ * Transports this process can actually observe. A ChatGPT secure tunnel is
+ * terminated by the local tunnel-client, which forwards to the loopback MCP
+ * listener without any distinguishing header or session metadata, so a tunnel
+ * call is observed as `loopback_http`; `external_mcp` is likewise not recorded
+ * by any producer today. Filtering on an unobservable transport must return an
+ * empty page instead of relabelling loopback traffic.
+ */
+const OBSERVABLE_TRANSPORTS: readonly ObservedCallTransport[] = ['local_stdio', 'loopback_http'];
 
 export class CallHistoryService {
   public constructor(
@@ -23,9 +33,9 @@ export class CallHistoryService {
       return err(appError('INVALID_INPUT', 'Invalid call history filters'));
     }
     const sampledAt = this.now().toISOString();
-    // This runtime has no trusted per-call transport identity or tunnel span,
-    // so non-unknown transport queries must return "unknown", not fabricated zeros.
-    if (query.transport !== undefined && query.transport !== 'unknown') {
+    // Filtering on a transport this process never observed returns an empty
+    // page with unknown coverage; it must never relabel observed calls.
+    if (query.transport !== undefined && !OBSERVABLE_TRANSPORTS.includes(query.transport)) {
       const items: CallTimingObservation[] = [];
       return ok({ items, nextCursor: null, sampledAt, coverage: 'unknown', truncated: false, totals: aggregateCallTimings(items) });
     }
@@ -35,6 +45,7 @@ export class CallHistoryService {
         workspaceId: query.workspaceId, limit: query.limit ?? 50,
         ...(query.goalId === undefined ? {} : { goalId: query.goalId }),
         ...(query.toolName === undefined ? {} : { toolName: query.toolName }),
+        ...(query.transport === undefined ? {} : { observedTransport: query.transport }),
         ...(query.since === undefined ? {} : { since: query.since }),
         ...(query.until === undefined ? {} : { until: query.until }),
         ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
@@ -44,7 +55,7 @@ export class CallHistoryService {
         toolName: item.toolName,
         workspaceId: item.workspaceId,
         goalId: item.goalId,
-        transport: 'unknown',
+        transport: narrowObservedTransport(item.observedTransport),
         outcome: item.phase !== 'completed' ? 'incomplete'
           : item.resultCode === 'SUCCESS' ? 'success'
             : item.resultCode === 'CANCELLED' ? 'cancelled' : 'failure',
@@ -58,4 +69,11 @@ export class CallHistoryService {
       return err(appError('INVALID_INPUT', 'Call history query or cursor is invalid'));
     }
   }
+}
+
+/** Stored transport is a plain string; unrecognized or legacy values stay unknown rather than being guessed. */
+function narrowObservedTransport(value: string | null): ObservedCallTransport {
+  return value === 'local_stdio' || value === 'loopback_http' || value === 'secure_tunnel' || value === 'external_mcp'
+    ? value
+    : 'unknown';
 }

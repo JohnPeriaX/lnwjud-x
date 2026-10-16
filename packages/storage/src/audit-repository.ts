@@ -143,6 +143,7 @@ export class SqliteAuditRepository implements AuditEventRepository {
     const params: Array<string | number> = [query.workspaceId];
     if (query.goalId !== undefined) { clauses.push('r.goal_id = ?'); params.push(query.goalId); }
     if (query.toolName !== undefined) { clauses.push('r.tool_name = ?'); params.push(query.toolName); }
+    if (query.observedTransport !== undefined) { clauses.push('r.observed_transport = ?'); params.push(query.observedTransport); }
     if (query.since !== undefined) { clauses.push('r.timestamp >= ?'); params.push(query.since); }
     if (query.until !== undefined) { clauses.push('r.timestamp <= ?'); params.push(query.until); }
     if (query.cursor !== undefined) {
@@ -159,6 +160,7 @@ export class SqliteAuditRepository implements AuditEventRepository {
           json_extract(e.metadata_json, '$.toolName') AS tool_name,
           json_extract(e.metadata_json, '$.phase') AS phase,
           json_extract(e.metadata_json, '$.goalId') AS goal_id,
+          json_extract(e.metadata_json, '$.observedTransport') AS observed_transport,
           1 AS rn
         FROM audit_events e
         WHERE e.workspace_id = ? AND e.action LIKE 'mcp_tool:%'
@@ -180,7 +182,7 @@ export class SqliteAuditRepository implements AuditEventRepository {
           )
       )
       SELECT r.id, r.timestamp, r.workspace_id, r.session_id, r.result_code, r.duration_ms,
-        r.call_id, r.tool_name, r.phase, r.goal_id,
+        r.call_id, r.tool_name, r.phase, r.goal_id, r.observed_transport,
         (SELECT MIN(s.timestamp) FROM audit_events s
           WHERE s.workspace_id = r.workspace_id
             AND s.session_id IS r.session_id
@@ -202,6 +204,7 @@ export class SqliteAuditRepository implements AuditEventRepository {
         resultCode: value.phase === 'completed' && typeof value.result_code === 'string' ? value.result_code : null,
         durationMs: value.phase === 'completed' && typeof value.duration_ms === 'number' && Number.isFinite(value.duration_ms) && value.duration_ms >= 0 ? value.duration_ms : null,
         phase: value.phase,
+        observedTransport: typeof value.observed_transport === 'string' && value.observed_transport.length > 0 ? value.observed_transport : null,
         startedAt: typeof value.started_at === 'string' ? value.started_at : null,
         sampledAt: value.timestamp,
       });

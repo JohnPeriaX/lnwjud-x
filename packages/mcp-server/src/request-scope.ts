@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { FileActor } from '@lnwjud/application';
+import type { ObservedCallTransport } from '@lnwjud/domain';
 import { CAPABILITY_TASK_OWNER_METADATA_KEY } from '@lnwjud/capabilities';
 
 export type McpTransportKind = 'http' | 'stdio';
@@ -7,6 +8,14 @@ export type McpTransportKind = 'http' | 'stdio';
 export interface McpRequestScope {
   readonly sessionId: string;
   readonly transport: McpTransportKind;
+  /**
+   * Transport this server actually observed for the request. It records the
+   * listener the call arrived on, never a client claim: a ChatGPT secure-tunnel
+   * call reaches lnwjud as loopback HTTP from the local tunnel-client and is
+   * indistinguishable from other loopback traffic, so it is reported as
+   * `loopback_http` rather than guessed as `secure_tunnel`.
+   */
+  readonly observedTransport: ObservedCallTransport;
   readonly protocolSessionId?: string;
   readonly workspaceId?: string;
   readonly requestId?: string;
@@ -27,7 +36,7 @@ export interface HttpRequestScopeOptions {
 
 /** One synthetic identity for one STDIO serving lifetime. */
 export function createStdioRequestScope(sessionId = randomUUID()): McpRequestScope {
-  return { sessionId: normalizeInternalSessionId(sessionId), transport: 'stdio' };
+  return { sessionId: normalizeInternalSessionId(sessionId), transport: 'stdio', observedTransport: 'local_stdio' };
 }
 
 /**
@@ -48,6 +57,7 @@ export function createHttpRequestScope(options: HttpRequestScopeOptions): McpReq
         : `chatgpt-${fingerprint(openAiSessionId)}`)
       : `http-${fingerprint(protocolSessionId)}`,
     transport: 'http',
+    observedTransport: 'loopback_http',
     ...(protocolSessionId === undefined ? {} : { protocolSessionId }),
     ...(traceParent === undefined ? {} : { traceParent }),
     ...(traceState === undefined ? {} : { traceState }),
@@ -58,7 +68,7 @@ export function createHttpRequestScope(options: HttpRequestScopeOptions): McpReq
 export function createProtocolHttpRequestScope(protocolSessionId: string): McpRequestScope {
   const bounded = boundedProtocolSessionId(protocolSessionId);
   if (bounded === undefined) throw new Error('Protocol session ID is invalid');
-  return { sessionId: `http-${fingerprint(bounded)}`, transport: 'http', protocolSessionId: bounded };
+  return { sessionId: `http-${fingerprint(bounded)}`, transport: 'http', observedTransport: 'loopback_http', protocolSessionId: bounded };
 }
 
 /**
@@ -69,7 +79,7 @@ export function createProtocolHttpRequestScope(protocolSessionId: string): McpRe
 export function createOpenAiSessionRequestScope(openAiSessionId: string): McpRequestScope {
   const bounded = boundedProtocolSessionId(openAiSessionId);
   if (bounded === undefined) throw new Error('OpenAI session ID is invalid');
-  return { sessionId: `chatgpt-${fingerprint(bounded)}`, transport: 'http' };
+  return { sessionId: `chatgpt-${fingerprint(bounded)}`, transport: 'http', observedTransport: 'loopback_http' };
 }
 
 /** Extract only the server-supplied OpenAI conversation metadata from an MCP message. */

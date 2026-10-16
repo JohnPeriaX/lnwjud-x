@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { VerifiedMutationReceipt } from './task-mutation-receipt.js';
+import type { ObservedCallTransport } from '@lnwjud/domain';
 import {
   activityTargetReference,
   redactActivityTargetDetail,
@@ -29,6 +30,8 @@ export interface ActivitySinkEvent {
   readonly traceParent?: string;
   readonly traceState?: string;
   readonly baggage?: string;
+  /** Listener this server observed the call on; never derived from client-supplied data. */
+  readonly observedTransport?: ObservedCallTransport;
   readonly authorizationMode?: 'standard' | 'full_bypass';
   /** Server-computed permission decision; never copied from tool input. */
   readonly permissionDecision?: 'ALLOW' | 'ASK' | 'DENY';
@@ -40,6 +43,7 @@ export interface TraceContext {
   readonly traceParent?: string;
   readonly traceState?: string;
   readonly baggage?: string;
+  readonly observedTransport?: ObservedCallTransport;
 }
 
 export interface ToolTelemetrySnapshot {
@@ -96,6 +100,7 @@ export interface InFlightToolCall {
   readonly traceParent?: string;
   readonly traceState?: string;
   readonly baggage?: string;
+  readonly observedTransport?: ObservedCallTransport;
   readonly authorizationMode?: 'standard' | 'full_bypass';
   readonly permissionDecision?: 'ALLOW' | 'ASK' | 'DENY';
 }
@@ -211,6 +216,7 @@ export class ActivityTracker {
       ...(trace.traceParent === undefined ? {} : { traceParent: trace.traceParent }),
       ...(trace.traceState === undefined ? {} : { traceState: trace.traceState }),
       ...(trace.baggage === undefined ? {} : { baggage: trace.baggage }),
+      ...(trace.observedTransport === undefined ? {} : { observedTransport: trace.observedTransport }),
       ...(authorizationMode === undefined ? {} : { authorizationMode }),
     };
     this.inflight.set(callId, entry);
@@ -230,6 +236,7 @@ export class ActivityTracker {
       ...(trace.traceParent === undefined ? {} : { traceParent: trace.traceParent }),
       ...(trace.traceState === undefined ? {} : { traceState: trace.traceState }),
       ...(trace.baggage === undefined ? {} : { baggage: trace.baggage }),
+      ...(trace.observedTransport === undefined ? {} : { observedTransport: trace.observedTransport }),
       ...(authorizationMode === undefined ? {} : { authorizationMode }),
     }, describedTarget.detail);
     return callId;
@@ -318,6 +325,7 @@ export class ActivityTracker {
       ...(existing?.traceParent === undefined ? {} : { traceParent: existing.traceParent }),
       ...(existing?.traceState === undefined ? {} : { traceState: existing.traceState }),
       ...(existing?.baggage === undefined ? {} : { baggage: existing.baggage }),
+      ...(existing?.observedTransport === undefined ? {} : { observedTransport: existing.observedTransport }),
       ...(existing?.authorizationMode === undefined ? {} : { authorizationMode: existing.authorizationMode }),
       ...(existing?.permissionDecision === undefined ? {} : { permissionDecision: existing.permissionDecision }),
       ...(resultMessage === undefined || resultMessage.length === 0 ? {} : { resultMessage }),

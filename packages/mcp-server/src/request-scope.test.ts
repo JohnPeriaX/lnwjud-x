@@ -15,6 +15,15 @@ describe('MCP request scope', () => {
     expect(createStdioRequestScope('stdio-a')).toMatchObject({ sessionId: 'stdio-a', transport: 'stdio' });
   });
 
+  it('records only the listener this server observed, never a client-claimed transport', () => {
+    expect(createStdioRequestScope().observedTransport).toBe('local_stdio');
+    expect(createHttpRequestScope({ request: new Request('http://127.0.0.1/mcp'), fallbackSessionId: 'endpoint-a' }).observedTransport).toBe('loopback_http');
+    // ChatGPT conversation metadata proves the caller, not the listener: the secure
+    // tunnel forwards to this same loopback endpoint, so the observation stays honest.
+    expect(createHttpRequestScope({ request: new Request('http://127.0.0.1/mcp'), fallbackSessionId: 'endpoint-a', openAiSessionId: 'chat-a' }).observedTransport).toBe('loopback_http');
+    expect(createProtocolHttpRequestScope('protocol-a').observedTransport).toBe('loopback_http');
+  });
+
   it('uses a stable endpoint fallback only when HTTP has no protocol session', () => {
     const request = new Request('http://127.0.0.1/mcp');
     expect(createHttpRequestScope({ request, fallbackSessionId: 'endpoint-a' }).sessionId).toBe('endpoint-a');

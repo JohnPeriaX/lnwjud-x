@@ -163,6 +163,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
       const traceContext = {
         ...sdkTrace,
         ...(requestScope?.sessionId === undefined ? {} : { sessionId: requestScope.sessionId }),
+        ...(requestScope?.observedTransport === undefined ? {} : { observedTransport: requestScope.observedTransport }),
         ...(sdkTrace.traceId !== undefined || requestScope?.traceId === undefined ? {} : { traceId: requestScope.traceId }),
         ...(sdkTrace.traceParent !== undefined || requestScope?.traceParent === undefined ? {} : { traceParent: requestScope.traceParent }),
         ...(sdkTrace.traceState !== undefined || requestScope?.traceState === undefined ? {} : { traceState: requestScope.traceState }),

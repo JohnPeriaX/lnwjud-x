@@ -86,6 +86,8 @@ export interface AuditCallHistoryQuery {
   readonly workspaceId: string;
   readonly goalId?: string;
   readonly toolName?: string;
+  /** Server-observed listener identity stored per call; unrecognized values never match. */
+  readonly observedTransport?: string;
   readonly since?: string;
   readonly until?: string;
   readonly limit: number;
@@ -99,6 +101,8 @@ export interface AuditCallHistoryRow {
   readonly goalId: string | null;
   readonly resultCode: string | null;
   readonly durationMs: number | null;
+  /** Transport the server observed for this call; null for events recorded before attribution existed. */
+  readonly observedTransport: string | null;
   readonly phase: 'started' | 'completed';
   readonly startedAt: string | null;
   readonly sampledAt: string;
@@ -163,6 +167,8 @@ export interface McpToolAuditInput {
   readonly durationMs: number;
   readonly traceId?: string;
   readonly traceParent?: string;
+  /** Listener the server observed the call arrive on, recorded server-side and never caller supplied. */
+  readonly observedTransport?: string;
   readonly authorizationMode?: 'standard' | 'full_bypass';
   /** Server-computed permission decision; never caller supplied. */
   readonly permissionDecision?: 'ALLOW' | 'ASK' | 'DENY';

@@ -213,6 +213,37 @@ describe('SqliteAuditRepository', () => {
     database.close();
   });
 
+  it('returns the server-observed transport and filters calls by it', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-call-transport-'));
+    temporaryRoots.push(root);
+    const database = new SqliteDatabase(path.join(root, 'state.db'));
+    const repository = new SqliteAuditRepository(database);
+    const at = (n: number): string => new Date(Date.parse('2026-10-16T00:00:00.000Z') + n * 1000).toISOString();
+    const record = (id: string, callId: string, tick: number, observedTransport?: string): Promise<void> => repository.insert({
+      id, timestamp: at(tick), actorId: 'client', actorName: 'Tester',
+      workspaceId: 'ws-a', sessionId: 'sess-a',
+      action: 'mcp_tool:read_file', resultCode: 'SUCCESS', durationMs: 5,
+      metadata: {
+        callId, toolName: 'read_file', phase: 'completed',
+        ...(observedTransport === undefined ? {} : { observedTransport }),
+      },
+    });
+    try {
+      await record('stdio-call', 'call-stdio', 1, 'local_stdio');
+      await record('http-call', 'call-http', 2, 'loopback_http');
+      await record('legacy-call', 'call-legacy', 3);
+      const all = await repository.listCallHistory({ workspaceId: 'ws-a', limit: 10 });
+      // Events stored before attribution existed stay null instead of being relabelled.
+      expect(all.items.map((item) => [item.eventId, item.observedTransport])).toEqual([
+        ['legacy-call', null], ['http-call', 'loopback_http'], ['stdio-call', 'local_stdio'],
+      ]);
+      const stdioOnly = await repository.listCallHistory({ workspaceId: 'ws-a', limit: 10, observedTransport: 'local_stdio' });
+      expect(stdioOnly.items.map((item) => item.eventId)).toEqual(['stdio-call']);
+    } finally {
+      database.close();
+    }
+  });
+
 });
 
 

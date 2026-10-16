@@ -301,6 +301,7 @@ export function createStdioMcpRuntime(
         ...(event.resultMessage === undefined ? {} : { resultMessage: event.resultMessage }),
         ...(event.traceId === undefined ? {} : { traceId: event.traceId }),
         ...(event.traceParent === undefined ? {} : { traceParent: event.traceParent }),
+        ...(event.observedTransport === undefined ? {} : { observedTransport: event.observedTransport }),
         ...(event.authorizationMode === undefined ? {} : { authorizationMode: event.authorizationMode }),
         durationMs: event.durationMs,
         timestamp: event.timestamp,

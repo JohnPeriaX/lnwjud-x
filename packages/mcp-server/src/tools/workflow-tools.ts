@@ -30,7 +30,7 @@ export function workflowTools(context: McpToolContext): McpToolDefinition[] {
     }),
     defineTool({
       name: 'call_history',
-      description: 'Read server-observed correlated MCP calls from bounded SQLite audit records. Values without measured transport spans remain null/unknown; supports filters and opaque keyset pagination.',
+      description: 'Read server-observed correlated MCP calls from bounded SQLite audit records. transport records only the listener this server saw: local_stdio for the STDIO runtime, loopback_http for the loopback MCP endpoint. A ChatGPT secure tunnel is forwarded to that endpoint by the local tunnel-client and is stored as loopback_http, so an empty secure_tunnel or external_mcp result is not evidence that the connector is down; no transport span is measured, so tunnel timing stays null. Supports filters and opaque keyset pagination.',
       permission: 'READ', annotations: { readOnlyHint: true, destructiveHint: false },
       inputSchema: z.object({
         workspaceId: z.string().min(1).max(128),

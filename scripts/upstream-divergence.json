@@ -304,6 +304,28 @@
       "proofTests": [
         "packages/mcp-server/src/tool-runtime-contract.test.ts"
       ]
+    },
+    {
+      "id": "server-observed-call-transport",
+      "summary": "lnwjud records, per MCP call, which listener the server itself observed (local_stdio for the STDIO runtime, loopback_http for the loopback MCP endpoint) and call_history returns that recorded value instead of hardcoding 'unknown' for every row. Upstream ships the transport enum, the IPC validation, the tool filter and the renderer's timing column but no producer, so a filter on any transport always yields an empty page that a remote agent reads as a connector outage. Reverting any marker here silently restores the stub: upstream owns all of these files, so a merge that keeps the upstream side removes the attribution while typecheck and CI still pass.",
+      "markers": [
+        { "file": "packages/mcp-server/src/request-scope.ts", "contains": "readonly observedTransport: ObservedCallTransport;" },
+        { "file": "packages/mcp-server/src/request-scope.ts", "contains": "observedTransport: 'local_stdio'" },
+        { "file": "packages/mcp-server/src/server.ts", "contains": "...(requestScope?.observedTransport === undefined ? {} : { observedTransport: requestScope.observedTransport })," },
+        { "file": "packages/mcp-server/src/activity-tracker.ts", "contains": "...(trace.observedTransport === undefined ? {} : { observedTransport: trace.observedTransport })," },
+        { "file": "packages/mcp-server/src/activity-log-file.ts", "contains": "...(event.observedTransport === undefined ? {} : { observedTransport: event.observedTransport })," },
+        { "file": "packages/audit/src/audit-service.ts", "contains": "...(input.observedTransport === undefined ? {} : { observedTransport: input.observedTransport })," },
+        { "file": "packages/storage/src/audit-repository.ts", "contains": "json_extract(e.metadata_json, '$.observedTransport') AS observed_transport," },
+        { "file": "packages/storage/src/audit-repository.ts", "contains": "if (query.observedTransport !== undefined) { clauses.push('r.observed_transport = ?'); params.push(query.observedTransport); }" },
+        { "file": "packages/application/src/observability/call-history-service.ts", "contains": "const OBSERVABLE_TRANSPORTS: readonly ObservedCallTransport[] = ['local_stdio', 'loopback_http'];" },
+        { "file": "packages/application/src/observability/call-history-service.ts", "contains": "transport: narrowObservedTransport(item.observedTransport)," },
+        { "file": "packages/mcp-server/src/tools/workflow-tools.ts", "contains": "an empty secure_tunnel or external_mcp result is not evidence that the connector is down" }
+      ],
+      "proofTests": [
+        "packages/mcp-server/src/request-scope.test.ts",
+        "packages/application/src/observability/call-history-service.test.ts",
+        "packages/storage/src/audit-repository.integration.test.ts"
+      ]
     }
   ]
 }

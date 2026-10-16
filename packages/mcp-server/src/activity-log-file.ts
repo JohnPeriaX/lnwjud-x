@@ -24,6 +24,7 @@ export function formatActivityLogLine(event: ActivitySinkEvent): string {
     ...(event.resultMessage === undefined ? {} : { resultMessage: redactor.redactText(event.resultMessage) }),
     ...(event.traceId === undefined ? {} : { traceId: event.traceId }),
     ...(event.traceParent === undefined ? {} : { traceParent: event.traceParent }),
+    ...(event.observedTransport === undefined ? {} : { observedTransport: event.observedTransport }),
   })}\n`;
 }
 
