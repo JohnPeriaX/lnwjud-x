@@ -326,6 +326,18 @@
         "packages/application/src/observability/call-history-service.test.ts",
         "packages/storage/src/audit-repository.integration.test.ts"
       ]
+    },
+    {
+      "id": "ci-workflow-fork-trigger-and-self-describing-failure",
+      "summary": "Upstream owns .github/workflows/ci.yml and its on.push.branches list only main, dev and release/v*. This fork develops on master, so without the extra master entry hosted CI never runs for fork work - the exact silent condition found on 2026-10-16, where every fork commit had total_count = 0 check-runs. The fork also re-emits the native suite failure lines as ::error:: check annotations, because job and run logs return 403 without repository admin and the public check-runs annotations API is the only evidence channel available; dropping that block restores an unobservable 'Process completed with exit code 1'. Accepting the upstream side of this file during a merge therefore removes both the trigger and the failure evidence while every local test still passes.",
+      "markers": [
+        { "file": ".github/workflows/ci.yml", "contains": "- master" },
+        { "file": ".github/workflows/ci.yml", "contains": "native-suite suspect file: %s" },
+        { "file": ".github/workflows/ci.yml", "contains": "ci-native-suites.log" }
+      ],
+      "proofTests": [
+        "tests/release/upstream-divergence.test.ts"
+      ]
     }
   ]
 }

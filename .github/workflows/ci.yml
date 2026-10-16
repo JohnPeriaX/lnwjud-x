@@ -99,7 +99,25 @@ jobs:
         shell: bash
         # The desktop suite runs in isolated shards below. Keep the remaining
         # workspace packages on pnpm's normal bounded recursive pool.
-        run: pnpm -r --filter '!@lnwjud/desktop' --if-present test
+        # Job logs need repository admin, so a failure has to publish its own
+        # evidence: vitest failure lines are re-emitted as check annotations,
+        # which the public check-runs API exposes. The exit code is preserved.
+        run: |
+          log="$RUNNER_TEMP/ci-native-suites.log"
+          NO_COLOR=1 FORCE_COLOR=0 pnpm -r --filter '!@lnwjud/desktop' --if-present test 2>&1 | tee "$log"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -aE '(FAIL |Tests +[0-9]+.*(failed|passed)|Test Files.*failed|ELIFECYCLE|Command failed)' "$log" \
+              | head -n 25 \
+              | while IFS= read -r line; do
+                  printf '::error::native-suite: %s\n' "$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g' | cut -c1-380)"
+                done
+            grep -aoE '[A-Za-z0-9_./-]+\.(test|integration)\.ts' "$log" | sort -u | head -n 25 \
+              | while IFS= read -r file; do
+                  printf '::error::native-suite suspect file: %s\n' "$file"
+                done
+          fi
+          exit "$status"
 
       - name: Test macOS native host protocol
         timeout-minutes: 10
