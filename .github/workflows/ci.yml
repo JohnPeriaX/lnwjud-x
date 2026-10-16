@@ -103,6 +103,10 @@ jobs:
         # evidence: vitest failure lines are re-emitted as check annotations,
         # which the public check-runs API exposes. The exit code is preserved.
         run: |
+          # GitHub runs this as bash -eo pipefail, so a failing pipeline would
+          # abort before any evidence could be published. Capture the status
+          # first, emit annotations, then exit with the original code.
+          set +o errexit
           log="$RUNNER_TEMP/ci-native-suites.log"
           NO_COLOR=1 FORCE_COLOR=0 pnpm -r --filter '!@lnwjud/desktop' --if-present test 2>&1 | tee "$log"
           status=${PIPESTATUS[0]}
