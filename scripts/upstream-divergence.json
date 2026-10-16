@@ -55,14 +55,16 @@
     },
     {
       "id": "actionable-scope-denial",
-      "summary": "A scope refusal names the retry that works, because a vague refusal makes the assistant tell the user to register the folder by hand, or to claim the host cannot read the path at all when the batch only spanned two projects.",
+      "summary": "A refusal an assistant will repeat to the user names the retry that actually works and states only constraints the code really enforces. A vague scope refusal made assistants tell the user to register the folder by hand, or claim the host cannot read the path at all when the batch merely spanned two projects. The image branch of media_read separately answered 'action=inspect only' while it accepts inspect and frame identically, so callers were told a false limitation and retried it; the denial now names both accepted actions and echoes the rejected one.",
       "markers": [
         { "file": "packages/mcp-server/src/tool-registry.ts", "contains": "describeActiveWorkspaceScopeMismatch" },
-        { "file": "packages/application/src/file-service.ts", "contains": "describeBatchProjectSplit" }
+        { "file": "packages/application/src/file-service.ts", "contains": "describeBatchProjectSplit" },
+        { "file": "packages/mcp-server/src/upgrade-runtime.ts", "contains": "Image media supports action=inspect or frame" }
       ],
       "proofTests": [
         "packages/mcp-server/src/external-project-attach.test.ts",
-        "packages/application/src/file-service.test.ts"
+        "packages/application/src/file-service.test.ts",
+        "packages/mcp-server/src/upgrade-runtime.test.ts"
       ]
     },
     {

@@ -2606,7 +2606,10 @@ export class UpgradeRuntimeService {
 
     if (imageLike) {
       if (action !== 'inspect' && action !== 'frame') {
-        return err(appError('INVALID_INPUT', 'Image media supports action=inspect only', false));
+        // Both accepted values take the identical path below, so the answer must not claim that only
+        // inspect exists: an assistant repeats this text to the user as its own diagnosis, and the
+        // false constraint stopped image reads five times across three sessions before it was checked.
+        return err(appError('INVALID_INPUT', `Image media supports action=inspect or frame; received action="${action}". action=sample applies to video files only.`, false));
       }
       const loaded = await this.services.file.readFile(this.actor, workspaceId, { path: requestedPath }, authorization);
       if (!loaded.ok) return loaded;

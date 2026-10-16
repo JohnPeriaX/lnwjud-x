@@ -48,6 +48,40 @@ describe('upgrade runtime', () => {
     }
   });
 
+  // The image branch accepts inspect and frame and makes them identical, so a denial must state that
+  // set truthfully and echo what was actually sent. A wrong list here is repeated to the user by the
+  // assistant as if lnwjud could not read the file at all.
+  it('names the accepted image actions and echoes the rejected one', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-media-actions-'));
+    const imagePath = path.join(root, 'spawn.png');
+    try {
+      await writeFile(imagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+      const runtime = new UpgradeRuntimeService({
+        file: {
+          async readFile() {
+            return ok({ encoding: 'base64', content: 'iVBORw0KGgo=', mimeType: 'image/png', byteLength: 8 });
+          },
+        } as McpApplicationServices['file'],
+      }, actor);
+      const imagePayload = { ok: true, value: { mediaType: 'image', path: imagePath, mimeType: 'image/png', encoding: 'base64' } } as const;
+
+      const rejected = await runtime.execute('media_read', { path: imagePath, action: 'sample' });
+      expect(rejected).toMatchObject({
+        ok: false,
+        error: { code: 'INVALID_INPUT', message: expect.stringContaining('received action="sample"') },
+      });
+      const message = rejected.ok === false ? rejected.error.message : '';
+      expect(message).toContain('inspect');
+      expect(message).toContain('frame');
+      expect(message).not.toMatch(/inspect only/i);
+
+      await expect(runtime.execute('media_read', { path: imagePath, action: 'frame' })).resolves.toMatchObject(imagePayload);
+      await expect(runtime.execute('media_read', { path: imagePath, action: 'inspect' })).resolves.toMatchObject(imagePayload);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   // Keep this catalog/registry smoke deterministic: verify operational tools
   // cross the normal input-validation boundary, while dependency-gated optional
   // tools stay undisclosed until their provider is configured. Focused tests cover
