@@ -281,6 +281,29 @@
       "proofTests": [
         "apps/desktop/tests/i18n.test.ts"
       ]
+    },
+    {
+      "id": "durable-http-task-lifetime-budget",
+      "summary": "The durable-task HTTP case grants the launched task a lifetime derived from its own 60s wall-clock allowance instead of upstream's fixed 30s. Upstream's number is shorter than the step sequence the same test runs before asserting state 'running' (measured 35s-44s on a busy Windows and macOS runner), so the durable shell expired the task exactly as declared, reported timed_out, and the assertion read that as the shell losing ownership. Linux finished inside 30s and passed, which is how the contradiction survived upstream: restoring the literal merges cleanly and re-fails CI on two of three platforms with no product defect. The ordering assertion in the same file is what makes the regression loud.",
+      "markers": [
+        { "file": "packages/mcp-server/src/durable-task-http.integration.test.ts", "contains": "const TASK_LIFETIME_SECONDS = Math.ceil(CASE_TIMEOUT_MS / 1_000) * 3;" },
+        { "file": "packages/mcp-server/src/durable-task-http.integration.test.ts", "contains": "timeout_seconds: TASK_LIFETIME_SECONDS" },
+        { "file": "packages/mcp-server/src/durable-task-http.integration.test.ts", "contains": "keeps the task lifetime above the per-case allowance so expiry cannot decide a state assertion" }
+      ],
+      "proofTests": [
+        "packages/mcp-server/src/durable-task-http.integration.test.ts"
+      ]
+    },
+    {
+      "id": "media-read-fixture-absolute-asset",
+      "summary": "The media_read runtime-contract fixture names its checked-in PNG absolutely through import.meta.url instead of upstream's cwd-relative '.test-assets/media-read.png'. media_read resolves a relative path against the harness workspace root, which falls back to the process working directory, so upstream's string only resolved when the suite ran from packages/mcp-server and failed with FILE_NOT_FOUND from the repository root - the directory CI uses - on Windows, macOS and Linux at the same step. Restoring the relative literal merges cleanly and re-breaks the native platform contract stage.",
+      "markers": [
+        { "file": "packages/mcp-server/src/tool-runtime-fixtures.ts", "contains": "const mediaReadAssetPath = fileURLToPath(new URL('../.test-assets/media-read.png', import.meta.url));" },
+        { "file": "packages/mcp-server/src/tool-runtime-fixtures.ts", "contains": "path: mediaReadAssetPath" }
+      ],
+      "proofTests": [
+        "packages/mcp-server/src/tool-runtime-contract.test.ts"
+      ]
     }
   ]
 }
