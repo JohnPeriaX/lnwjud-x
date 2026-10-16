@@ -1,4 +1,14 @@
+import { fileURLToPath } from 'node:url';
 import type { ToolRuntimeEvidence } from './tool-delivery-contract.js';
+
+/**
+ * media_read resolves a relative path against the workspace root, which falls back to the process
+ * current directory when the contract harness has no registered root. A relative fixture string
+ * therefore only resolved when the suite happened to run from `packages/mcp-server`, and the same
+ * assertion failed with ENOENT from the repository root on every platform. The checked-in asset is
+ * named absolutely from this module instead, which media_read accepts as an explicit absolute path.
+ */
+const mediaReadAssetPath = fileURLToPath(new URL('../.test-assets/media-read.png', import.meta.url));
 
 export type ToolRuntimePreparation =
   | 'workspace_context'
@@ -376,7 +386,7 @@ export const PHASE_34_TO_46_TOOL_RUNTIME_FIXTURES = {
   dom_snapshot: service({ tab_id: 'tab-1' }, 'capabilities.dom_cdp'),
   layout_metadata: service({ tab_id: 'tab-1' }, 'capabilities.dom_cdp'),
   visual_context: service({ tab_id: 'tab-1' }, 'capabilities.dom_cdp'),
-  media_read: service({ workspaceId, path: '.test-assets/media-read.png', action: 'inspect' }, 'file.readFile'),
+  media_read: service({ workspaceId, path: mediaReadAssetPath, action: 'inspect' }, 'file.readFile'),
   inspect_workbook: service({ workspaceId, file_path: 'package.json' }, 'capabilities.office'),
   compare_workbook_layout: service({ workspaceId, baseline_path: 'package.json', actual_path: 'package.json' }, 'capabilities.office'),
   render_excel_preview: service({ workspaceId, file_path: 'package.json' }, 'capabilities.office'),
