@@ -39,6 +39,19 @@ const cases: Array<{ protocol: 'modern' | 'legacy'; launchTool: 'shell' | 'task_
   { protocol: 'legacy', launchTool: 'task_create' },
 ];
 
+/** Wall-clock allowance for one case, which is also the vitest timeout passed to `it(...)`. */
+const CASE_TIMEOUT_MS = 60_000;
+/**
+ * The launched task's kill budget must exceed the test's own wall-clock allowance, otherwise the
+ * `state: 'running'` assertion measures runner speed instead of ownership. It was 30s while the same
+ * step sequence was measured at 35s-44s on a busy Windows runner: the durable shell expired the task
+ * exactly as declared, the task reported `timed_out`, and only the assertion disagreed. A faster Linux
+ * runner finished inside 30s, which is how the contradiction stayed invisible there.
+ */
+const TASK_LIFETIME_SECONDS = Math.ceil(CASE_TIMEOUT_MS / 1_000) * 3;
+/** Bounded wait for a real Node child to spawn and surface its first output line. */
+const PROCESS_READY_WAIT_MS = Math.round(CASE_TIMEOUT_MS / 4);
+
 describe('durable task ownership over HTTP', () => {
   it.each(cases)('$protocol $launchTool preserves outputs and ownership across provider replacement', async ({ protocol, launchTool }) => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-owned-http-'));
@@ -95,10 +108,11 @@ describe('durable task ownership over HTTP', () => {
 
       const launched = await client.callTool({ name: launchTool, arguments: {
         workspaceId: 'workspace-a', executable: process.execPath, arguments: [fixturePath, readyPath, releasePath], cwd: rootA,
-        timeout_seconds: 30, ...(launchTool === 'shell' ? { operation: 'run', execution: 'background' } : {}),
+        timeout_seconds: TASK_LIFETIME_SECONDS, ...(launchTool === 'shell' ? { operation: 'run', execution: 'background' } : {}),
       } });
       expect(launched.isError, JSON.stringify(launched)).not.toBe(true);
       taskId = z.string().min(1).parse(launched.structuredContent?.task_id);
+      const launchedAt = Date.now();
       launchOwner = owners[0];
       if (launchOwner === undefined) throw new Error('Trusted launch owner was not captured');
       expect(launchOwner).toMatchObject({ clientId: options.actor.clientId, workspaceId: 'workspace-a' });
@@ -110,11 +124,11 @@ describe('durable task ownership over HTTP', () => {
       const ownerFields = { owner_client_id: launchOwner.clientId, owner_session_id: launchOwner.sessionId, owner_workspace_id: 'workspace-a' };
       const metadataPath = path.join(taskDirectory, taskId, 'task.json');
       expect(metadataSchema.parse(JSON.parse(await readFile(metadataPath, 'utf8')))).toEqual(ownerFields);
-      await vi.waitFor(async () => { await access(readyPath); }, { timeout: 5000 });
+      await vi.waitFor(async () => { await access(readyPath); }, { timeout: PROCESS_READY_WAIT_MS });
       await vi.waitFor(async () => {
         const logs = await client.callTool({ name: 'shell', arguments: { workspaceId: 'workspace-a', operation: 'logs', task_id: taskId } });
         expect(logs.structuredContent).toMatchObject({ state: 'running', stdout: '  ready ไทย 😀\n', stderr: 'warning ไทย\n' });
-      }, { timeout: 5000 });
+      }, { timeout: PROCESS_READY_WAIT_MS });
       backend = makeBackend();
       for (const operation of ['status', 'logs', 'result', 'wait']) {
         const observed = await client.callTool({ name: 'shell', arguments: { workspaceId: 'workspace-a', operation, task_id: taskId, timeout_seconds: 0.1 } });
@@ -156,7 +170,10 @@ describe('durable task ownership over HTTP', () => {
         expect(denied).toMatchObject({ isError: true, structuredContent: { error: { code: 'PERMISSION_DENIED' } } });
       }
       const stillRunning = await client.callTool({ name: 'task_status', arguments: { workspaceId: 'workspace-a', taskId } });
-      expect(stillRunning.structuredContent).toMatchObject({ state: 'running' });
+      // The elapsed figure makes an expiry self-describing: a task that reached its own lifetime here
+      // is a budget problem in this file, while any other state is a real ownership defect.
+      const elapsedMs = Date.now() - launchedAt;
+      expect(stillRunning.structuredContent, `task should still be running ${elapsedMs}ms after launch, inside its ${TASK_LIFETIME_SECONDS}s lifetime: ${JSON.stringify(stillRunning.structuredContent)}`).toMatchObject({ state: 'running' });
       await writeFile(releasePath, 'release');
       const terminal = await client.callTool({ name: 'shell', arguments: { workspaceId: 'workspace-a', operation: 'wait', task_id: taskId, timeout_seconds: 5 } });
       expect(terminal.structuredContent).toMatchObject({ state: 'completed', exit_code: 0, stdout, stderr });
@@ -187,5 +204,13 @@ describe('durable task ownership over HTTP', () => {
       await handle.close();
       await rm(directory, { recursive: true, force: true });
     }
-  }, 60_000);
+  }, CASE_TIMEOUT_MS);
+
+  it('keeps the task lifetime above the per-case allowance so expiry cannot decide a state assertion', () => {
+    // These three budgets are read by the same file that asserts a task is still running, so their
+    // order is a correctness condition and not a style choice: an expiring task reported `timed_out`
+    // truthfully while the assertion below it blamed the durable shell for losing ownership.
+    expect(TASK_LIFETIME_SECONDS * 1_000).toBeGreaterThan(CASE_TIMEOUT_MS);
+    expect(PROCESS_READY_WAIT_MS * 2).toBeLessThan(CASE_TIMEOUT_MS);
+  });
 });
