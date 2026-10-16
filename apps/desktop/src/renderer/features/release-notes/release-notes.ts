@@ -21,6 +21,18 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.10',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'image-action-truth', titleKey: 'whatsNew.5810.media.title', descriptionKey: 'whatsNew.5810.media.description', badge: 'fixed', tags: ['media_read', 'screenshot', 'MCP'] },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.8.9',
     categories: [
       {

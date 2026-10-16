@@ -53,7 +53,13 @@ and returns the response without opening a public inbound port on the host.
 
 ## Current published version: v5.8.6
 
-## Current source version: v5.8.9
+## Current source version: v5.8.10
+
+### What's new in v5.8.10
+
+- **A still image really does accept `action=inspect` or `frame`:** `media_read` accepted both values on the identical code path, yet any other action answered `Image media supports action=inspect only`. That text is agent-facing, so assistants told users lnwjud could not handle the file that way and retried the same rejected value; five identical rejections on `.png` targets were recorded across three sessions. The denial now names both accepted actions, echoes the action that was actually sent, and says that `action=sample` belongs to video files. Image reading behaviour is unchanged.
+- **Fork source build:** the fix carries a deterministic regression test at the `media_read` seam (rejected action names the accepted set and the echoed value; `frame` and `inspect` both still succeed) and is registered in the fork's divergence registry under `actionable-scope-denial`, so an upstream merge that restores the false constraint fails a guard instead of passing silently. No tool was added or removed and the MCP catalog is unchanged.
+- **ภาษาไทย:** `media_read` กับไฟล์ภาพรับทั้ง `action=inspect` และ `frame` จริง (โค้ดรับสองค่านี้และเดิน path เดียวกัน) แต่ข้อความปฏิเสธเคยบอกว่ารับแค่ inspect เท่านั้น ผู้ช่วยจึงไปบอกผู้ใช้ว่าทำได้ไม่ครบทั้งที่ไม่จริง และลองค่าเดิมซ้ำ ตอนนี้ข้อความระบุค่าที่รับได้ทั้งสองค่า แสดงค่าที่ถูกส่งมาจริง และบอกว่า `action=sample` ใช้ได้เฉพาะวิดีโอ ส่วนการอ่านภาพนิ่งเหมือนเดิมทุกประการ
 
 ### What's new in v5.8.9
 
@@ -72,13 +78,6 @@ and returns the response without opening a public inbound port on the host.
 - **Fork source build:** this version carries the fork's routing and attribution fixes on top of the upstream v5.8.6 tree, with the ToolRegistry catalog unchanged at 289 declared tools (277 default-advertised).
 - **ภาษาไทย:** ทุกโปรเจกต์ที่เปิดอยู่ใช้งานพร้อมกันได้จริง — `workspaceId` ที่ไม่ตรงกับ `path`/`cwd` ถูก reconcile ไปยังโปรเจกต์เจ้าของ path, วางพาธเต็มหรือชื่อโปรเจกต์ใน `workspaceId` ก็จับคู่ได้, พาธที่ไม่อยู่ในโปรเจกต์ใดเลยถูกปฏิเสธตรง ๆ แทนการหยิบโปรเจกต์แรก, และ UI เปลี่ยนจาก "โปรเจกต์หลัก (Primary)" เป็น "โปรเจกต์เริ่มต้น (Default)"
 
-### What's new in v5.8.7
-
-- **Absolute paths work without registering the folder first:** a tool call that names another folder attaches it as the project for that call instead of failing. Full Access attaches silently; stricter profiles ask once per new folder and the primary Active Project never moves. `workspace_tree` now applies the same read trust the host already grants `read_file`, and `git_status`, `git_diff` and `git_log` accept any repository through `cwd`.
-- **Goal leases are per project:** a durable goal owned by a different project no longer rejects ordinary Git or file work in a project that has no rolling goal. Ownership is still enforced per workspace, and an unreadable fence state fails closed with a call that actually works.
-- **Denials name a usable retry:** scope denials return the path or retry form that will succeed instead of only reporting a mismatch with the Active Project, so the assistant no longer tells you to register folders by hand. The new `get_file_info` tool reports size, type, timestamps and permissions without pulling file content into the conversation.
-- **Fork source build:** the ToolRegistry catalog is synchronized at 289 declared tools (277 default-advertised), and this version is built from the fork tree that also carries upstream v5.8.6 and v5.8.5.
-- **ภาษาไทย:** วาง absolute path แล้วทำงานได้ทันทีโดยโปรเจกต์หลักไม่ถูกย้าย, durable goal ของโปรเจกต์อื่นไม่บล็อกงานปกติในโปรเจกต์ที่ไม่มี goal ค้างอยู่, ข้อความปฏิเสธบอกวิธีเรียกที่ใช้ได้จริง, `workspace_tree` ใช้สิทธิ์การอ่านเดียวกับ `read_file`, คำสั่ง Git รับ `cwd` จาก repository ใดก็ได้ และเพิ่มเครื่องมือใหม่ `get_file_info`
 
 ### Earlier release highlights — v5.8.0
 
@@ -275,7 +274,7 @@ A few operating-system boundaries still apply:
 
 ### 2. Connect ChatGPT with Remote MCP + OAuth (recommended)
 
-For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.8.9 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
+For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.8.10 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
 
 1. Open **lnwjud → Settings → Remote MCP & Tunnel**.
 2. Check the ngrok status. If lnwjud shows **READY**, keep the detected installation. If it is not ready, lnwjud shows only the installation path supported by the current host: Windows may use Microsoft Store/WinGet, macOS may use Homebrew when available, and hosts without a verified automatic installer get the official ngrok download link instead. Runtime discovery itself is cross-platform and verifies `ngrok version` before use.
@@ -646,8 +645,8 @@ corepack pnpm@10.15.0 package:windows
 The Windows 10/11 x64 artifacts are written to:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.8.9.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.8.9.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.8.10.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.8.10.exe
 ```
 
 The installer is per-user by default. The portable executable needs no installation but uses the same per-user lnwjud data/settings location. A common installed executable path is:
