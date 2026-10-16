@@ -21,6 +21,18 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.11',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'observed-transport', titleKey: 'whatsNew.5811.transport.title', descriptionKey: 'whatsNew.5811.transport.description', badge: 'fixed', tags: ['call_history', 'MCP', 'Secure Tunnel', 'audit', 'Doctor'] },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.8.10',
     categories: [
       {

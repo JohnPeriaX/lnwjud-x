@@ -53,7 +53,14 @@ and returns the response without opening a public inbound port on the host.
 
 ## Current published version: v5.8.6
 
-## Current source version: v5.8.10
+## Current source version: v5.8.11
+
+### What's new in v5.8.11
+
+- **`call_history` transport now reports what the server actually saw:** the transport filter, its IPC validation, the result type and the Doctor timing column were all wired to a value nothing ever wrote. Every audit row was stored as `unknown` and any transport filter returned an empty page, so an assistant that asked for `secure_tunnel` "found no evidence" of a connector that had just completed every call in the test. MCP calls now carry `observedTransport` taken from the server's own request scope - `local_stdio` for the STDIO runtime, `loopback_http` for the local endpoint - and never from client-supplied data. Rows written before this attribution stay `unknown` instead of being relabelled, and ChatGPT tunnel traffic is honestly recorded as `loopback_http` because the local tunnel-client forwards it into the same `/mcp` listener with nothing that distinguishes it.
+- **The wording is what stops the false outage:** the tool description now states that an empty `secure_tunnel` or `external_mcp` result is not evidence that the connector is down. Proving a call really arrived over the tunnel stays an external, reproducible check: correlate `mcp-activity.log` with the tunnel-client's `dispatcher forwarded command` lines, or observe the on-disk effect of a write.
+- **Fork source build:** deterministic regression tests at the request-scope, storage read-model and service seams, plus divergence entry `server-observed-call-transport` carrying eleven markers across the eleven upstream-owned files, so an upstream merge that restores the stub fails a guard instead of passing silently. The `master` branch trigger and the new self-describing native-suite failure annotation are registered as one entry too, because upstream owns `.github/workflows/ci.yml` and accepting its side would silently remove the fork's only hosted verification path. No tool was added or removed and the MCP catalog is unchanged.
+- **ภาษาไทย:** ตัวกรอง transport ของ `call_history` เคยไม่มีผู้เขียนค่าจริง ทุกแถวถูกบันทึกเป็น unknown และกรองด้วยค่าใดก็คืนผลว่าง ทำให้ผู้ช่วยสรุปว่า connector ล่มทั้งที่คำสั่งสำเร็จครบทุกข้อ ตอนนี้บันทึกสิ่งที่เซิร์ฟเวอร์เห็นจริงคือ `local_stdio` และ `loopback_http` จาก request scope ของตนเอง ไม่เชื่อข้อมูลจาก client แถวเก่ายังคง unknown แทนการเดา และ traffic จาก tunnel ของ ChatGPT ถูกบันทึกเป็น `loopback_http` ตามความจริง เพราะ tunnel-client บนเครื่องเดียวกันส่งเข้ามาที่ listener `/mcp` เหมือนกันทุกประการโดยไม่มีสิ่งใดแยกได้ ส่วนคำอธิบาย tool ระบุตรง ๆ ว่าผลว่างของ `secure_tunnel` ไม่ใช่หลักฐานว่า connector พัง
 
 ### What's new in v5.8.10
 
@@ -68,16 +75,6 @@ and returns the response without opening a public inbound port on the host.
 - **Start Tunnel no longer depends on how busy the machine is:** Windows answers "when did this process start" only through PowerShell, whose cold start measures 1.6-2.1s on this host, while the tunnel lock identified its own process with the short timeout meant for judging whether another process is still alive. Naming the running process now has its own budget, so the coin flip that users worked around by killing the app and waiting minutes is gone. Cross-process liveness keeps the fast timeout and still fails closed.
 - **Fork source build:** each behavior change above carries a deterministic regression test at its own seam and is registered in the fork's divergence registry (23 behaviors now), so an upstream merge that restores the old message-only or exit-128-only classification fails a guard instead of passing silently. No tool was added or removed and the MCP catalog is unchanged.
 - **ภาษาไทย:** batch ที่ปนไฟล์คนละโปรเจกต์จะบอกว่าไฟล์ใดทำให้ข้ามโปรเจกต์ พร้อมโฟลเดอร์ของทั้งสองโปรเจกต์และวิธีแยกเรียกที่ถูกต้อง, โฟลเดอร์ธรรมดาตอบตรงว่าไม่ใช่ Git repository แทน error ลึกลับที่ไม่บอกสาเหตุ, และการกด Start Tunnel ไม่ขึ้นกับความว่างของเครื่องอีกต่อไป โดยเกณฑ์ตัดสินว่า process อื่นยังอยู่หรือตายยังคง timeout สั้นและ fail closed ตามเดิม
-
-### What's new in v5.8.8
-
-- **Every Active Project is usable at the same time:** a call whose `workspaceId` disagrees with the folder named in its own `path` or `cwd` no longer fails. The project that owns that path wins, the id is rewritten to match, and the reconciled project travels to the executor, so shell, task and process work lands where you pointed it and stays addressable from that project afterwards.
-- **A path typed into `workspaceId` is understood:** an absolute folder path, or a uniquely matching project name, resolves to the project that owns it (or attaches the folder as a project under the existing policy) instead of returning `WORKSPACE_NOT_FOUND` or an unanswerable "not an Active Project". A mistyped project id now names the projects that exist, including the closest one, so the retry fixes itself.
-- **No more borrowed projects:** an absolute path that belongs to no registered project is refused with the folder worth adding, instead of quietly borrowing the first project in the registry for the relative path, the permission decision and the audit/checkpoint attribution. There is no setting or environment escape that restores the old fallback.
-- **"Primary project" is now "Default project":** Control Center, the Projects page and scope messages use the wording that matches real behaviour. The stored project order is untouched, so index 0 remains the default and no migration or data move is needed.
-- **Fork source build:** this version carries the fork's routing and attribution fixes on top of the upstream v5.8.6 tree, with the ToolRegistry catalog unchanged at 289 declared tools (277 default-advertised).
-- **ภาษาไทย:** ทุกโปรเจกต์ที่เปิดอยู่ใช้งานพร้อมกันได้จริง — `workspaceId` ที่ไม่ตรงกับ `path`/`cwd` ถูก reconcile ไปยังโปรเจกต์เจ้าของ path, วางพาธเต็มหรือชื่อโปรเจกต์ใน `workspaceId` ก็จับคู่ได้, พาธที่ไม่อยู่ในโปรเจกต์ใดเลยถูกปฏิเสธตรง ๆ แทนการหยิบโปรเจกต์แรก, และ UI เปลี่ยนจาก "โปรเจกต์หลัก (Primary)" เป็น "โปรเจกต์เริ่มต้น (Default)"
-
 
 ### Earlier release highlights — v5.8.0
 
@@ -274,7 +271,7 @@ A few operating-system boundaries still apply:
 
 ### 2. Connect ChatGPT with Remote MCP + OAuth (recommended)
 
-For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.8.10 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
+For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.8.11 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
 
 1. Open **lnwjud → Settings → Remote MCP & Tunnel**.
 2. Check the ngrok status. If lnwjud shows **READY**, keep the detected installation. If it is not ready, lnwjud shows only the installation path supported by the current host: Windows may use Microsoft Store/WinGet, macOS may use Homebrew when available, and hosts without a verified automatic installer get the official ngrok download link instead. Runtime discovery itself is cross-platform and verifies `ngrok version` before use.
@@ -645,8 +642,8 @@ corepack pnpm@10.15.0 package:windows
 The Windows 10/11 x64 artifacts are written to:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.8.10.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.8.10.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.8.11.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.8.11.exe
 ```
 
 The installer is per-user by default. The portable executable needs no installation but uses the same per-user lnwjud data/settings location. A common installed executable path is:
