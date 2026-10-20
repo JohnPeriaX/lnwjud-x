@@ -195,3 +195,40 @@ describe('mapResult image payloads', () => {
     });
   });
 });
+
+describe('mapResult nested image payloads', () => {
+  it('turns every image inside a batch read into MCP image content instead of base64 text', () => {
+    const response = mapResult({
+      ok: true as const,
+      value: {
+        files: [
+          { path: 'one.png', content: PNG_1X1, encoding: 'base64', mimeType: 'image/png', byteLength: PNG_BYTES.length },
+          { path: 'note.txt', content: 'hello', encoding: 'utf8', mimeType: 'text/plain', byteLength: 5 },
+        ],
+      },
+    });
+
+    expect(response.content[0]).toEqual({ type: 'image', data: PNG_1X1, mimeType: 'image/png' });
+    const trailing = response.content[response.content.length - 1];
+    expect(trailing?.type).toBe('text');
+    expect(trailing?.type === 'text' ? trailing.text : '').not.toContain(PNG_1X1);
+    expect(response.structuredContent).toEqual({
+      files: [
+        { path: 'one.png', encoding: 'base64', mimeType: 'image/png', byteLength: PNG_BYTES.length },
+        { path: 'note.txt', content: 'hello', encoding: 'utf8', mimeType: 'text/plain', byteLength: 5 },
+      ],
+    });
+  });
+
+  it('finds an image nested under any response key, not only image and images', () => {
+    const response = mapResult({
+      ok: true as const,
+      value: { result: { attachments: [{ name: 'chart.png', content: PNG_1X1, encoding: 'base64', mimeType: 'image/png' }] } },
+    });
+
+    expect(response.content[0]).toEqual({ type: 'image', data: PNG_1X1, mimeType: 'image/png' });
+    expect(response.structuredContent).toEqual({
+      result: { attachments: [{ name: 'chart.png', encoding: 'base64', mimeType: 'image/png' }] },
+    });
+  });
+});

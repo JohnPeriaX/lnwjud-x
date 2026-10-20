@@ -230,7 +230,12 @@ function extractImageContents(value: unknown): readonly McpImageContent[] {
     return [{ type: 'image', data: record.data_base64, mimeType: record.mime_type }];
   }
   if (Array.isArray(record.images)) return record.images.flatMap((entry) => extractImageContents(entry));
-  return record.image === undefined ? [] : extractImageContents(record.image);
+  if (record.image !== undefined) return extractImageContents(record.image);
+  // Every other field is searched too. A batch read nests each file under `files`, and a tool that
+  // returns only that key would otherwise hand the model megabytes of base64 inside one text block -
+  // which a vision client cannot decode, so it reports that the read "returned only metadata". The
+  // integrity validator below already walks every value; extraction has to walk the same surface.
+  return Object.values(record).flatMap((nested) => extractImageContents(nested));
 }
 
 function stripImagePayloads(value: unknown): unknown {

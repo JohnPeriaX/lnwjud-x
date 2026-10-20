@@ -399,6 +399,16 @@
         "packages/storage/src/ephemeral-workspace-repository.integration.test.ts",
         "apps/desktop/tests/external-project-attach.test.ts"
       ]
+    },
+    {
+      "id": "nested-image-extraction-in-mcp-results",
+      "summary": "Upstream owns result-mapper.ts and only hoists a base64 image into MCP image content when it is reachable through the top-level fields or the image/images keys. A batch read nests each file under files, so read_files of an image produced one text block carrying the whole base64 inside JSON, which a vision client cannot render - the measured pre-fix response was text(185107) with no image block, and the reported symptom was that reading a PNG \"returned only metadata\". Extraction now walks every value the same way the integrity validator already does, so every nested image becomes an MCP image part and its bytes are stripped from structuredContent. Accepting the upstream side reintroduces unreadable image batch reads.",
+      "markers": [
+        { "file": "packages/mcp-server/src/result-mapper.ts", "contains": "Object.values(record).flatMap((nested) => extractImageContents(nested))" }
+      ],
+      "proofTests": [
+        "packages/mcp-server/src/result-mapper.test.ts"
+      ]
     }
   ]
 }
