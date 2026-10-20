@@ -9,6 +9,7 @@ export * from './migrations/goal-cancellation-migration.js';
 export * from './migrations/retire-auto-machine-roots-migration.js';
 export * from './settings-repository.js';
 export * from './workspace-repository.js';
+export * from './ephemeral-workspace-repository.js';
 export * from './checkpoint-cipher.js';
 export * from './checkpoint-key-store.js';
 export * from './backup-service.js';

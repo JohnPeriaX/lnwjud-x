@@ -132,4 +132,79 @@ describe('Desktop external project attach', () => {
       await runtime.close();
     }
   }, 60_000);
+
+  it('serves a machine location for the call without recording it as a workspace', async () => {
+    const rawData = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-ephemeral-data-'));
+    const primaryRaw = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-ephemeral-primary-'));
+    // A dot-directory under home is a tool or credential store on every host, which is exactly the
+    // location a chat passes through without the user opening a project there.
+    const storeRaw = await mkdtemp(path.join(os.homedir(), '.lnwjud-ephemeral-store-'));
+    temporaryRoots.push(rawData, primaryRaw, storeRaw);
+    const dataRoot = await realpath(rawData);
+    const primaryRoot = await realpath(primaryRaw);
+    const storeRoot = await realpath(storeRaw);
+    const target = path.join(storeRoot, 'settings.json');
+    await writeFile(target, '{ "stored": true }\n', 'utf8');
+    const runtime = createDesktopRuntime(dataRoot, { hostMutationApprovalProvider: async () => true });
+    try {
+      const primary = await runtime.services.addWorkspace({ rootPath: primaryRoot });
+      await runtime.services.selectWorkspace({ workspaceId: primary.id });
+      const registry = new ToolRegistry(runtime.mcpServices, runtime.mcpActor, {
+        profileProvider: (): PermissionProfile => permissionProfiles.full,
+        activeWorkspaceScopesProvider: async (): Promise<readonly WorkspaceScope[]> => runtime.getActiveWorkspaceScopes(),
+        externalProjectAttachProvider: async (request: ExternalProjectAttachRequest): Promise<WorkspaceScope | null> => runtime.attachExternalProjectScope(request),
+        hostMutationApprovalProvider: async (): Promise<boolean> => true,
+      });
+
+      const firstRead = await registry.invoke('read_file', { path: target });
+      expect(firstRead.isError, JSON.stringify(firstRead)).not.toBe(true);
+      const info = await registry.invoke('get_file_info', { path: target });
+      expect(info.isError, JSON.stringify(info)).not.toBe(true);
+      const tree = await registry.invoke('workspace_tree', { path: storeRoot });
+      expect(tree.isError, JSON.stringify(tree)).not.toBe(true);
+
+      const attached = await runtime.attachExternalProjectScope({ path: target, toolName: 'read_file', approve: true });
+      const again = await runtime.attachExternalProjectScope({ path: target, toolName: 'read_file', approve: true });
+      expect(attached?.rootPath).toBe(storeRoot);
+      // One folder, one id: repeat contact must not grow a new scope per call.
+      expect(again?.workspaceId).toBe(attached?.workspaceId);
+
+      const recorded = await runtime.services.listWorkspaces();
+      expect(recorded.map((workspace) => workspace.rootPath), JSON.stringify(recorded)).not.toContain(storeRoot);
+      // The project list a chat reads before choosing stays the durable registry too.
+      const infoPort = runtime.mcpServices.workspaceInfo;
+      const listed = infoPort?.list === undefined ? undefined : await infoPort.list(runtime.mcpActor);
+      const roots = listed !== undefined && listed.ok ? listed.value.map((entry: { realRootPath: string }) => entry.realRootPath) : [];
+      expect(roots.length).toBeGreaterThan(0);
+      expect(roots, JSON.stringify(roots)).not.toContain(storeRoot);
+      // The call stayed usable, but the folder never joined the Active Project set.
+      expect((await runtime.getActiveWorkspaceScopes()).map((scope) => scope.workspaceId)).toEqual([primary.id]);
+    } finally {
+      await runtime.close();
+    }
+  }, 120_000);
+
+  it('never registers a second row beside a project the user archived', async () => {
+    const rawData = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-archived-attach-data-'));
+    const projectRaw = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-archived-attach-project-'));
+    temporaryRoots.push(rawData, projectRaw);
+    const runtime = createDesktopRuntime(await realpath(rawData), { hostMutationApprovalProvider: async () => true });
+    try {
+      const project = await runtime.services.addWorkspace({ rootPath: await realpath(projectRaw) });
+      await runtime.services.setWorkspaceArchived({ workspaceId: project.id, archived: true });
+
+      const attached = await runtime.attachExternalProjectScope({
+        path: path.join(project.rootPath, 'notes.txt'), toolName: 'write_file', approve: true,
+      });
+
+      // Registration is an unconditional insert, so the archived row has to be found first: taking
+      // the insert path would duplicate the project and re-open one the user deliberately closed.
+      expect(attached).toBeNull();
+      const stored = await runtime.services.listWorkspaces();
+      expect(stored.filter((workspace) => workspace.rootPath === project.rootPath)).toHaveLength(1);
+      expect((await runtime.getActiveWorkspaceScopes()).map((scope) => scope.workspaceId)).not.toContain(project.id);
+    } finally {
+      await runtime.close();
+    }
+  }, 120_000);
 });

@@ -128,10 +128,10 @@ import {
   type EngineeringHarnessSettings,
   type EngineeringHarnessWorkspaceOverride,
 } from '@lnwjud/shared';
-import { AesGcmCheckpointCipher, BACKUP_RESTORE_NOTICE_SETTING_KEY, parseBackupRestoreNotice, SqliteAgentSwarmRepository, SqliteAuditRepository, SqliteAutomationRepository, SqliteBackupService, SqliteCheckpointRepository, SqliteDatabase, SqliteSettingsRepository, SqliteWorkspaceRepository, type BackupReason, type BackupRestoreNotice as StorageBackupRestoreNotice, type BackupSummary, type CheckpointPayloadCipher } from '@lnwjud/storage';
+import { AesGcmCheckpointCipher, BACKUP_RESTORE_NOTICE_SETTING_KEY, EphemeralWorkspaceRepository, parseBackupRestoreNotice, SqliteAgentSwarmRepository, SqliteAuditRepository, SqliteAutomationRepository, SqliteBackupService, SqliteCheckpointRepository, SqliteDatabase, SqliteSettingsRepository, SqliteWorkspaceRepository, type BackupReason, type BackupRestoreNotice as StorageBackupRestoreNotice, type BackupSummary, type CheckpointPayloadCipher } from '@lnwjud/storage';
 import { SqliteGoalRepository } from '@lnwjud/storage';
 import type { Workspace } from '@lnwjud/workspace';
-import { comparableHostPath, isDriveRoot, isMachineRootPath, resolveAttachableProjectRoot, resolveHostPath, SecretPolicy, WorkspacePathGuard, WorkspaceService } from '@lnwjud/workspace';
+import { classifyExternalAttachPersistence, comparableHostPath, EphemeralWorkspaceRegistry, isDriveRoot, isMachineRootPath, resolveAttachableProjectRoot, resolveHostPath, SecretPolicy, WorkspacePathGuard, WorkspaceService } from '@lnwjud/workspace';
 import {
   type AddWorkspaceRequest,
   type BackupRestoreNotice as IpcBackupRestoreNotice,
@@ -440,7 +440,11 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
     arch: process.arch,
     onCanonicalFileReplaced: (filename): void => { console.warn(`[storage] Reopened replaced canonical SQLite database: ${filename}`); },
   });
-  const workspaceRepository = new SqliteWorkspaceRepository(database);
+  const storedWorkspaceRepository = new SqliteWorkspaceRepository(database);
+  // Folders a call only passed through stay usable for that call and never reach the durable
+  // registry, so a read of a system directory cannot become a project the user never opened.
+  const ephemeralWorkspaces = new EphemeralWorkspaceRegistry();
+  const workspaceRepository = new EphemeralWorkspaceRepository(storedWorkspaceRepository, ephemeralWorkspaces);
   const goalRepository = new SqliteGoalRepository(database);
   const automationRepository = new SqliteAutomationRepository(database);
   const workspaceIndex = new WorkspaceIndexService(workspaceRepository, new JsonWorkspaceIndexStore(path.join(dataPath, 'workspace-index')));
@@ -1268,11 +1272,36 @@ export function createDesktopRuntime(dataPath: string, options: DesktopRuntimeOp
     if (comparableRoot === null) return null;
     const existing = await workspaceService.list();
     const known = existing.find((workspace) => comparableHostPath(workspace.realRootPath, process.platform) === comparableRoot);
-    if (known === undefined) {
-      const registered = await registerProject(path.basename(projectRoot) || 'Workspace', projectRoot);
-      return finishProjectAttach(registered, request.approve, true);
+    if (known !== undefined) {
+      // A folder held only in the ephemeral registry serves this call and stops there: it is not a
+      // project the user opened, so it never enters the Active Project set or the pending list.
+      if (ephemeralWorkspaces.get(known.id) !== null) return ephemeralProjectScope(known, request.approve);
+      return finishProjectAttach(known, request.approve, false);
     }
-    return finishProjectAttach(known, request.approve, false);
+    if (classifyExternalAttachPersistence(projectRoot) === 'ephemeral') {
+      const remembered = ephemeralWorkspaces.remember({
+        displayName: path.basename(projectRoot) || 'Workspace',
+        rootPath: projectRoot,
+        realRootPath: projectRoot,
+      });
+      return remembered === null ? null : ephemeralProjectScope(remembered, request.approve);
+    }
+    // Registration writes permanently, so a project the user archived is looked up first: inserting
+    // beside the archived row would duplicate it and activate a project that was deliberately closed.
+    const archived = (await workspaceRepository.listAll()).find((workspace) => (
+      workspace.archivedAt !== undefined && workspace.archivedAt !== null
+      && comparableHostPath(workspace.realRootPath, process.platform) === comparableRoot
+    ));
+    if (archived !== undefined) return null;
+    const registered = await registerProject(path.basename(projectRoot) || 'Workspace', projectRoot);
+    return finishProjectAttach(registered, request.approve, true);
+  }
+
+  /** The scope for a folder that exists only for this process: usable now, never recorded. */
+  function ephemeralProjectScope(workspace: Workspace, approve: boolean): WorkspaceScope {
+    return approve
+      ? { workspaceId: workspace.id, rootPath: workspace.realRootPath }
+      : { workspaceId: workspace.id, rootPath: workspace.realRootPath, requiresProjectApproval: true };
   }
 
   async function registerProject(displayName: string, rootPath: string): Promise<Workspace | null> {

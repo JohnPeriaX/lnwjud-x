@@ -4,6 +4,7 @@ import {
   isAbsoluteHostPath,
   isHostPathWithin,
   isMachineRootPath,
+  listDurableWorkspaces,
   resolveHostPath,
   type Workspace,
   type WorkspaceRepository,
@@ -48,7 +49,9 @@ export class WorkspaceInfoService {
 
   public async list(actor: FileActor): Promise<Result<readonly WorkspaceInfo[]>> {
     void actor;
-    const workspaces = await this.workspaces.list();
+    // A folder one call merely passed through is resolvable for that call but is not a project the
+    // user has, so the list a chat reads before choosing stays the durable registry.
+    const workspaces = await listDurableWorkspaces(this.workspaces);
     return ok(workspaces.map((workspace) => this.toWorkspaceInfo(workspace)));
   }
 

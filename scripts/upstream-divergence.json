@@ -382,6 +382,23 @@
         "apps/desktop/tests/external-mcp-live-settings.test.ts",
         "tests/release/upstream-divergence.test.ts"
       ]
+    },
+    {
+      "id": "ephemeral-attachment-for-passed-through-locations",
+      "summary": "Upstream owns desktop-services.ts, stdio-mcp-runtime.ts, workspace-info-service.ts and both package index files. This fork resolves an explicit absolute path by registering the folder it points at, which turned every location a call merely passed through into a permanent workspace row AND an Active Project - measured 63 rows on a real workstation, including C:\\Program Files, another application's %APPDATA% tree, dot-directories under home and user library roots - silently widening the mutation fence with no user action. classifyExternalAttachPersistence now routes those machine locations through an in-process EphemeralWorkspaceRegistry published by EphemeralWorkspaceRepository, so the locator and path guard still resolve one stable id per folder (measured: with no registered folder, read_file, read_files, get_file_info and workspace_tree all fail PATH_OUTSIDE_WORKSPACE, so the folder cannot simply go unregistered) while listAll and listDurable keep only durable registrations. Attach also looks up an archived registration before WorkspaceService.add because that insert is unconditional and would duplicate the row then re-activate a project the user deliberately closed. Accepting the upstream side restores silent permanent registration of system directories.",
+      "markers": [
+        { "file": "apps/desktop/src/main/desktop-services.ts", "contains": "classifyExternalAttachPersistence(projectRoot) === 'ephemeral'" },
+        { "file": "apps/cli/src/runtime/stdio-mcp-runtime.ts", "contains": "new EphemeralWorkspaceRepository(rawWorkspaceRepository, ephemeralWorkspaces)" },
+        { "file": "packages/application/src/workspace-info-service.ts", "contains": "listDurableWorkspaces(this.workspaces)" },
+        { "file": "packages/workspace/src/index.ts", "contains": "ephemeral-workspace-registry.js" },
+        { "file": "packages/storage/src/index.ts", "contains": "ephemeral-workspace-repository.js" }
+      ],
+      "proofTests": [
+        "packages/workspace/src/project-attach.test.ts",
+        "packages/workspace/src/ephemeral-workspace-registry.test.ts",
+        "packages/storage/src/ephemeral-workspace-repository.integration.test.ts",
+        "apps/desktop/tests/external-project-attach.test.ts"
+      ]
     }
   ]
 }

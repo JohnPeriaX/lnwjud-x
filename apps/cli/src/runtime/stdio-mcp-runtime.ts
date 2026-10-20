@@ -58,8 +58,9 @@ import {
   SqliteGoalRepository,
   SqliteSettingsRepository,
   SqliteWorkspaceRepository,
+  EphemeralWorkspaceRepository,
 } from '@lnwjud/storage';
-import { comparableHostPath, isMachineRootPath, resolveAttachableProjectRoot, SecretPolicy, WorkspacePathGuard, WorkspaceService, type Workspace } from '@lnwjud/workspace';
+import { classifyExternalAttachPersistence, comparableHostPath, EphemeralWorkspaceRegistry, isMachineRootPath, resolveAttachableProjectRoot, SecretPolicy, WorkspacePathGuard, WorkspaceService, type Workspace } from '@lnwjud/workspace';
 import { StrictWorkspaceRepository } from './strict-workspace-repository.js';
 
 export interface PersistedStdioSecurityPolicy {
@@ -110,9 +111,13 @@ export function createStdioMcpRuntime(
   const databaseFilename = path.join(dataPath, 'lnwjud.sqlite');
   const database = new SqliteDatabase(databaseFilename, { backupDirectory: path.join(dataPath, 'backups') });
   const rawWorkspaceRepository = new SqliteWorkspaceRepository(database);
+  // Mirrors Desktop: a folder a call only passed through is usable for that call and is never
+  // written into the durable workspace registry.
+  const ephemeralWorkspaces = new EphemeralWorkspaceRegistry();
+  const storedWorkspaceRepository = new EphemeralWorkspaceRepository(rawWorkspaceRepository, ephemeralWorkspaces);
   const workspaceRepository = options.strictAllowedRoots === undefined
-    ? rawWorkspaceRepository
-    : new StrictWorkspaceRepository(rawWorkspaceRepository, options.strictAllowedRoots);
+    ? storedWorkspaceRepository
+    : new StrictWorkspaceRepository(storedWorkspaceRepository, options.strictAllowedRoots);
   const goalRepository = new SqliteGoalRepository(database);
   const automationRepository = new SqliteAutomationRepository(database);
   const workspaceIndex = new WorkspaceIndexService(workspaceRepository, new JsonWorkspaceIndexStore(path.join(dataPath, 'workspace-index')));
@@ -165,6 +170,21 @@ export function createStdioMcpRuntime(
     const existing = await workspaceService.list();
     const known = existing.find((entry) => comparableHostPath(entry.realRootPath, process.platform) === comparableRoot);
     if (known !== undefined) return stdioProjectScope(known, request.approve);
+    if (classifyExternalAttachPersistence(projectRoot) === 'ephemeral') {
+      const remembered = ephemeralWorkspaces.remember({
+        displayName: path.basename(projectRoot) || 'Workspace',
+        rootPath: projectRoot,
+        realRootPath: projectRoot,
+      });
+      return remembered === null ? null : stdioProjectScope(remembered, request.approve);
+    }
+    // Insert is unconditional, so a project the user archived has to be found first: registering the
+    // same root again would duplicate the row and re-open a project that was deliberately closed.
+    const archived = (await rawWorkspaceRepository.listAll()).find((entry) => (
+      entry.archivedAt !== undefined && entry.archivedAt !== null
+      && comparableHostPath(entry.realRootPath, process.platform) === comparableRoot
+    ));
+    if (archived !== undefined) return null;
     const added = await workspaceService.add(path.basename(projectRoot) || 'Workspace', projectRoot);
     if (!added.ok) return null;
     return stdioProjectScope(added.value, request.approve);
