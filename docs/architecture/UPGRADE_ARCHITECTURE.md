@@ -1,6 +1,6 @@
 # lnwjud upgrade architecture contract
 
-Status: God-Tier local-first implementation checkpoint synchronized for `v5.8.12`.
+Status: God-Tier local-first implementation checkpoint synchronized for `v5.8.13`.
 
 This document is the architectural boundary for the upgrade roadmap. It describes
 the existing runtime before Phase 01 and the invariants every later phase must

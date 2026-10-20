@@ -2,7 +2,7 @@
 
 Operational release sequencing is defined by [`docs/development/RELEASE_PROCESS.md`](../docs/development/RELEASE_PROCESS.md). This checklist records current-version acceptance evidence and does not override that sequence.
 
-**Current version:** `v5.8.12` - Windows installer `lnwjud-Setup-5.8.12.exe` and portable executable `lnwjud-Portable-5.8.12.exe`; MCP registry **289 total definitions / 277 advertised by default / all 289 with Codex delegation plus Agent Swarm enabled**.
+**Current version:** `v5.8.13` - Windows installer `lnwjud-Setup-5.8.13.exe` and portable executable `lnwjud-Portable-5.8.13.exe`; MCP registry **289 total definitions / 277 advertised by default / all 289 with Codex delegation plus Agent Swarm enabled**.
 
 After a tagged release is publicly published and GitHub assets are verified, synchronize the published-version headings/download filenames with `node scripts/sync-published-docs.mjs vX.Y.Z --apply`, verify using `node scripts/sync-published-docs.mjs vX.Y.Z`, then PR `dev -> main`. Keep historical comparison sections and the immutable tag unchanged. The main README and all public download links must match the actual published release before declaring documentation complete.
 

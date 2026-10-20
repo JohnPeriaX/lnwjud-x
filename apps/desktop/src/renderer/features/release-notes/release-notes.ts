@@ -21,6 +21,25 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.13',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'passed-through-paths', titleKey: 'whatsNew.5813.attach.title', descriptionKey: 'whatsNew.5813.attach.description', badge: 'fixed', tags: ['Active Project', 'Workspace', 'Windows'] },
+        ],
+      },
+      {
+        id: 'experience',
+        titleKey: 'whatsNew.category.experience',
+        items: [
+          { id: 'image-batch-read', titleKey: 'whatsNew.5813.image.title', descriptionKey: 'whatsNew.5813.image.description', badge: 'fixed', tags: ['read_files', 'images', 'ChatGPT'] },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.8.12',
     categories: [
       {
