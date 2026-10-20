@@ -28,6 +28,7 @@ const RELEASE_NOTES: readonly ReleaseNote[] = [
         titleKey: 'whatsNew.category.safety',
         items: [
           { id: 'bundled-ffmpeg', titleKey: 'whatsNew.5812.ffmpeg.title', descriptionKey: 'whatsNew.5812.ffmpeg.description', badge: 'fixed', tags: ['screen_record', 'media_read', 'FFmpeg', 'Windows'] },
+          { id: 'fork-update-channel', titleKey: 'whatsNew.5812.channel.title', descriptionKey: 'whatsNew.5812.channel.description', badge: 'improved', tags: ['Auto-update', 'Portable', 'provenance', 'Secure Tunnel'] },
         ],
       },
     ],
