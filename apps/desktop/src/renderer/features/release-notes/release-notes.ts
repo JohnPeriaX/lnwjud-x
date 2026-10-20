@@ -21,6 +21,18 @@ export interface ReleaseNote {
 
 const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '5.8.12',
+    categories: [
+      {
+        id: 'safety',
+        titleKey: 'whatsNew.category.safety',
+        items: [
+          { id: 'bundled-ffmpeg', titleKey: 'whatsNew.5812.ffmpeg.title', descriptionKey: 'whatsNew.5812.ffmpeg.description', badge: 'fixed', tags: ['screen_record', 'media_read', 'FFmpeg', 'Windows'] },
+        ],
+      },
+    ],
+  },
+  {
     version: '5.8.11',
     categories: [
       {

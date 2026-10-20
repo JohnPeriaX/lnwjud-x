@@ -53,7 +53,14 @@ and returns the response without opening a public inbound port on the host.
 
 ## Current published version: v5.8.6
 
-## Current source version: v5.8.11
+## Current source version: v5.8.12
+
+### What's new in v5.8.12
+
+- **lnwjud finds the FFmpeg it already ships:** Windows `screen_record` looked FFmpeg up with `Get-Command`, which consults only PATH, and the video branch of `media_read` fell back to a bare executable name. A freshly imaged machine was therefore told `ffmpeg is not installed; install ffmpeg to use screen_record` even though every Windows installer places `resources/media-runtime/ffmpeg.exe` - the `afterPack` evidence hook fails the build if that file is missing. Resolution order is now explicit: operator override (`LNWJUD_FFMPEG_PATH` / `LNWJUD_FFPROBE_PATH`), then the bundled folder beside the packaged bridge script or inside the install tree, and only then PATH.
+- **A real miss says what it checked:** the failure text names the bundled `resources/media-runtime` folder and lists every path searched instead of instructing an install, and `screen_record` responses carry `ffmpeg_source` plus `ffmpeg_path`, so the answer alone shows whether the bundled runtime or a machine copy was used.
+- **Fork source build:** regression coverage runs the real bridge under Windows PowerShell with PATH trimmed to `System32` and a stand-in executable in the bundled folder; the pre-fix script reproduces the exact user-visible message while the fixed one records from the bundle. Registered as divergence `bundled-media-runtime-before-path-lookup` across the two upstream-owned files, because accepting upstream's side during a sync restores the PATH-only lookup and a developer workstation that happens to have FFmpeg installed cannot catch it. The bridge integrity constants were regenerated with the canonical script. No tool was added or removed and the MCP catalog is unchanged.
+- **ภาษาไทย:** `screen_record` และ `media_read` ของวิดีโอเคยค้นหา ffmpeg ผ่าน PATH ทางเดียว เครื่องที่ล้างใหม่จึงถูกบอกว่าไม่ได้ติดตั้ง FFmpeg ทั้งที่ตัวติดตั้งมี `resources/media-runtime` อยู่แล้ว ตอนนี้ค้นหาจากโฟลเดอร์ที่แพ็กมากับโปรแกรมก่อน PATH เสมอ ถ้าขาดจริงจะรายงานเส้นทางที่ค้นครบทุกแห่งพร้อมตัวแปร `LNWJUD_FFMPEG_PATH` และคำตอบบันทึกหน้าจอแนบ `ffmpeg_source` ว่าใช้ตัวที่แพ็กหรือตัวในเครื่อง จึงตรวจได้ตรงหลักฐานโดยไม่ต้องเดา
 
 ### What's new in v5.8.11
 
@@ -67,14 +74,6 @@ and returns the response without opening a public inbound port on the host.
 - **A still image really does accept `action=inspect` or `frame`:** `media_read` accepted both values on the identical code path, yet any other action answered `Image media supports action=inspect only`. That text is agent-facing, so assistants told users lnwjud could not handle the file that way and retried the same rejected value; five identical rejections on `.png` targets were recorded across three sessions. The denial now names both accepted actions, echoes the action that was actually sent, and says that `action=sample` belongs to video files. Image reading behaviour is unchanged.
 - **Fork source build:** the fix carries a deterministic regression test at the `media_read` seam (rejected action names the accepted set and the echoed value; `frame` and `inspect` both still succeed) and is registered in the fork's divergence registry under `actionable-scope-denial`, so an upstream merge that restores the false constraint fails a guard instead of passing silently. No tool was added or removed and the MCP catalog is unchanged.
 - **ภาษาไทย:** `media_read` กับไฟล์ภาพรับทั้ง `action=inspect` และ `frame` จริง (โค้ดรับสองค่านี้และเดิน path เดียวกัน) แต่ข้อความปฏิเสธเคยบอกว่ารับแค่ inspect เท่านั้น ผู้ช่วยจึงไปบอกผู้ใช้ว่าทำได้ไม่ครบทั้งที่ไม่จริง และลองค่าเดิมซ้ำ ตอนนี้ข้อความระบุค่าที่รับได้ทั้งสองค่า แสดงค่าที่ถูกส่งมาจริง และบอกว่า `action=sample` ใช้ได้เฉพาะวิดีโอ ส่วนการอ่านภาพนิ่งเหมือนเดิมทุกประการ
-
-### What's new in v5.8.9
-
-- **Mixed-project file batches name the folders to split:** one `read_files` or `apply_patch` call that crossed two projects used to answer only `All files must be in the same workspace`, which an assistant repeated to the user as "the connector cannot read paths on this machine" even though every file was readable. The refusal now names the file that broke the batch, both project folders, and the retry that works: one call per project. Absolute paths still attach their own folder, and the one-project-per-call rule itself was not relaxed.
-- **A plain folder is reported as not a Git repository:** `git_diff` inside a folder without a repository failed as an unexplained internal error, because Git signals that condition with exit 129 for `diff` and exit 128 for `status`, and only 128 was recognised. The call now returns `GIT_NOT_REPOSITORY`, so an uninitialized folder is never mistaken for an lnwjud fault, while an unrelated Git failure still stays an internal error.
-- **Start Tunnel no longer depends on how busy the machine is:** Windows answers "when did this process start" only through PowerShell, whose cold start measures 1.6-2.1s on this host, while the tunnel lock identified its own process with the short timeout meant for judging whether another process is still alive. Naming the running process now has its own budget, so the coin flip that users worked around by killing the app and waiting minutes is gone. Cross-process liveness keeps the fast timeout and still fails closed.
-- **Fork source build:** each behavior change above carries a deterministic regression test at its own seam and is registered in the fork's divergence registry (23 behaviors now), so an upstream merge that restores the old message-only or exit-128-only classification fails a guard instead of passing silently. No tool was added or removed and the MCP catalog is unchanged.
-- **ภาษาไทย:** batch ที่ปนไฟล์คนละโปรเจกต์จะบอกว่าไฟล์ใดทำให้ข้ามโปรเจกต์ พร้อมโฟลเดอร์ของทั้งสองโปรเจกต์และวิธีแยกเรียกที่ถูกต้อง, โฟลเดอร์ธรรมดาตอบตรงว่าไม่ใช่ Git repository แทน error ลึกลับที่ไม่บอกสาเหตุ, และการกด Start Tunnel ไม่ขึ้นกับความว่างของเครื่องอีกต่อไป โดยเกณฑ์ตัดสินว่า process อื่นยังอยู่หรือตายยังคง timeout สั้นและ fail closed ตามเดิม
 
 ### Earlier release highlights — v5.8.0
 
@@ -271,7 +270,7 @@ A few operating-system boundaries still apply:
 
 ### 2. Connect ChatGPT with Remote MCP + OAuth (recommended)
 
-For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.8.11 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
+For most ChatGPT web users, **start here**. Remote MCP via **ngrok + OAuth** was established as the default/backward-compatible Remote MCP transport in v5.5.0 and remains the default in the current v5.8.12 source line. It does **not** require an OpenAI Tunnel ID or Runtime API key. lnwjud keeps its real MCP server on loopback, places an OAuth-protected gateway in front of it, and exposes only that protected gateway through ngrok as an HTTPS URL ending in `/mcp`.
 
 1. Open **lnwjud → Settings → Remote MCP & Tunnel**.
 2. Check the ngrok status. If lnwjud shows **READY**, keep the detected installation. If it is not ready, lnwjud shows only the installation path supported by the current host: Windows may use Microsoft Store/WinGet, macOS may use Homebrew when available, and hosts without a verified automatic installer get the official ngrok download link instead. Runtime discovery itself is cross-platform and verifies `ngrok version` before use.
@@ -642,8 +641,8 @@ corepack pnpm@10.15.0 package:windows
 The Windows 10/11 x64 artifacts are written to:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.8.11.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.8.11.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.8.12.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.8.12.exe
 ```
 
 The installer is per-user by default. The portable executable needs no installation but uses the same per-user lnwjud data/settings location. A common installed executable path is:
