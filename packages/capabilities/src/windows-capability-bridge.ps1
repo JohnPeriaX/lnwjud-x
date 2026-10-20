@@ -773,13 +773,48 @@ function Invoke-AudioAction {
   }
 }
 
+# lnwjud bundles FFmpeg with every Windows installer under <install>\resources\media-runtime.
+# The bridge script is packaged into that same resources directory, so its own location is
+# the reliable pointer to the bundled runtime; PATH is only a last resort. Without this order
+# a fresh machine (or a service account with a stripped PATH) was told to install FFmpeg even
+# though the product already shipped it.
+function Resolve-MediaExecutable {
+  param([string]$Name)
+  $fileName = "$Name.exe"
+  $environmentName = if ($Name -eq 'ffprobe') { 'LNWJUD_FFPROBE_PATH' } else { 'LNWJUD_FFMPEG_PATH' }
+  $configured = [Environment]::GetEnvironmentVariable($environmentName)
+  if (-not [string]::IsNullOrWhiteSpace($configured)) {
+    return [pscustomobject]@{ path = [Environment]::ExpandEnvironmentVariables($configured.Trim()); source = 'configured'; checked = @() }
+  }
+  $checked = New-Object System.Collections.Generic.List[string]
+  $roots = @($PSScriptRoot, (Join-Path $PSScriptRoot '..\..\..'))
+  foreach ($root in $roots) {
+    if ([string]::IsNullOrWhiteSpace($root)) { continue }
+    foreach ($layout in @('media-runtime', 'resources\media-runtime', 'apps\desktop\build\media-runtime')) {
+      $candidate = [IO.Path]::GetFullPath((Join-Path (Join-Path $root $layout) $fileName))
+      if (-not $checked.Contains($candidate)) { $checked.Add($candidate) }
+      if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+        return [pscustomobject]@{ path = $candidate; source = 'bundled'; checked = $checked.ToArray() }
+      }
+    }
+  }
+  $onPath = (Get-Command $Name -ErrorAction SilentlyContinue).Source
+  if ($null -ne $onPath) {
+    return [pscustomobject]@{ path = $onPath; source = 'path'; checked = $checked.ToArray() }
+  }
+  return [pscustomobject]@{ path = $null; source = $null; checked = $checked.ToArray() }
+}
+
 function Invoke-ScreenRecordAction {
   param([string]$Action, [object]$Parameters)
   $statePath = Join-Path $env:TEMP 'lnwjud-screen-record-state.json'
   switch ($Action) {
     'start' {
-      $ffmpeg = (Get-Command ffmpeg -ErrorAction SilentlyContinue).Source
-      if ($null -eq $ffmpeg) { throw 'ffmpeg is not installed; install ffmpeg to use screen_record' }
+      $media = Resolve-MediaExecutable 'ffmpeg'
+      if ([string]::IsNullOrWhiteSpace($media.path)) {
+        throw ('ffmpeg.exe was not found beside the lnwjud install (expected resources\media-runtime\ffmpeg.exe) and is not on PATH; set LNWJUD_FFMPEG_PATH or restore the bundled media-runtime folder. Checked: ' + ($media.checked -join '; '))
+      }
+      $ffmpeg = $media.path
       $out = [string](Get-Field $Parameters 'output_path')
       if ($out.Length -eq 0) { throw 'output_path is required' }
       $parent = Split-Path -Parent $out
@@ -793,7 +828,7 @@ function Invoke-ScreenRecordAction {
       if ([int]$fps -lt 1 -or [int]$fps -gt 60) { throw 'fps must be from 1 to 60' }
       $process = Start-Process -FilePath $ffmpeg -ArgumentList @('-y', '-loglevel', 'error', '-f', 'gdigrab', '-framerate', [string][int]$fps, '-offset_x', [string][int]$x, '-offset_y', [string][int]$y, '-video_size', ([string][int]$w + 'x' + [string][int]$h), '-i', 'desktop', '-t', '3600', '-pix_fmt', 'yuv420p', $out) -WindowStyle Hidden -PassThru
       @{ pid = [int]$process.Id; output_path = $out; started_at = (Get-Date).ToString('o') } | ConvertTo-Json -Compress | Set-Content $statePath
-      return [ordered]@{ recording = $true; pid = [int]$process.Id; output_path = $out; max_duration_seconds = 3600 }
+      return [ordered]@{ recording = $true; pid = [int]$process.Id; output_path = $out; max_duration_seconds = 3600; ffmpeg_source = $media.source; ffmpeg_path = $ffmpeg }
     }
     'stop' {
       if (-not (Test-Path $statePath)) { return [ordered]@{ recording = $false; reason = 'No active recording' } }

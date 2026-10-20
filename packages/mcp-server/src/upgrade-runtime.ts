@@ -2918,34 +2918,66 @@ interface VideoProbe {
   readonly sizeBytes?: number;
 }
 
-function resolveBundledMediaExecutable(kind: 'ffmpeg' | 'ffprobe'): string {
-  const executableName = process.platform === 'win32' ? `${kind}.exe` : kind;
-  const explicitPath = (kind === 'ffmpeg' ? process.env.LNWJUD_FFMPEG_PATH : process.env.LNWJUD_FFPROBE_PATH)?.trim();
-  if (explicitPath) return explicitPath;
+interface BundledMediaExecutable {
+  readonly executable: string;
+  readonly source: 'configured' | 'bundled' | 'path';
+  readonly checked: readonly string[];
+}
 
-  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+/**
+ * lnwjud ships FFmpeg/ffprobe inside every Windows installer at `<resources>/media-runtime`.
+ * A packaged Electron host exposes that directory through `process.resourcesPath`, and the
+ * install tree is also reachable from `process.execPath`, so a freshly imaged machine with a
+ * minimal PATH still gets the bundled runtime instead of being told to install FFmpeg.
+ * PATH remains the last resort and is reported honestly as such.
+ */
+export function resolveBundledMediaExecutable(
+  kind: 'ffmpeg' | 'ffprobe',
+  overrides: {
+    readonly env?: Readonly<Record<string, string | undefined>>;
+    readonly resourcesPath?: string;
+    readonly execPath?: string;
+    readonly cwd?: string;
+  } = {},
+): BundledMediaExecutable {
+  const env = overrides.env ?? process.env;
+  const executableName = process.platform === 'win32' ? `${kind}.exe` : kind;
+  const explicitPath = (kind === 'ffmpeg' ? env.LNWJUD_FFMPEG_PATH : env.LNWJUD_FFPROBE_PATH)?.trim();
+  if (explicitPath) return { executable: explicitPath, source: 'configured', checked: [] };
+
+  const resourcesPath = overrides.resourcesPath ?? (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const execPath = overrides.execPath ?? process.execPath;
+  const cwd = overrides.cwd ?? process.cwd();
   const candidates = [
-    resourcesPath ? path.join(resourcesPath, 'media-runtime', executableName) : undefined,
-    path.join(process.cwd(), 'apps', 'desktop', 'build', 'media-runtime', executableName),
-    path.join(process.cwd(), 'build', 'media-runtime', executableName),
+    resourcesPath !== undefined ? path.join(resourcesPath, 'media-runtime', executableName) : undefined,
+    path.join(path.dirname(execPath), 'resources', 'media-runtime', executableName),
+    path.join(cwd, 'apps', 'desktop', 'build', 'media-runtime', executableName),
+    path.join(cwd, 'build', 'media-runtime', executableName),
   ].filter((candidate): candidate is string => typeof candidate === 'string');
-  return candidates.find((candidate) => {
+  const bundled = candidates.find((candidate) => {
     try {
       return existsSync(candidate);
     } catch {
       return false;
     }
-  }) ?? executableName;
+  });
+  if (bundled !== undefined) return { executable: bundled, source: 'bundled', checked: candidates };
+  return { executable: executableName, source: 'path', checked: candidates };
+}
+
+function describeMissingMediaExecutable(kind: 'ffmpeg' | 'ffprobe', checked: readonly string[]): string {
+  const locations = checked.length > 0 ? checked.join(', ') : 'the packaged resources directory';
+  return `${kind} was not found in the lnwjud bundled media-runtime (${locations}); restore the bundled folder or set LNWJUD_${kind.toUpperCase()}_PATH. Installing a separate copy is optional.`;
 }
 
 async function probeVideo(filePath: string, signal: AbortSignal | undefined, maxBytes: number): Promise<Result<VideoProbe>> {
-  const executable = resolveBundledMediaExecutable('ffprobe');
-  const result = await runBoundedProcess(executable, [
+  const probe = resolveBundledMediaExecutable('ffprobe');
+  const result = await runBoundedProcess(probe.executable, [
     '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', filePath,
   ], signal, 30_000, Math.min(maxBytes, 2 * 1024 * 1024), process.platform);
   if (!result.ok) {
     return result.error.code === 'PROCESS_NOT_FOUND'
-      ? err(appError('EXECUTABLE_NOT_FOUND', 'Video inspection requires ffprobe. Set LNWJUD_FFPROBE_PATH or install ffmpeg/ffprobe.', true))
+      ? err(appError('EXECUTABLE_NOT_FOUND', describeMissingMediaExecutable('ffprobe', probe.checked), true))
       : result;
   }
   try {
@@ -2976,14 +3008,14 @@ async function probeVideo(filePath: string, signal: AbortSignal | undefined, max
 }
 
 async function extractVideoFrame(filePath: string, timestampSeconds: number, maxBytes: number, signal?: AbortSignal): Promise<Result<{ readonly data: string; readonly bytes: number }>> {
-  const executable = resolveBundledMediaExecutable('ffmpeg');
-  const result = await runBoundedBinaryProcess(executable, [
+  const frame = resolveBundledMediaExecutable('ffmpeg');
+  const result = await runBoundedBinaryProcess(frame.executable, [
     '-hide_banner', '-loglevel', 'error', '-ss', timestampSeconds.toFixed(3), '-i', filePath,
     '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'mjpeg', '-q:v', '5', 'pipe:1',
   ], signal, 60_000, maxBytes, process.platform);
   if (!result.ok) {
     return result.error.code === 'PROCESS_NOT_FOUND'
-      ? err(appError('EXECUTABLE_NOT_FOUND', 'Video frame extraction requires ffmpeg. Set LNWJUD_FFMPEG_PATH or install ffmpeg.', true))
+      ? err(appError('EXECUTABLE_NOT_FOUND', describeMissingMediaExecutable('ffmpeg', frame.checked), true))
       : result;
   }
   return ok({ data: result.value.toString('base64'), bytes: result.value.byteLength });
