@@ -8,6 +8,7 @@ import {
   configureUpdaterForDistribution,
   configureUpdaterForPlatform,
   createLinuxAppImageRollback,
+  portableUpdateFeedUrl,
   restoreLinuxAppImageIfMissing,
   currentPortableExecutablePath,
   detectWindowsDistribution,
@@ -18,6 +19,22 @@ import {
 } from '../src/main/portable-update.js';
 
 describe('Windows distribution-aware auto updater', () => {
+  it('keeps the update channel on the repository that builds this artifact', () => {
+    // A foreign release channel would replace fork-only packaged runtime bundles, so the
+    // default must be this repository and an override has to be an explicit operator choice.
+    expect(PORTABLE_UPDATE_FEED_URL).toBe('https://github.com/JohnPeriaX/lnwjud-x/releases/latest/download/');
+    expect(portableUpdateFeedUrl({})).toBe(PORTABLE_UPDATE_FEED_URL);
+    expect(portableUpdateFeedUrl({ LNWJUD_UPDATE_FEED_URL: '   ' })).toBe(PORTABLE_UPDATE_FEED_URL);
+    expect(portableUpdateFeedUrl({ LNWJUD_UPDATE_FEED_URL: 'https://example.invalid/channel/' })).toBe('https://example.invalid/channel/');
+
+    const updater = { disableDifferentialDownload: false, setFeedURL: vi.fn() };
+    configureUpdaterForDistribution(updater, 'portable', { LNWJUD_UPDATE_FEED_URL: 'https://example.invalid/channel/' });
+    expect(updater.setFeedURL).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'generic',
+      url: 'https://example.invalid/channel/',
+      channel: PORTABLE_UPDATE_CHANNEL,
+    }));
+  });
   it('selects only updater formats with a platform-owned installation path', () => {
     expect(detectUpdaterDistribution(true, 'darwin', {})).toBe('macos');
     expect(detectUpdaterDistribution(true, 'linux', { APPIMAGE: '/tmp/lnwjud.AppImage' })).toBe('linux-appimage');

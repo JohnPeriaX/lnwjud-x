@@ -24,7 +24,11 @@ describe('native crash diagnostics', () => {
     const old = path.join(directory, 'old.dmp'); writeFileSync(old, 'old');
     const oldDate = new Date(now - 31 * 24 * 60 * 60 * 1000); utimesSync(old, oldDate, oldDate);
     pruneNativeCrashDumps(directory, now);
-    const metadata = readNativeCrashDumpMetadata(root);
+    // The read side must be evaluated at the same logical instant as the prune.
+    // Leaving it to default to Date.now() made this fixture expire exactly 30 days
+    // after the hard-coded September date: the age filter dropped every dump and
+    // the retained count became 0.
+    const metadata = readNativeCrashDumpMetadata(root, now);
     expect(metadata.count).toBe(20);
     expect(metadata).not.toHaveProperty('directory');
     expect(metadata.dumps.some((dump) => dump.fileName === 'old.dmp')).toBe(false);

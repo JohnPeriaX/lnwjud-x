@@ -16,6 +16,7 @@ const version = packageJson.version;
 if (typeof version !== 'string' || version.length === 0) throw new Error('Desktop package version is unavailable');
 
 const commit = git(['rev-parse', 'HEAD']).trim();
+const sourceRepository = provenanceRepositoryUrl();
 const githubSha = process.env.GITHUB_SHA?.trim();
 if (githubSha && githubSha.toLowerCase() !== commit.toLowerCase()) {
   throw new Error(`GITHUB_SHA does not match checked-out commit: github=${githubSha} git=${commit}`);
@@ -50,7 +51,7 @@ const provenance = {
   platform,
   arch: runtimeEvidence.arch,
   source: {
-    repository: 'https://github.com/engasnm111/lnwjud',
+    repository: sourceRepository,
     commit,
     dirty,
   },
@@ -225,6 +226,28 @@ function isCapabilityBridgeIdentity(value) {
 
 function git(args) {
   return execFileSync('git', args, { cwd: repositoryRoot, encoding: 'utf8', windowsHide: true });
+}
+
+/**
+ * Provenance has to name a repository where the recorded commit actually exists. The
+ * packaged metadata still credits the upstream project, but a commit that only exists on
+ * the built remote would resolve to nothing for anyone verifying the artifact, so the
+ * origin URL of this checkout is the honest value and upstream is only the fallback when
+ * no remote is configured.
+ */
+function provenanceRepositoryUrl() {
+  const fallback = 'https://github.com/engasnm111/lnwjud';
+  let remote = '';
+  try {
+    remote = git(['config', '--get', 'remote.origin.url']).trim();
+  } catch {
+    return fallback;
+  }
+  if (remote.length === 0) return fallback;
+  const ssh = /^git@([^:]+):(.+?)(?:\.git)?$/i.exec(remote);
+  if (ssh !== null) return `https://${ssh[1]}/${ssh[2]}`;
+  const url = /^(https?:\/\/.+?)(?:\.git)?\/??$/i.exec(remote);
+  return url !== null ? url[1] : remote;
 }
 
 function parseSourceDirtyAtStart(value) {

@@ -4,8 +4,21 @@ import { access, link, lstat, mkdir, rename, writeFile } from 'node:fs/promises'
 import os from 'node:os';
 import path from 'node:path';
 
-export const PORTABLE_UPDATE_FEED_URL = 'https://github.com/engasnm111/lnwjud/releases/latest/download/';
+/**
+ * The update channel must belong to the repository that produced this binary.
+ * lnwjud-x builds carry fork-only runtime bundles (for example resources/media-runtime
+ * FFmpeg, asserted at pack time); a release published by the upstream repository would
+ * replace them with an artifact that does not contain that behavior, and the version
+ * numbers between the two repositories are not ordered consistently. An operator who
+ * deliberately wants another channel can still point LNWJUD_UPDATE_FEED_URL at it.
+ */
+export const PORTABLE_UPDATE_FEED_URL = 'https://github.com/JohnPeriaX/lnwjud-x/releases/latest/download/';
 export const PORTABLE_UPDATE_CHANNEL = 'portable';
+
+export function portableUpdateFeedUrl(environment: NodeJS.ProcessEnv = process.env): string {
+  const configured = environment.LNWJUD_UPDATE_FEED_URL?.trim();
+  return configured === undefined || configured.length === 0 ? PORTABLE_UPDATE_FEED_URL : configured;
+}
 
 export type WindowsDistribution = 'installer' | 'portable';
 export type UpdaterDistribution = WindowsDistribution | 'macos' | 'linux-appimage' | 'unsupported';
@@ -86,12 +99,13 @@ export function currentPortableExecutablePath(
 export function configureUpdaterForDistribution(
   updater: AutoUpdaterFeedAdapter,
   distribution: WindowsDistribution,
+  environment: NodeJS.ProcessEnv = process.env,
 ): void {
   if (distribution !== 'portable') return;
   updater.disableDifferentialDownload = true;
   updater.setFeedURL({
     provider: 'generic',
-    url: PORTABLE_UPDATE_FEED_URL,
+    url: portableUpdateFeedUrl(environment),
     channel: PORTABLE_UPDATE_CHANNEL,
     useMultipleRangeRequest: false,
   });

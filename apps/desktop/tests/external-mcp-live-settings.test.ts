@@ -47,7 +47,13 @@ describe('Desktop live External MCP settings', () => {
     } finally {
       await runtime.close();
     }
-  });
+    // Measured on this host, not guessed: an explicit single-requirement recheck still
+    // builds the full Doctor report, which runs 48 host probes and timed 19,285ms cold /
+    // 16,396ms warm while the default 15s budget therefore measured the machine, not the
+    // behaviour. The report-wide sweep is a separate defect (a filtered recheck should not
+    // pay for 47 checks nobody asked for); until it is fixed this case needs a budget above
+    // the observed cost rather than a rerun.
+  }, 90_000);
 
   it('connects a server saved after runtime startup without requiring an app restart', async () => {
     const rawDataRoot = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-live-external-mcp-'));

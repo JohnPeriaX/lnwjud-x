@@ -353,6 +353,35 @@
         "packages/mcp-server/src/upgrade-runtime-media-runtime.test.ts",
         "tests/release/upstream-divergence.test.ts"
       ]
+    },
+    {
+      "id": "fork-owned-release-channel-and-provenance-source",
+      "summary": "Upstream owns apps/desktop/electron-builder.yml, apps/desktop/src/main/portable-update.ts and apps/desktop/scripts/write-release-evidence.mjs, and in all three it names engasnm111/lnwjud: the GitHub publish block, the portable updater's generic feed URL, and the provenance source repository. Accepting the upstream side during a sync points this fork's installed builds at a release channel whose artifacts do not contain fork-only packaged runtime bundles (resources/media-runtime FFmpeg is asserted at pack time only in this fork), so an auto-update would silently remove fork behavior, and provenance would record a commit that does not exist in the named repository. The fork keeps the channel on the building repository with an explicit LNWJUD_UPDATE_FEED_URL operator override, and derives provenance from the checkout's origin remote with upstream as the fallback. Attribution fields (homepage, repository, maintainer) intentionally still credit upstream and are asserted by tests/packaging/desktop-packaging.test.ts.",
+      "markers": [
+        { "file": "apps/desktop/electron-builder.yml", "contains": "owner: JohnPeriaX" },
+        { "file": "apps/desktop/electron-builder.yml", "contains": "repo: lnwjud-x" },
+        { "file": "apps/desktop/src/main/portable-update.ts", "contains": "https://github.com/JohnPeriaX/lnwjud-x/releases/latest/download/" },
+        { "file": "apps/desktop/src/main/portable-update.ts", "contains": "export function portableUpdateFeedUrl" },
+        { "file": "apps/desktop/scripts/write-release-evidence.mjs", "contains": "function provenanceRepositoryUrl" }
+      ],
+      "proofTests": [
+        "apps/desktop/tests/portable-update.test.ts",
+        "tests/packaging/desktop-packaging.test.ts",
+        "tests/release/upstream-divergence.test.ts"
+      ]
+    },
+    {
+      "id": "wall-clock-stable-crash-dump-and-recheck-budgets",
+      "summary": "Upstream owns both desktop tests. native-crash-diagnostics.test.ts hard-codes dump mtimes around a fixed September date and calls readNativeCrashDumpMetadata without its injectable now, so the age filter silently drops every dump exactly 30 days after that date and the retained count asserts 0 instead of 20 - a fixture that expires on the calendar, not on behavior. external-mcp-live-settings.test.ts asserts one Doctor check from a filtered recheck, but an explicit single-requirement recheck still builds the full Doctor report (48 host probes), measured on this workstation at 19,285ms cold and 16,396ms warm, so vitest's default 15s budget measures machine speed instead of the code. Accepting upstream's side restores a date-bomb that fails the release gate 30 days after any upstream edit and a timing-dependent test that fails on loaded or slower hosts.",
+      "markers": [
+        { "file": "apps/desktop/tests/native-crash-diagnostics.test.ts", "contains": "readNativeCrashDumpMetadata(root, now)" },
+        { "file": "apps/desktop/tests/external-mcp-live-settings.test.ts", "contains": "Measured on this host, not guessed" }
+      ],
+      "proofTests": [
+        "apps/desktop/tests/native-crash-diagnostics.test.ts",
+        "apps/desktop/tests/external-mcp-live-settings.test.ts",
+        "tests/release/upstream-divergence.test.ts"
+      ]
     }
   ]
 }

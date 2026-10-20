@@ -16,8 +16,11 @@ files:
   - package.json
 publish:
   provider: github
-  owner: engasnm111
-  repo: lnwjud
+  # The update channel is the repository that builds this artifact. Upstream releases
+  # do not contain this fork's packaged runtime bundles, so pointing here would let an
+  # update silently replace fork-only behavior.
+  owner: JohnPeriaX
+  repo: lnwjud-x
   releaseType: release
 afterPack: scripts/capture-packaged-runtime-evidence.mjs
 afterSign: scripts/capture-packaged-runtime-evidence.mjs

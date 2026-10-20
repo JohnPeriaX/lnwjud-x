@@ -169,6 +169,12 @@ describe('cross-platform desktop packaging', () => {
     // breaking the lnwjud executable expected by the launcher and evidence.
     expect(config).toMatch(/linux:\r?\n\s+executableName: lnwjud(?:\r?\n|$)/);
     expect(config).toContain('maintainer: Adisorn <engasnm111@users.noreply.github.com>');
+    // The GitHub publish channel is the repository that builds the artifact. Upstream
+    // releases carry none of this fork's packaged runtime bundles, so restoring the
+    // upstream owner/repo pair would let an auto-update remove fork-only behavior.
+    expect(config).toMatch(/owner: JohnPeriaX/);
+    expect(config).toMatch(/repo: lnwjud-x/);
+    expect(config).not.toMatch(/owner: engasnm111/);
     expect(config).toContain('artifactName: lnwjud-${version}-${env.LNWJUD_RUNTIME_ARCH}.${ext}');
     expect(config).toContain('target: dmg');
     expect(config).toContain('target: zip');
