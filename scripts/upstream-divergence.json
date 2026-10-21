@@ -341,16 +341,20 @@
     },
     {
       "id": "bundled-media-runtime-before-path-lookup",
-      "summary": "Upstream resolves FFmpeg/ffprobe for Windows screen_record with Get-Command (PATH only) and the mcp-server media seam falls back to a bare executable name, so a freshly imaged machine reports 'ffmpeg is not installed; install ffmpeg' even though every Windows installer in this fork ships resources/media-runtime/ffmpeg.exe (the afterPack evidence hook asserts it). The fork instead resolves the bundled runtime first - from the bridge script's own resources directory in PowerShell, and from process.resourcesPath or the directory beside process.execPath in TypeScript - and reports the searched bundled locations when it truly is missing. Accepting the upstream side of windows-capability-bridge.ps1 or upgrade-runtime.ts during a sync silently restores the PATH-only lookup and re-breaks screen_record and video media_read on clean machines, which local tests on a developer workstation with ffmpeg installed cannot catch.",
+      "summary": "Upstream resolves FFmpeg/ffprobe for Windows screen_record with Get-Command (PATH only) and the mcp-server media seam falls back to a bare executable name, so a freshly imaged machine reports 'ffmpeg is not installed; install ffmpeg' even though every Windows installer in this fork ships resources/media-runtime/ffmpeg.exe (the afterPack evidence hook asserts it). The fork instead builds an ordered candidate plan per executable: the configured LNWJUD_FFMPEG_PATH/LNWJUD_FFPROBE_PATH (either an executable or a folder containing it, with surrounding quotes and %VAR% normalized), the bundled runtime from the bridge script's own resources directory in PowerShell or process.resourcesPath/process.execPath/module ancestors in TypeScript, and finally PATH. Real execution falls through only when a candidate cannot start at all (ENOENT/EACCES/EPERM); a real ffprobe/ffmpeg exit-code failure is surfaced instead of being hidden by another binary, the original OS error code is preserved, and successful media responses report ffprobe_source/ffprobe_path plus ffmpeg_source/ffmpeg_path. A genuine miss reports every searched location. Accepting the upstream side of windows-capability-bridge.ps1 or upgrade-runtime.ts during a sync silently restores the PATH-only lookup and re-breaks screen_record and video media_read on clean machines, which local tests on a developer workstation with ffmpeg installed cannot catch.",
       "markers": [
         { "file": "packages/capabilities/src/windows-capability-bridge.ps1", "contains": "function Resolve-MediaExecutable" },
+        { "file": "packages/capabilities/src/windows-capability-bridge.ps1", "contains": "function Get-MediaExecutableCandidates" },
         { "file": "packages/capabilities/src/windows-capability-bridge.ps1", "contains": "ffmpeg_source = $media.source" },
         { "file": "packages/mcp-server/src/upgrade-runtime.ts", "contains": "export function resolveBundledMediaExecutable" },
+        { "file": "packages/mcp-server/src/upgrade-runtime.ts", "contains": "export function resolveMediaExecutableCandidates" },
+        { "file": "packages/mcp-server/src/upgrade-runtime.ts", "contains": "export async function runMediaExecutableWithFallback" },
         { "file": "packages/mcp-server/src/upgrade-runtime.ts", "contains": "describeMissingMediaExecutable" }
       ],
       "proofTests": [
         "packages/capabilities/src/windows-bridge-media-runtime.test.ts",
         "packages/mcp-server/src/upgrade-runtime-media-runtime.test.ts",
+        "packages/mcp-server/src/upgrade-runtime-media-video.test.ts",
         "tests/release/upstream-divergence.test.ts"
       ]
     },

@@ -153,4 +153,65 @@ describe('windows capability bridge bundled FFmpeg', () => {
       delete process.env.LNWJUD_FFMPEG_PATH;
     }
   }, 30_000);
+
+  it.skipIf(!isWindows)('accepts a folder in LNWJUD_FFMPEG_PATH', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-bridge-folder-'));
+    temporaryRoots.push(root);
+    const resources = path.join(root, 'resources');
+    const mediaRuntime = path.join(resources, 'media-runtime');
+    await mkdir(mediaRuntime, { recursive: true });
+    await copyFile(path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe'), path.join(mediaRuntime, 'ffmpeg.exe'));
+    const tools = path.join(root, 'tools');
+    await mkdir(tools, { recursive: true });
+    const override = path.join(tools, 'ffmpeg.exe');
+    await copyFile(path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'where.exe'), override);
+    process.env.LNWJUD_FFMPEG_PATH = tools;
+    try {
+      const response = await runBridgeScript(resources, {
+        capability: 'screen_record',
+        input: { action: 'start', output_path: path.join(root, 'capture.mp4') },
+      }, root);
+      expect(response.ok).toBe(true);
+      expect(response.value?.ffmpeg_source).toBe('configured');
+      expect(response.value?.ffmpeg_path).toBe(override);
+      if (typeof response.value?.pid === 'number') {
+        try {
+          process.kill(response.value.pid);
+        } catch {
+          // already exited
+        }
+      }
+    } finally {
+      delete process.env.LNWJUD_FFMPEG_PATH;
+    }
+  }, 30_000);
+
+  it.skipIf(!isWindows)('falls back to the bundled FFmpeg when the configured path cannot start', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'lnwjud-bridge-fallback-'));
+    temporaryRoots.push(root);
+    const resources = path.join(root, 'resources');
+    const mediaRuntime = path.join(resources, 'media-runtime');
+    await mkdir(mediaRuntime, { recursive: true });
+    const bundled = path.join(mediaRuntime, 'ffmpeg.exe');
+    await copyFile(path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe'), bundled);
+    process.env.LNWJUD_FFMPEG_PATH = path.join(root, 'missing-tools');
+    try {
+      const response = await runBridgeScript(resources, {
+        capability: 'screen_record',
+        input: { action: 'start', output_path: path.join(root, 'capture.mp4') },
+      }, root);
+      expect(response.ok).toBe(true);
+      expect(response.value?.ffmpeg_source).toBe('bundled');
+      expect(response.value?.ffmpeg_path).toBe(bundled);
+      if (typeof response.value?.pid === 'number') {
+        try {
+          process.kill(response.value.pid);
+        } catch {
+          // already exited
+        }
+      }
+    } finally {
+      delete process.env.LNWJUD_FFMPEG_PATH;
+    }
+  }, 30_000);
 });

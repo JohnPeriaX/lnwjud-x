@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { open, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   appError,
   err,
@@ -2630,8 +2631,13 @@ export class UpgradeRuntimeService {
     const metadata = await probeVideo(targetPath, signal, maxBytes);
     if (!metadata.ok) return metadata;
     const duration = typeof metadata.value.durationSeconds === 'number' ? metadata.value.durationSeconds : 0;
+    const probeRuntime = metadata.value.runtime.ffprobe;
+    const probeEvidence = {
+      ffprobe_source: probeRuntime.source,
+      ffprobe_path: probeRuntime.executable,
+    };
     if (action === 'inspect') {
-      return ok({ tool: 'media_read', status: 'ready', available: true, ready: true, executed: true, mediaType: 'video', path: requestedPath, metadata: metadata.value });
+      return ok({ tool: 'media_read', status: 'ready', available: true, ready: true, executed: true, mediaType: 'video', path: requestedPath, metadata: metadata.value, ...probeEvidence });
     }
     if (action !== 'frame' && action !== 'sample') {
       return err(appError('INVALID_INPUT', 'Video media supports action=inspect, frame, or sample', false));
@@ -2646,10 +2652,12 @@ export class UpgradeRuntimeService {
         return Math.max(0, Math.min(duration - 0.05, duration * ((index + 1) / (requestedCount + 1))));
       });
     const images: Array<Record<string, unknown>> = [];
+    let frameRuntime: MediaExecutableUse | undefined;
     for (const timestamp of timestamps) {
       if (signal?.aborted) return err(appError('PROCESS_TIMEOUT', 'Video frame sampling was cancelled', true));
       const frame = await extractVideoFrame(targetPath, timestamp, maxBytes, signal);
       if (!frame.ok) return frame;
+      frameRuntime ??= frame.value.runtime.ffmpeg;
       images.push({
         encoding: 'base64',
         content: frame.value.data,
@@ -2661,6 +2669,8 @@ export class UpgradeRuntimeService {
     return ok({
       tool: 'media_read', status: 'ready', available: true, ready: true, executed: true,
       mediaType: 'video', path: requestedPath, metadata: metadata.value,
+      ffprobe_source: probeEvidence.ffprobe_source, ffprobe_path: probeEvidence.ffprobe_path,
+      ...(frameRuntime === undefined ? {} : { ffmpeg_source: frameRuntime.source, ffmpeg_path: frameRuntime.executable }),
       frameCount: images.length, images,
     });
   }
@@ -2916,12 +2926,161 @@ interface VideoProbe {
   readonly audioCodec?: string;
   readonly format?: string;
   readonly sizeBytes?: number;
+  readonly runtime: {
+    readonly ffprobe: MediaExecutableUse;
+  };
 }
 
-interface BundledMediaExecutable {
+type MediaExecutableSource = 'configured' | 'bundled' | 'path';
+
+interface MediaExecutableUse {
   readonly executable: string;
-  readonly source: 'configured' | 'bundled' | 'path';
+  readonly source: MediaExecutableSource;
+}
+
+type MediaExecutableCandidate = MediaExecutableUse;
+
+interface BundledMediaExecutable extends MediaExecutableUse {
   readonly checked: readonly string[];
+}
+
+interface MediaExecutablePlan {
+  readonly candidates: readonly MediaExecutableCandidate[];
+  readonly checked: readonly string[];
+}
+
+interface MediaExecutableRun<T> {
+  readonly result: Result<T>;
+  readonly selection?: MediaExecutableUse;
+  readonly attempts: readonly string[];
+}
+
+interface VideoFrame {
+  readonly data: string;
+  readonly bytes: number;
+  readonly runtime: {
+    readonly ffmpeg: MediaExecutableUse;
+  };
+}
+
+function mediaExecutableName(kind: 'ffmpeg' | 'ffprobe', platform: NodeJS.Platform = process.platform): string {
+  return platform === 'win32' ? `${kind}.exe` : kind;
+}
+
+function expandMediaEnvironmentVariables(value: string, env: Readonly<Record<string, string | undefined>>): string {
+  if (process.platform !== 'win32') return value;
+  return value.replace(/%([^%]+)%/g, (match, name: string) => env[name] ?? match);
+}
+
+function configuredMediaExecutableCandidates(
+  kind: 'ffmpeg' | 'ffprobe',
+  env: Readonly<Record<string, string | undefined>>,
+): readonly string[] {
+  const raw = (kind === 'ffmpeg' ? env.LNWJUD_FFMPEG_PATH : env.LNWJUD_FFPROBE_PATH)?.trim();
+  if (raw === undefined || raw.length === 0) return [];
+  let value = expandMediaEnvironmentVariables(raw, env).trim();
+  if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) {
+    value = value.slice(1, -1).trim();
+  }
+  if (value.length === 0) return [];
+  const executableName = mediaExecutableName(kind);
+  try {
+    return statSync(value).isDirectory() ? [path.join(value, executableName)] : [value];
+  } catch {
+    // A configured folder that does not exist yet is still worth trying as a
+    // folder; the literal path stays first so a real executable without an
+    // extension keeps working on POSIX hosts.
+    const candidates = [value];
+    if (/[\\/]$/u.test(value) || path.extname(value).length === 0) candidates.push(path.join(value, executableName));
+    return candidates;
+  }
+}
+
+function bundledMediaExecutableCandidates(
+  kind: 'ffmpeg' | 'ffprobe',
+  overrides: {
+    readonly resourcesPath?: string;
+    readonly execPath?: string;
+    readonly cwd?: string;
+  },
+): readonly string[] {
+  const executableName = mediaExecutableName(kind);
+  const resourcesPath = overrides.resourcesPath ?? (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const execPath = overrides.execPath ?? process.execPath;
+  const cwd = overrides.cwd ?? process.cwd();
+  const roots: string[] = [];
+  const addRoot = (root: string | undefined): void => {
+    if (root !== undefined && root.trim().length > 0) roots.push(root);
+  };
+  if (resourcesPath !== undefined) addRoot(path.join(resourcesPath, 'media-runtime'));
+  addRoot(path.join(path.dirname(execPath), 'resources', 'media-runtime'));
+  addRoot(path.join(path.dirname(execPath), 'media-runtime'));
+  addRoot(path.join(path.dirname(execPath), '..', 'resources', 'media-runtime'));
+  addRoot(path.join(cwd, 'apps', 'desktop', 'build', 'media-runtime'));
+  addRoot(path.join(cwd, 'build', 'media-runtime'));
+  try {
+    // Walk up from this module as well. In a packaged Electron app the module
+    // lives inside resources/app.asar/node_modules/...; in a source checkout it
+    // lives under packages/mcp-server/src. Both layouts reach media-runtime from
+    // one of the ancestors, so a missing process.resourcesPath is not fatal.
+    let current = path.dirname(fileURLToPath(import.meta.url));
+    for (let depth = 0; depth < 8; depth += 1) {
+      addRoot(path.join(current, 'media-runtime'));
+      addRoot(path.join(current, 'resources', 'media-runtime'));
+      addRoot(path.join(current, 'apps', 'desktop', 'build', 'media-runtime'));
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+  } catch {
+    // Some bundled module formats do not expose import.meta.url; the explicit
+    // resourcesPath, execPath, and cwd candidates above still cover installs.
+  }
+  return roots.map((root) => path.join(root, executableName));
+}
+
+function mediaPathKey(value: string, platform: NodeJS.Platform): string {
+  const key = path.resolve(value);
+  return platform === 'win32' ? key.toLowerCase() : key;
+}
+
+function existsSyncSafe(candidate: string): boolean {
+  try {
+    return existsSync(candidate);
+  } catch {
+    return false;
+  }
+}
+
+function resolveMediaExecutablePlan(
+  kind: 'ffmpeg' | 'ffprobe',
+  overrides: {
+    readonly env?: Readonly<Record<string, string | undefined>>;
+    readonly resourcesPath?: string;
+    readonly execPath?: string;
+    readonly cwd?: string;
+  } = {},
+): MediaExecutablePlan {
+  const env = overrides.env ?? process.env;
+  const candidates: MediaExecutableCandidate[] = [];
+  const checked: string[] = [];
+  const seen = new Set<string>();
+  const add = (executable: string, source: MediaExecutableSource): void => {
+    const key = mediaPathKey(executable, process.platform);
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push({ executable, source });
+  };
+  for (const configured of configuredMediaExecutableCandidates(kind, env)) {
+    checked.push(configured);
+    add(configured, 'configured');
+  }
+  for (const bundled of bundledMediaExecutableCandidates(kind, overrides)) {
+    checked.push(bundled);
+    if (existsSyncSafe(bundled)) add(bundled, 'bundled');
+  }
+  add(mediaExecutableName(kind), 'path');
+  return { candidates, checked };
 }
 
 /**
@@ -2930,6 +3089,12 @@ interface BundledMediaExecutable {
  * install tree is also reachable from `process.execPath`, so a freshly imaged machine with a
  * minimal PATH still gets the bundled runtime instead of being told to install FFmpeg.
  * PATH remains the last resort and is reported honestly as such.
+ *
+ * A configured value may name either the executable or a folder containing it. The
+ * single-result form keeps returning the configured value first, preserving the explicit
+ * override contract; callers that actually run the executable use
+ * {@link resolveMediaExecutableCandidates} so a blocked or malformed candidate can fall
+ * through to the bundle or PATH.
  */
 export function resolveBundledMediaExecutable(
   kind: 'ffmpeg' | 'ffprobe',
@@ -2940,48 +3105,74 @@ export function resolveBundledMediaExecutable(
     readonly cwd?: string;
   } = {},
 ): BundledMediaExecutable {
-  const env = overrides.env ?? process.env;
-  const executableName = process.platform === 'win32' ? `${kind}.exe` : kind;
-  const explicitPath = (kind === 'ffmpeg' ? env.LNWJUD_FFMPEG_PATH : env.LNWJUD_FFPROBE_PATH)?.trim();
-  if (explicitPath) return { executable: explicitPath, source: 'configured', checked: [] };
-
-  const resourcesPath = overrides.resourcesPath ?? (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
-  const execPath = overrides.execPath ?? process.execPath;
-  const cwd = overrides.cwd ?? process.cwd();
-  const candidates = [
-    resourcesPath !== undefined ? path.join(resourcesPath, 'media-runtime', executableName) : undefined,
-    path.join(path.dirname(execPath), 'resources', 'media-runtime', executableName),
-    path.join(cwd, 'apps', 'desktop', 'build', 'media-runtime', executableName),
-    path.join(cwd, 'build', 'media-runtime', executableName),
-  ].filter((candidate): candidate is string => typeof candidate === 'string');
-  const bundled = candidates.find((candidate) => {
-    try {
-      return existsSync(candidate);
-    } catch {
-      return false;
-    }
-  });
-  if (bundled !== undefined) return { executable: bundled, source: 'bundled', checked: candidates };
-  return { executable: executableName, source: 'path', checked: candidates };
+  const plan = resolveMediaExecutablePlan(kind, overrides);
+  const selected = plan.candidates.find((candidate) => candidate.source === 'configured')
+    ?? plan.candidates.find((candidate) => candidate.source === 'bundled')
+    ?? plan.candidates.find((candidate) => candidate.source === 'path')
+    ?? { executable: mediaExecutableName(kind), source: 'path' as const };
+  return { executable: selected.executable, source: selected.source, checked: plan.checked };
 }
 
-function describeMissingMediaExecutable(kind: 'ffmpeg' | 'ffprobe', checked: readonly string[]): string {
+export function resolveMediaExecutableCandidates(
+  kind: 'ffmpeg' | 'ffprobe',
+  overrides: {
+    readonly env?: Readonly<Record<string, string | undefined>>;
+    readonly resourcesPath?: string;
+    readonly execPath?: string;
+    readonly cwd?: string;
+  } = {},
+): readonly MediaExecutableCandidate[] {
+  return resolveMediaExecutablePlan(kind, overrides).candidates;
+}
+
+function describeMissingMediaExecutable(kind: 'ffmpeg' | 'ffprobe', checked: readonly string[], attempts: readonly string[] = []): string {
   const locations = checked.length > 0 ? checked.join(', ') : 'the packaged resources directory';
-  return `${kind} was not found in the lnwjud bundled media-runtime (${locations}); restore the bundled folder or set LNWJUD_${kind.toUpperCase()}_PATH. Installing a separate copy is optional.`;
+  const attempted = attempts.length > 0 ? ` Tried: ${attempts.join('; ')}.` : '';
+  return `${kind} could not be started from the lnwjud bundled media-runtime or PATH (${locations}).${attempted} Restore the bundled folder or set LNWJUD_${kind.toUpperCase()}_PATH to the ${mediaExecutableName(kind)} file or its folder. Antivirus or AppLocker may also be blocking the bundled executable; a separate FFmpeg install is optional.`;
+}
+
+export async function runMediaExecutableWithFallback<T>(
+  kind: 'ffmpeg' | 'ffprobe',
+  run: (executable: string) => Promise<Result<T>>,
+  overrides: {
+    readonly env?: Readonly<Record<string, string | undefined>>;
+    readonly resourcesPath?: string;
+    readonly execPath?: string;
+    readonly cwd?: string;
+  } = {},
+): Promise<MediaExecutableRun<T>> {
+  const plan = resolveMediaExecutablePlan(kind, overrides);
+  const attempts: string[] = [];
+  for (const candidate of plan.candidates) {
+    const result = await run(candidate.executable);
+    if (result.ok) {
+      return {
+        result,
+        selection: { executable: candidate.executable, source: candidate.source },
+        attempts,
+      };
+    }
+    // A real ffprobe/ffmpeg exit-code failure means the executable ran; trying
+    // another binary would hide the media defect. Only a process that could not
+    // be started at all (missing, blocked, wrong architecture) falls through.
+    if (result.error.code !== 'PROCESS_NOT_FOUND') return { result, attempts };
+    attempts.push(`${candidate.executable} (${result.error.message})`);
+  }
+  return {
+    result: err(appError('EXECUTABLE_NOT_FOUND', describeMissingMediaExecutable(kind, plan.checked, attempts), true)),
+    attempts,
+  };
 }
 
 async function probeVideo(filePath: string, signal: AbortSignal | undefined, maxBytes: number): Promise<Result<VideoProbe>> {
-  const probe = resolveBundledMediaExecutable('ffprobe');
-  const result = await runBoundedProcess(probe.executable, [
+  const execution = await runMediaExecutableWithFallback('ffprobe', (executable) => runBoundedProcess(executable, [
     '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', filePath,
-  ], signal, 30_000, Math.min(maxBytes, 2 * 1024 * 1024), process.platform);
-  if (!result.ok) {
-    return result.error.code === 'PROCESS_NOT_FOUND'
-      ? err(appError('EXECUTABLE_NOT_FOUND', describeMissingMediaExecutable('ffprobe', probe.checked), true))
-      : result;
-  }
+  ], signal, 30_000, Math.min(maxBytes, 2 * 1024 * 1024), process.platform));
+  if (!execution.result.ok) return execution.result;
+  const selection = execution.selection;
+  if (selection === undefined) return err(appError('INTERNAL_ERROR', 'ffprobe executable selection was not recorded', true));
   try {
-    const parsed: unknown = JSON.parse(result.value.stdout);
+    const parsed: unknown = JSON.parse(execution.result.value.stdout);
     if (!isRecord(parsed)) throw new Error('invalid ffprobe response');
     const streams = Array.isArray(parsed.streams) ? parsed.streams.filter(isRecord) : [];
     const video = streams.find((stream) => stream.codec_type === 'video');
@@ -3001,24 +3192,31 @@ async function probeVideo(filePath: string, signal: AbortSignal | undefined, max
       ...(typeof audio?.codec_name === 'string' ? { audioCodec: audio.codec_name } : {}),
       ...(typeof format.format_name === 'string' ? { format: format.format_name } : {}),
       ...(typeof format.size === 'string' && Number.isFinite(Number(format.size)) ? { sizeBytes: Number(format.size) } : {}),
+      runtime: { ffprobe: selection },
     });
   } catch {
-    return err(appError('INTERNAL_ERROR', 'ffprobe returned invalid video metadata', true));
+    return err(appError('INTERNAL_ERROR', `ffprobe returned invalid video metadata (${selection.executable})`, true));
   }
 }
 
-async function extractVideoFrame(filePath: string, timestampSeconds: number, maxBytes: number, signal?: AbortSignal): Promise<Result<{ readonly data: string; readonly bytes: number }>> {
-  const frame = resolveBundledMediaExecutable('ffmpeg');
-  const result = await runBoundedBinaryProcess(frame.executable, [
+async function extractVideoFrame(filePath: string, timestampSeconds: number, maxBytes: number, signal?: AbortSignal): Promise<Result<VideoFrame>> {
+  const execution = await runMediaExecutableWithFallback('ffmpeg', (executable) => runBoundedBinaryProcess(executable, [
     '-hide_banner', '-loglevel', 'error', '-ss', timestampSeconds.toFixed(3), '-i', filePath,
     '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'mjpeg', '-q:v', '5', 'pipe:1',
-  ], signal, 60_000, maxBytes, process.platform);
-  if (!result.ok) {
-    return result.error.code === 'PROCESS_NOT_FOUND'
-      ? err(appError('EXECUTABLE_NOT_FOUND', describeMissingMediaExecutable('ffmpeg', frame.checked), true))
-      : result;
+  ], signal, 60_000, maxBytes, process.platform));
+  if (!execution.result.ok) return execution.result;
+  const selection = execution.selection;
+  if (selection === undefined) return err(appError('INTERNAL_ERROR', 'ffmpeg executable selection was not recorded', true));
+  return ok({ data: execution.result.value.toString('base64'), bytes: execution.result.value.byteLength, runtime: { ffmpeg: selection } });
+}
+
+
+function processStartFailureCode(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = (error as { readonly code?: unknown }).code;
+    if (typeof code === 'string' && code.length > 0) return code;
   }
-  return ok({ data: result.value.toString('base64'), bytes: result.value.byteLength });
+  return error instanceof Error && error.message.length > 0 ? error.message : 'unknown error';
 }
 
 function runBoundedBinaryProcess(
@@ -3037,8 +3235,8 @@ function runBoundedBinaryProcess(
     let child: ReturnType<typeof spawn>;
     try {
       child = spawn(executable, [...args], { windowsHide: true, shell: false, detached: platform !== 'win32', env: sanitizedDiagnosticEnvironment() });
-    } catch {
-      resolve(err(appError('PROCESS_NOT_FOUND', `${executable} could not be started`, true)));
+    } catch (error) {
+      resolve(err(appError('PROCESS_NOT_FOUND', `${executable} could not be started (${processStartFailureCode(error)})`, true)));
       return;
     }
     const chunks: Buffer[] = [];
@@ -3070,7 +3268,7 @@ function runBoundedBinaryProcess(
       else void terminate(`${executable} exceeded the ${maxBytes} byte output limit`);
     });
     child.stderr?.on('data', () => undefined);
-    child.once('error', () => finish(err(appError('PROCESS_NOT_FOUND', `${executable} is unavailable`, true))));
+    child.once('error', (error) => finish(err(appError('PROCESS_NOT_FOUND', `${executable} is unavailable (${processStartFailureCode(error)})`, true))));
     child.once('close', (code) => {
       if (settled) return;
       if ((code ?? -1) !== 0) {
@@ -3113,8 +3311,8 @@ function runBoundedProcess(
         detached: platform !== 'win32',
         env: environment,
       });
-    } catch {
-      resolve(err(appError('PROCESS_NOT_FOUND', `${executable} could not be started`, true)));
+    } catch (error) {
+      resolve(err(appError('PROCESS_NOT_FOUND', `${executable} could not be started (${processStartFailureCode(error)})`, true)));
       return;
     }
     const finish = (result: Result<{ readonly exitCode: number; readonly stdout: string; readonly stderr: string }>): void => {
@@ -3154,7 +3352,7 @@ function runBoundedProcess(
     signal?.addEventListener('abort', onAbort, { once: true });
     child.stdout?.on('data', (chunk: Buffer) => { stdout = append(stdout, chunk); });
     child.stderr?.on('data', (chunk: Buffer) => { stderr = append(stderr, chunk); });
-    child.once('error', () => finish(err(appError('PROCESS_NOT_FOUND', `${executable} is unavailable`, true))));
+    child.once('error', (error) => finish(err(appError('PROCESS_NOT_FOUND', `${executable} is unavailable (${processStartFailureCode(error)})`, true))));
     child.once('close', (code) => {
       if (terminationRequested) {
         // Wait for the identity-bound terminator above. A root close event by

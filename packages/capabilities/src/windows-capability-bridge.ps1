@@ -778,31 +778,68 @@ function Invoke-AudioAction {
 # the reliable pointer to the bundled runtime; PATH is only a last resort. Without this order
 # a fresh machine (or a service account with a stripped PATH) was told to install FFmpeg even
 # though the product already shipped it.
-function Resolve-MediaExecutable {
+function Add-MediaExecutableCandidate {
+  param(
+    [System.Collections.Generic.List[object]]$Candidates,
+    [System.Collections.Generic.List[string]]$Checked,
+    [string]$Path,
+    [string]$Source
+  )
+  if ([string]::IsNullOrWhiteSpace($Path)) { return }
+  if (-not $Checked.Contains($Path)) { [void]$Checked.Add($Path) }
+  foreach ($existing in $Candidates) {
+    if ([string]::Equals([string]$existing.path, $Path, [System.StringComparison]::OrdinalIgnoreCase)) { return }
+  }
+  [void]$Candidates.Add([pscustomobject]@{ path = $Path; source = $Source })
+}
+
+function Get-MediaExecutableCandidates {
   param([string]$Name)
   $fileName = "$Name.exe"
   $environmentName = if ($Name -eq 'ffprobe') { 'LNWJUD_FFPROBE_PATH' } else { 'LNWJUD_FFMPEG_PATH' }
+  $candidates = New-Object System.Collections.Generic.List[object]
+  $checked = New-Object System.Collections.Generic.List[string]
   $configured = [Environment]::GetEnvironmentVariable($environmentName)
   if (-not [string]::IsNullOrWhiteSpace($configured)) {
-    return [pscustomobject]@{ path = [Environment]::ExpandEnvironmentVariables($configured.Trim()); source = 'configured'; checked = @() }
+    $configuredPath = [Environment]::ExpandEnvironmentVariables($configured.Trim().Trim('"'))
+    if (Test-Path -LiteralPath $configuredPath -PathType Container) {
+      Add-MediaExecutableCandidate $candidates $checked (Join-Path $configuredPath $fileName) 'configured'
+    } elseif (Test-Path -LiteralPath $configuredPath -PathType Leaf) {
+      Add-MediaExecutableCandidate $candidates $checked $configuredPath 'configured'
+    } else {
+      Add-MediaExecutableCandidate $candidates $checked $configuredPath 'configured'
+      if ($configuredPath.EndsWith('\') -or $configuredPath.EndsWith('/') -or [IO.Path]::GetExtension($configuredPath).Length -eq 0) {
+        Add-MediaExecutableCandidate $candidates $checked (Join-Path $configuredPath $fileName) 'configured'
+      }
+    }
   }
-  $checked = New-Object System.Collections.Generic.List[string]
   $roots = @($PSScriptRoot, (Join-Path $PSScriptRoot '..\..\..'))
   foreach ($root in $roots) {
     if ([string]::IsNullOrWhiteSpace($root)) { continue }
     foreach ($layout in @('media-runtime', 'resources\media-runtime', 'apps\desktop\build\media-runtime')) {
       $candidate = [IO.Path]::GetFullPath((Join-Path (Join-Path $root $layout) $fileName))
-      if (-not $checked.Contains($candidate)) { $checked.Add($candidate) }
       if (Test-Path -LiteralPath $candidate -PathType Leaf) {
-        return [pscustomobject]@{ path = $candidate; source = 'bundled'; checked = $checked.ToArray() }
+        Add-MediaExecutableCandidate $candidates $checked $candidate 'bundled'
+      } elseif (-not $checked.Contains($candidate)) {
+        [void]$checked.Add($candidate)
       }
     }
   }
-  $onPath = (Get-Command $Name -ErrorAction SilentlyContinue).Source
-  if ($null -ne $onPath) {
-    return [pscustomobject]@{ path = $onPath; source = 'path'; checked = $checked.ToArray() }
+  $onPath = (Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+  if (-not [string]::IsNullOrWhiteSpace($onPath)) {
+    Add-MediaExecutableCandidate $candidates $checked $onPath 'path'
   }
-  return [pscustomobject]@{ path = $null; source = $null; checked = $checked.ToArray() }
+  return [pscustomobject]@{ candidates = $candidates.ToArray(); checked = $checked.ToArray() }
+}
+
+function Resolve-MediaExecutable {
+  param([string]$Name)
+  $plan = Get-MediaExecutableCandidates $Name
+  $first = $plan.candidates | Select-Object -First 1
+  if ($null -eq $first) {
+    return [pscustomobject]@{ path = $null; source = $null; checked = $plan.checked }
+  }
+  return [pscustomobject]@{ path = $first.path; source = $first.source; checked = $plan.checked }
 }
 
 function Invoke-ScreenRecordAction {
@@ -810,11 +847,7 @@ function Invoke-ScreenRecordAction {
   $statePath = Join-Path $env:TEMP 'lnwjud-screen-record-state.json'
   switch ($Action) {
     'start' {
-      $media = Resolve-MediaExecutable 'ffmpeg'
-      if ([string]::IsNullOrWhiteSpace($media.path)) {
-        throw ('ffmpeg.exe was not found beside the lnwjud install (expected resources\media-runtime\ffmpeg.exe) and is not on PATH; set LNWJUD_FFMPEG_PATH or restore the bundled media-runtime folder. Checked: ' + ($media.checked -join '; '))
-      }
-      $ffmpeg = $media.path
+      $plan = Get-MediaExecutableCandidates 'ffmpeg'
       $out = [string](Get-Field $Parameters 'output_path')
       if ($out.Length -eq 0) { throw 'output_path is required' }
       $parent = Split-Path -Parent $out
@@ -826,7 +859,25 @@ function Invoke-ScreenRecordAction {
       $fps = Get-Field $Parameters 'fps'; if ($null -eq $fps) { $fps = 10 }
       if ([int]$w -lt 1 -or [int]$h -lt 1 -or [int]$w -gt 7680 -or [int]$h -gt 4320) { throw 'Capture size is invalid' }
       if ([int]$fps -lt 1 -or [int]$fps -gt 60) { throw 'fps must be from 1 to 60' }
-      $process = Start-Process -FilePath $ffmpeg -ArgumentList @('-y', '-loglevel', 'error', '-f', 'gdigrab', '-framerate', [string][int]$fps, '-offset_x', [string][int]$x, '-offset_y', [string][int]$y, '-video_size', ([string][int]$w + 'x' + [string][int]$h), '-i', 'desktop', '-t', '3600', '-pix_fmt', 'yuv420p', $out) -WindowStyle Hidden -PassThru
+      $started = $null
+      $attempts = New-Object System.Collections.Generic.List[string]
+      foreach ($candidate in $plan.candidates) {
+        try {
+          $process = Start-Process -FilePath $candidate.path -ArgumentList @('-y', '-loglevel', 'error', '-f', 'gdigrab', '-framerate', [string][int]$fps, '-offset_x', [string][int]$x, '-offset_y', [string][int]$y, '-video_size', ([string][int]$w + 'x' + [string][int]$h), '-i', 'desktop', '-t', '3600', '-pix_fmt', 'yuv420p', $out) -WindowStyle Hidden -PassThru -ErrorAction Stop
+          $started = [pscustomobject]@{ process = $process; path = $candidate.path; source = $candidate.source }
+          break
+        } catch {
+          [void]$attempts.Add(($candidate.path + ': ' + $_.Exception.Message))
+        }
+      }
+      if ($null -eq $started) {
+        $checkedText = if ($plan.checked.Count -gt 0) { $plan.checked -join '; ' } else { 'no candidates' }
+        $attemptText = if ($attempts.Count -gt 0) { ' Attempts: ' + ($attempts -join '; ') + '.' } else { '' }
+        throw ('ffmpeg.exe could not be started from the lnwjud bundled media-runtime or PATH. Checked: ' + $checkedText + '.' + $attemptText + ' Set LNWJUD_FFMPEG_PATH to the executable or its folder, restore the bundled media-runtime folder, or allow the bundled executable in antivirus/AppLocker.')
+      }
+      $media = $started
+      $process = $started.process
+      $ffmpeg = $media.path
       @{ pid = [int]$process.Id; output_path = $out; started_at = (Get-Date).ToString('o') } | ConvertTo-Json -Compress | Set-Content $statePath
       return [ordered]@{ recording = $true; pid = [int]$process.Id; output_path = $out; max_duration_seconds = 3600; ffmpeg_source = $media.source; ffmpeg_path = $ffmpeg }
     }
